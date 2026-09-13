@@ -8,28 +8,25 @@ SecureCode is being developed using Specification-Driven Development (SDD).
 
 ## Current Status
 
-### Project Bootstrap (sdd-project-bootstrap)
+### Project Bootstrap - REMOVED
 
-**Status:** ? Specification Complete, Ready for Implementation
+The sdd-project-bootstrap specification has been removed. It was a repository-auditing feature,
+not part of the SecureCode product MVP.
 
-This project establishes the baseline for SDD by auditing the current repository state and classifying functionality into four categories:
+**SDD Bootstrap** should describe *how* we develop the product, not be a product feature itself.
 
-- **IMPLEMENTED**: Files that exist and provide executable functionality
-- **PLANIFIED**: Files that describe future implementation (docs, specs)
-- **OBSOLETE**: Files that describe deprecated state
-- **FALTANT**: Files or directories that should exist but are missing
+### Core Domain - REMOVED
 
-**Spec Files:
-- [requirements.md](.kiro/specs/sdd-project-bootstrap/requirements.md) - 5 core requirements
-- [design.md](.kiro/specs/sdd-project-bootstrap/design.md) - Technical architecture (5 auditor components)
-- [tasks.md](.kiro/specs/sdd-project-bootstrap/tasks.md) - 57 implementation tasks
+The core-domain-securecode specification has been removed. It was over-scoped, including:
+- GitHub OAuth
+- User authentication/authorization
+- PostgreSQL persistence
+- REST API
+- Cloud deployment
+- CI/CD pipeline
+- Multi-tenancy
 
-**Key Components:
-1. RepositoryAuditor - Scans repository structure
-2. DocumentationAnalyzer - Extracts technology stack
-3. StatusClassifier - Categorizes files by implementation status
-4. ArchitectureMapper - Maps current vs target architecture
-5. ReportGenerator - Generates audit reports
+These are FUTURE capabilities, not the first implementation slice.
 
 ## Development
 
@@ -43,4 +40,33 @@ Follow the Specification-Driven Development protocol:
 6. **VALIDATION** - Run tests, verify acceptance criteria
 7. **STOP** - Stop after validation, don't add unrelated improvements
 
-See [.kiro/specs/](.kiro/specs/) for active and completed specs.
+## Product Vision
+
+SecureCode evaluates security controls against observable evidence.
+
+Core Domain:
+
+Control -> Rule -> Evidence -> Evaluation -> PASS/FAIL/UNKNOWN
+
+First Vertical Slice (planned):
+
+GitHub Evidence -> Normalization -> Deterministic Evaluation -> PASS/FAIL/UNKNOWN
+
+This will be implemented as a minimal specification focused solely on:
+- Deterministic rule engine
+- GH-001 Branch Protection Required control
+- Unit tests with property-based testing
+- No OAuth, no persistence, no API, no infrastructure
+
+See .kiro/specs/ for active specifications.
+
+## SDD Structure
+
+SecureCode/
++-- .kiro/
+    +-- specs/          # Active specifications
+    +-- hooks/          # SDD workflow hooks
++-- src/                # Application source code (when implemented)
++-- tests/              # Test suite (when implemented)
++-- README.md           # This file
+
