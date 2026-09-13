@@ -58,12 +58,12 @@ This will be implemented as a minimal specification focused solely on:
 - Unit tests with property-based testing
 - No OAuth, no persistence, no API, no infrastructure
 
-See .kiro/specs/ for active specifications.
+See docs/specs/ for active specifications.
 
 ## SDD Structure
 
 SecureCode/
-+-- .kiro/
++-- docs/
     +-- specs/          # Active specifications
     +-- hooks/          # SDD workflow hooks
 +-- src/                # Application source code (when implemented)
