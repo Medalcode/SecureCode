@@ -1,0 +1,50 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: securecode_postgres
+    environment:
+      POSTGRES_USER: securecode_user
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: securecode_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U securecode_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - securecode-net
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: securecode_api
+    environment:
+      DATABASE_URL: postgresql://securecode_user:password123@postgres:5432/securecode_dev
+      GITHUB_API_TOKEN: ${GITHUB_API_TOKEN}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      APP_ENV: development
+      LOG_LEVEL: DEBUG
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - securecode-net
+
+volumes:
+  postgres_data:
+
+networks:
+  securecode-net:
+    driver: bridge
