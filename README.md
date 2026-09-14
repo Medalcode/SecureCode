@@ -60,6 +60,13 @@ This will be implemented as a minimal specification focused solely on:
 
 See docs/specs/ for active specifications.
 
+## Ground Truth
+
+SecureCode uses a Ground Truth dataset to empirically validate the accuracy of the rule engine against real-world data.
+- **GH-001** utilizes controlled synthetic repositories to guarantee immutability and reproducibility.
+- The dataset is versioned inside the repository (`data/ground_truth/`).
+- *Note:* Cases currently in the dataset are pending human validation and must be mapped to real controlled repositories before being considered definitive Ground Truth.
+
 ## SDD Structure
 
 SecureCode/
