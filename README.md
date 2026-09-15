@@ -63,9 +63,9 @@ See docs/specs/ for active specifications.
 ## Ground Truth
 
 SecureCode uses a Ground Truth dataset to empirically validate the accuracy of the rule engine against real-world data.
-- **GH-001** utilizes controlled synthetic repositories to guarantee immutability and reproducibility.
+- **GH-001** utilizes controlled synthetic repositories (`Medalcode/securecode-ground-truth`) to guarantee immutability and reproducibility.
 - The dataset is versioned inside the repository (`data/ground_truth/`).
-- *Note:* Cases currently in the dataset are pending human validation and must be mapped to real controlled repositories before being considered definitive Ground Truth.
+- **Evidence:** Real API responses from the synthetic repositories are captured and stored in `docs/evidence/ground_truth/` to serve as an irrefutable baseline. The 6 scenarios for GH-001 have been empirically validated and their raw JSON responses are saved as evidence.
 
 ## SDD Structure
 
