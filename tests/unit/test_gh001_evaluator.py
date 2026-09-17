@@ -1,8 +1,8 @@
 """Unit tests for GH-001 deterministic evaluator."""
 
 import pytest
-from src.engine.evaluator import evaluate_gh001, EvaluationStatus
-from src.models.gh001 import GH001Evidence
+from securecode.engine.evaluator import evaluate_gh001, EvaluationStatus
+from securecode.models.gh001 import GH001Evidence
 
 
 class TestGH001Evaluator:

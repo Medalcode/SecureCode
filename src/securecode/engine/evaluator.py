@@ -2,7 +2,7 @@
 
 from enum import Enum
 from typing import Optional
-from src.models.gh001 import GH001Evidence
+from securecode.models.gh001 import GH001Evidence
 
 
 class EvaluationStatus(Enum):

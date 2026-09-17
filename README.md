@@ -60,12 +60,11 @@ This will be implemented as a minimal specification focused solely on:
 
 See docs/specs/ for active specifications.
 
-## Ground Truth
+## Validation & Benchmarking
 
-SecureCode uses a Ground Truth dataset to empirically validate the accuracy of the rule engine against real-world data.
-- **GH-001** utilizes controlled synthetic repositories (`Medalcode/securecode-ground-truth`) to guarantee immutability and reproducibility.
-- The dataset is versioned inside the repository (`data/ground_truth/`).
-- **Evidence:** Real API responses from the synthetic repositories are captured and stored in `docs/evidence/ground_truth/` to serve as an irrefutable baseline. The 6 scenarios for GH-001 have been empirically validated and their raw JSON responses are saved as evidence.
+The deterministic accuracy of the SecureCode engine is empirically validated against synthetic scenarios.
+
+The reference dataset, raw evidence, and benchmark metrics are maintained externally in the [securecode-ground-truth](https://github.com/Medalcode/securecode-ground-truth) repository.
 
 ## SDD Structure
 
@@ -73,7 +72,10 @@ SecureCode/
 +-- docs/
     +-- specs/          # Active specifications
     +-- hooks/          # SDD workflow hooks
-+-- src/                # Application source code (when implemented)
-+-- tests/              # Test suite (when implemented)
++-- src/
+    +-- securecode/
+        +-- engine/     # Deterministic evaluation engine
+        +-- models/     # Evidence models
++-- tests/              # Test suite
++-- pyproject.toml      # Package configuration
 +-- README.md           # This file
-

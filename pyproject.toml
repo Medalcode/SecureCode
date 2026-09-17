@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "securecode"
+version = "0.1.0"
+description = "A GRC platform for automated security control evaluation."
+requires-python = ">=3.11"
+authors = [
+    {name = "Jonatthan Medalla", email = "jonatthan@example.com"}
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
