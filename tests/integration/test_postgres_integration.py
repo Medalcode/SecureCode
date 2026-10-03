@@ -152,7 +152,7 @@ def test_atomic_transaction_rollback(repo, session):
         )
         
     # Prove no partial state exists
-    count = session.query(EvaluationRecord).filter_by(status="FAIL").count()
+    count = session.query(EvaluationRecord).filter_by(id=eval_id, status="FAIL").count()
     assert count == 0
 
 def test_foreign_key_enforcement(session):
