@@ -8,25 +8,15 @@ SecureCode is being developed using Specification-Driven Development (SDD).
 
 ## Current Status
 
-### Project Bootstrap - REMOVED
+### First Vertical Slice: GH-001 (IMPLEMENTED)
+The first complete vertical slice is fully implemented, covering:
+- **GH-001 (Branch Protection Required)**: Deterministic evaluation engine.
+- **GitHub REST API**: Live evidence extraction and normalization.
+- **PostgreSQL Persistence**: Immutable, traceable evaluation records with canonical JSONB hashes.
+- **FastAPI**: HTTP boundaries.
+- **CI/CD**: GitHub Actions remote validation workflows covering API, SQLite integration, and containerized PostgreSQL.
 
-The sdd-project-bootstrap specification has been removed. It was a repository-auditing feature,
-not part of the SecureCode product MVP.
-
-**SDD Bootstrap** should describe *how* we develop the product, not be a product feature itself.
-
-### Core Domain - REMOVED
-
-The core-domain-securecode specification has been removed. It was over-scoped, including:
-- GitHub OAuth
-- User authentication/authorization
-- PostgreSQL persistence
-- REST API
-- Cloud deployment
-- CI/CD pipeline
-- Multi-tenancy
-
-These are FUTURE capabilities, not the first implementation slice.
+The next planned phase includes User Authentication (JWT) and broader Multi-Tenancy capabilities.
 
 ## Development
 
@@ -48,17 +38,11 @@ Core Domain:
 
 Control -> Rule -> Evidence -> Evaluation -> PASS/FAIL/UNKNOWN
 
-First Vertical Slice (planned):
+First Vertical Slice (Implemented):
 
-GitHub Evidence -> Normalization -> Deterministic Evaluation -> PASS/FAIL/UNKNOWN
+GitHub Evidence -> Normalization -> Deterministic Evaluation -> Traceable DB Record -> HTTP Response
 
-This will be implemented as a minimal specification focused solely on:
-- Deterministic rule engine
-- GH-001 Branch Protection Required control
-- Unit tests with property-based testing
-- No OAuth, no persistence, no API, no infrastructure
-
-See docs/specs/ for active specifications.
+See `docs/specs/` for active specifications.
 
 ## Validation & Benchmarking
 
@@ -76,6 +60,9 @@ SecureCode/
     +-- securecode/
         +-- engine/     # Deterministic evaluation engine
         +-- models/     # Evidence models
-+-- tests/              # Test suite
+        +-- api/        # FastAPI REST endpoints
+        +-- adapters/   # External infrastructure (GitHub/Postgres)
++-- tests/              # Test suite (Unit/Integration)
++-- scripts/            # Traceability, Validation, Artifact extraction
 +-- pyproject.toml      # Package configuration
 +-- README.md           # This file
