@@ -40,7 +40,12 @@ jobs:
           pip install pytest
           
       - name: Run PostgreSQL Integration Tests & Generate Artifact
+        env:
+          REQUIRE_POSTGRES_TESTS: "1"
         run: python scripts/run_postgres_validation.py
+
+      - name: Generate API Validation Artifact
+        run: python scripts/generate_api_artifact.py
 
       - name: Run Traceability Demo (PostgreSQL)
         run: python scripts/traceability_demo.py
@@ -51,3 +56,10 @@ jobs:
         with:
           name: securecode-postgresql-validation
           path: artifacts/postgresql_validation.json
+
+      - name: Upload API Validation Artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: securecode-api-validation
+          path: artifacts/api_validation.json

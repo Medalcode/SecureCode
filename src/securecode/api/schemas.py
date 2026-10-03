@@ -1,0 +1,26 @@
+from typing import Optional, Dict, Any
+from pydantic import BaseModel, Field
+
+class GH001EvaluationRequest(BaseModel):
+    owner: str = Field(..., min_length=1, description="GitHub repository owner")
+    repository: str = Field(..., min_length=1, description="GitHub repository name")
+    branch: str = Field(..., min_length=1, description="Branch to evaluate")
+
+class SourceResponse(BaseModel):
+    type: str
+    repository: str
+    branch: str
+
+class EvidenceResponse(BaseModel):
+    required_review_approvals: Optional[int]
+    dismiss_stale_reviews: Optional[bool]
+    hash: str
+
+class EvaluationResponse(BaseModel):
+    evaluation_id: str
+    control_id: str
+    status: str
+    source: SourceResponse
+    evidence: EvidenceResponse
+    collected_at: str
+    evaluated_at: str
