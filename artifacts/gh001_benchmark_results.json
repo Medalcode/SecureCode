@@ -1,0 +1,682 @@
+{
+  "benchmark_version": "1.0",
+  "timestamp_utc": "2026-10-03T00:58:15.331513+00:00",
+  "securecode_commit": "bfb2e726eba447f6559d2d6b9303757a56732632",
+  "ground_truth_commit": "fbe498d3eb83364433ceeba6f37565255de9682a",
+  "python_version": "3.14.6",
+  "dataset_distribution": {
+    "PASS": 35,
+    "FAIL": 35,
+    "UNKNOWN": 35
+  },
+  "total_cases": 105,
+  "matched": 105,
+  "mismatched": 0,
+  "metrics": {
+    "PASS": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "FAIL": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "UNKNOWN": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "overall_accuracy": 1.0
+  },
+  "confusion_matrix": {
+    "PASS": {
+      "PASS": 35,
+      "FAIL": 0,
+      "UNKNOWN": 0
+    },
+    "FAIL": {
+      "PASS": 0,
+      "FAIL": 35,
+      "UNKNOWN": 0
+    },
+    "UNKNOWN": {
+      "PASS": 0,
+      "FAIL": 0,
+      "UNKNOWN": 35
+    }
+  },
+  "cases": [
+    {
+      "case_id": "GT-GH001-BENCH-066",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-043",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-016",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-010",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-100",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-059",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-002",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-074",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-077",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-083",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-081",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-084",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-011",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-042",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-068",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-067",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-053",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-057",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-034",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-031",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-069",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-061",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-073",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-027",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-060",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-009",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-022",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-064",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-033",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-085",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-038",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-045",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-079",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-098",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-051",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-063",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-046",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-050",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-048",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-104",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-056",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-090",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-013",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-037",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-024",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-040",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-041",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-019",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-080",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-006",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-025",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-008",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-035",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-086",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-047",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-003",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-052",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-017",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-039",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-062",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-105",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-023",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-007",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-049",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-088",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-096",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-071",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-097",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-020",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-075",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-044",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-091",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-021",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-001",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-101",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-092",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-058",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-099",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-054",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-094",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-026",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-072",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-089",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-078",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-065",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-030",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-028",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-093",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-103",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-005",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-055",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-076",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-012",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-070",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-087",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-014",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-102",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-018",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-029",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-032",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-036",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-095",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-004",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-015",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true
+    },
+    {
+      "case_id": "GT-GH001-BENCH-082",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true
+    }
+  ]
+}

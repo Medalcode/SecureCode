@@ -1,6 +1,8 @@
 """GH-001 evidence model for branch protection evaluation."""
 
-from dataclasses import dataclass
+import json
+import hashlib
+from dataclasses import dataclass, asdict
 from typing import Optional
 
 
@@ -14,3 +16,14 @@ class GH001Evidence:
     """
     required_review_approvals: Optional[int] = None
     dismiss_stale_reviews: Optional[bool] = None
+
+    def canonical_hash(self) -> str:
+        """Calculate a deterministic SHA-256 hash of the evidence."""
+        payload = {
+            "control": "GH-001",
+            "dismiss_stale_reviews": self.dismiss_stale_reviews,
+            "required_review_approvals": self.required_review_approvals,
+        }
+        # Serialize with sorted keys and no spaces to ensure determinism
+        canonical_json = json.dumps(payload, sort_keys=True, separators=(',', ':'))
+        return hashlib.sha256(canonical_json.encode('utf-8')).hexdigest()

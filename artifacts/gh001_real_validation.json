@@ -1,0 +1,73 @@
+{
+  "control": "GH-001",
+  "validation_type": "real_github_pilot",
+  "timestamp": "2026-10-03T00:40:40.092207+00:00",
+  "cases": [
+    {
+      "case_id": "GT-GH001-01",
+      "repository": "Medalcode/securecode-ground-truth",
+      "branch": "branch-case-1-pass",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "match": true,
+      "required_review_approvals": 2,
+      "dismiss_stale_reviews": true
+    },
+    {
+      "case_id": "GT-GH001-02",
+      "repository": "Medalcode/securecode-ground-truth",
+      "branch": "branch-case-2-fail-low-approvals",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true,
+      "required_review_approvals": 1,
+      "dismiss_stale_reviews": true
+    },
+    {
+      "case_id": "GT-GH001-03",
+      "repository": "Medalcode/securecode-ground-truth",
+      "branch": "branch-case-3-fail-no-dismiss",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true,
+      "required_review_approvals": 2,
+      "dismiss_stale_reviews": false
+    },
+    {
+      "case_id": "GT-GH001-04",
+      "repository": "Medalcode/securecode-ground-truth",
+      "branch": "branch-case-4-fail-both",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "match": true,
+      "required_review_approvals": 1,
+      "dismiss_stale_reviews": false
+    },
+    {
+      "case_id": "GT-GH001-05",
+      "repository": "Medalcode/securecode-ground-truth",
+      "branch": "branch-case-5-unprotected",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true,
+      "required_review_approvals": null,
+      "dismiss_stale_reviews": null
+    },
+    {
+      "case_id": "GT-GH001-06",
+      "repository": "Medalcode/securecode-ground-truth",
+      "branch": "branch-case-6-status-checks-only",
+      "expected_status": "UNKNOWN",
+      "actual_status": "UNKNOWN",
+      "match": true,
+      "required_review_approvals": null,
+      "dismiss_stale_reviews": null
+    }
+  ],
+  "summary": {
+    "total": 6,
+    "matched": 6,
+    "mismatched": 0,
+    "accuracy": 1.0
+  }
+}

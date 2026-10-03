@@ -7,6 +7,10 @@ name = "securecode"
 version = "0.1.0"
 description = "A GRC platform for automated security control evaluation."
 requires-python = ">=3.11"
+dependencies = [
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.0"
+]
 authors = [
     {name = "Jonatthan Medalla", email = "jonatthan@example.com"}
 ]
@@ -16,3 +20,6 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "postgres: marks tests that require a real postgres database"
+]
