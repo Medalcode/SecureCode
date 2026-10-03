@@ -1,0 +1,55 @@
+name: Full E2E Real Validation
+
+on:
+  workflow_dispatch:
+
+jobs:
+  validate-e2e:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: securecode_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pytest httpx
+          
+      - name: Run Full E2E Validation
+        env:
+          DATABASE_URL: postgresql+psycopg2://securecode_test@localhost:5432/securecode_test
+          VALIDATION_GITHUB_TOKEN: ${{ secrets.VALIDATION_GITHUB_TOKEN }}
+        run: |
+          if [ -z "$VALIDATION_GITHUB_TOKEN" ]; then
+            echo "VALIDATION_GITHUB_TOKEN secret is not set. E2E Validation BLOCKED."
+            exit 1
+          fi
+          python scripts/run_full_e2e.py
+
+      - name: Upload E2E Validation Artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: securecode-gh001-full-e2e-validation
+          path: artifacts/gh001_full_e2e_validation.json

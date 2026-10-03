@@ -77,7 +77,7 @@ def evaluate_gh001_endpoint(
             dismiss_stale_reviews=persisted.reconstructed_evidence.dismiss_stale_reviews,
             hash=persisted.reconstructed_evidence.canonical_hash()
         ),
-        collected_at=persisted.evaluated_at.isoformat(),
+        collected_at=persisted.collected_at.isoformat(),
         evaluated_at=persisted.evaluated_at.isoformat()
     )
 

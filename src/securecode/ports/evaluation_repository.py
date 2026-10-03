@@ -11,6 +11,7 @@ class PersistedEvaluation:
     id: UUID
     control_id: str
     status: EvaluationStatus
+    collected_at: datetime
     evaluated_at: datetime
     evidence_id: UUID
     source_type: str

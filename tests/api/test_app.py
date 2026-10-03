@@ -19,6 +19,7 @@ def mock_persisted_evaluation(status: EvaluationStatus, evidence: GH001Evidence)
         id=uuid4(),
         control_id="GH-001",
         status=status,
+        collected_at=datetime.now(timezone.utc),
         evaluated_at=datetime.now(timezone.utc),
         evidence_id=uuid4(),
         source_type="GitHub",

@@ -81,6 +81,7 @@ class PostgresEvaluationRepository(EvaluationRepository):
             id=record.id,
             control_id=record.control_id,
             status=EvaluationStatus(record.status),
+            collected_at=evidence_record.collected_at,
             evaluated_at=record.evaluated_at,
             evidence_id=record.evidence_id,
             source_type=record.source_type,
