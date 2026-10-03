@@ -1,0 +1,48 @@
+name: GH-001 Real Validation
+
+on:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout SecureCode
+        uses: actions/checkout@v4
+        with:
+          path: SecureCode
+          
+      - name: Checkout Ground Truth
+        uses: actions/checkout@v4
+        with:
+          repository: Medalcode/securecode-ground-truth
+          path: securecode-ground-truth
+          
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ./SecureCode
+          
+      - name: Run GH-001 Validation
+        env:
+          # Note: branch protection for another repo requires authentication.
+          # The default GITHUB_TOKEN may not have enough permission.
+          # Configure VALIDATION_GITHUB_TOKEN (a fine-grained PAT) in repository secrets if needed.
+          GITHUB_TOKEN: ${{ secrets.VALIDATION_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          GROUND_TRUTH_PATH: ${{ github.workspace }}/securecode-ground-truth/data/ground_truth/gh001_ground_truth.json
+        run: |
+          cd SecureCode
+          python scripts/validate_gh001_real.py
+          
+      - name: Upload Validation Artifact
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: gh001-real-validation
+          path: SecureCode/artifacts/gh001_real_validation.json
+          retention-days: 30

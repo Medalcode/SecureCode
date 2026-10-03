@@ -57,7 +57,7 @@ def mock_ground_truth(tmp_path):
 def test_validation_runner_no_token_exits(mock_env_no_token, capsys):
     with pytest.raises(SystemExit) as e:
         main()
-    assert e.value.code == 0
+    assert e.value.code == 1
     out, _ = capsys.readouterr()
     assert "REAL VALIDATION BLOCKED - GITHUB_TOKEN NOT AVAILABLE" in out
 
@@ -66,7 +66,9 @@ def test_validation_runner_executes(mock_get_evidence, mock_env_with_token, mock
     # Setup mock to return a passing evidence
     mock_get_evidence.return_value = GH001Evidence(required_review_approvals=2, dismiss_stale_reviews=True)
     
-    main()
+    with pytest.raises(SystemExit) as e:
+        main()
+    assert e.value.code == 0
     
     # Check output
     out, _ = capsys.readouterr()

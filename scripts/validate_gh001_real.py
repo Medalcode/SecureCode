@@ -1,6 +1,8 @@
 import os
 import sys
 import json
+import subprocess
+import platform
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -10,18 +12,33 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from securecode.adapters.github import get_gh001_evidence
 from securecode.engine.evaluator import evaluate_gh001
 
+def get_git_commit(repo_path: Path) -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], 
+            cwd=str(repo_path),
+            stderr=subprocess.DEVNULL
+        ).decode("utf-8").strip()
+    except Exception:
+        return "unknown"
+
 def main():
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
         print("REAL VALIDATION BLOCKED - GITHUB_TOKEN NOT AVAILABLE")
-        sys.exit(0)
+        sys.exit(1)
 
-    # Load Ground Truth
     repo_root = Path(__file__).parent.parent
-    gt_path = repo_root.parent / "securecode-ground-truth" / "data" / "ground_truth" / "gh001_ground_truth.json"
+    
+    # Allow overriding Ground Truth path via environment variable
+    env_gt_path = os.environ.get("GROUND_TRUTH_PATH")
+    if env_gt_path:
+        gt_path = Path(env_gt_path)
+    else:
+        gt_path = repo_root.parent / "securecode-ground-truth" / "data" / "ground_truth" / "gh001_ground_truth.json"
     
     if not gt_path.exists():
-        print(f"Ground Truth dataset not found at {gt_path}")
+        print(f"ERROR: Ground Truth dataset not found at {gt_path}")
         sys.exit(1)
         
     with open(gt_path, "r", encoding="utf-8") as f:
@@ -73,10 +90,15 @@ def main():
 
     accuracy = matched_count / len(cases) if cases else 0.0
     
+    gt_repo_root = gt_path.parent.parent.parent
+    
     artifact = {
         "control": "GH-001",
         "validation_type": "real_github_pilot",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "securecode_commit": get_git_commit(repo_root),
+        "ground_truth_commit": get_git_commit(gt_repo_root),
+        "python_version": platform.python_version(),
         "cases": results,
         "summary": {
             "total": len(cases),
@@ -95,6 +117,12 @@ def main():
         
     print(f"\nValidation complete. Accuracy: {accuracy*100:.1f}%")
     print(f"Artifact saved to {out_file}")
+    
+    if mismatched_count > 0:
+        print(f"ERROR: {mismatched_count} cases mismatched.")
+        sys.exit(1)
+        
+    sys.exit(0)
 
 if __name__ == "__main__":
     main()
