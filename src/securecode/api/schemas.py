@@ -11,6 +11,10 @@ class SourceResponse(BaseModel):
     repository: str
     branch: str
 
+class RuleResponse(BaseModel):
+    id: str
+    version: int
+
 class EvidenceResponse(BaseModel):
     required_review_approvals: Optional[int]
     dismiss_stale_reviews: Optional[bool]
@@ -19,6 +23,7 @@ class EvidenceResponse(BaseModel):
 class EvaluationResponse(BaseModel):
     evaluation_id: str
     control_id: str
+    rule: Optional[RuleResponse]
     status: str
     source: SourceResponse
     evidence: EvidenceResponse
@@ -37,6 +42,7 @@ class GH002EvidenceResponse(BaseModel):
 class GH002EvaluationResponse(BaseModel):
     evaluation_id: str
     control_id: str
+    rule: Optional[RuleResponse]
     status: str
     source: SourceResponse
     evidence: GH002EvidenceResponse

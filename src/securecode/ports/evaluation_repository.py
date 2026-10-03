@@ -11,6 +11,8 @@ from securecode.models.gh002 import GH002Evidence
 class PersistedEvaluation:
     id: UUID
     control_id: str
+    rule_id: Optional[str]
+    rule_version: Optional[int]
     status: EvaluationStatus
     collected_at: datetime
     evaluated_at: datetime
@@ -33,6 +35,8 @@ class EvaluationRepository(Protocol):
         source_branch: str,
         collected_at: datetime,
         evaluated_at: datetime,
+        rule_id: Optional[str] = None,
+        rule_version: Optional[int] = None,
     ) -> None:
         """Save a GH-001 evaluation and its normalized evidence atomically."""
         ...
@@ -47,6 +51,8 @@ class EvaluationRepository(Protocol):
         source_branch: str,
         collected_at: datetime,
         evaluated_at: datetime,
+        rule_id: Optional[str] = None,
+        rule_version: Optional[int] = None,
     ) -> None:
         """Save a GH-002 evaluation and its normalized evidence atomically."""
         ...

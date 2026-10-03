@@ -1,0 +1,15 @@
+{
+  "rule_id": "GH-002-RULE",
+  "control_id": "GH-002",
+  "version": 1,
+  "active": true,
+  "allowlisted_fields": [
+    "default_branch",
+    "protection_enabled"
+  ],
+  "condition": {
+    "field": "protection_enabled",
+    "operator": "EQ",
+    "value": true
+  }
+}

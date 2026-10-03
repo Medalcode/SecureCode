@@ -25,6 +25,8 @@ class EvaluationRecord(Base):
     
     id: Mapped[UUID] = mapped_column(primary_key=True)
     control_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    rule_id: Mapped[str] = mapped_column(String(100), nullable=True) # Migration safety
+    rule_version: Mapped[int] = mapped_column(nullable=True)
     status: Mapped[str] = mapped_column(String(50), nullable=False)
     evaluated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     evidence_id: Mapped[UUID] = mapped_column(ForeignKey("evidence_records.id"), nullable=False)

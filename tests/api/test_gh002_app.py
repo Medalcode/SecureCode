@@ -18,6 +18,8 @@ def mock_persisted_gh002(status: EvaluationStatus, evidence: GH002Evidence):
     return PersistedEvaluation(
         id=uuid4(),
         control_id="GH-002",
+        rule_id="GH-002-RULE",
+        rule_version=1,
         status=status,
         collected_at=datetime.now(timezone.utc),
         evaluated_at=datetime.now(timezone.utc),

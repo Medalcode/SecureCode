@@ -1,69 +1,27 @@
-"""GH-001 deterministic rule evaluator."""
-
+"""Deterministic rule evaluator facade."""
+import json
+from pathlib import Path
 from enum import Enum
 from typing import Optional
+
 from securecode.models.gh001 import GH001Evidence
+from securecode.models.gh002 import GH002Evidence
+from securecode.models.rules import RuleDefinition
+from securecode.engine.types import EvaluationStatus
+from securecode.engine.executor import evaluate_rule
 
+_RULES_DIR = Path(__file__).parent.parent.parent.parent / "rules"
 
-class EvaluationStatus(Enum):
-    """Status of a rule evaluation."""
-    PASS = "PASS"
-    FAIL = "FAIL"
-    UNKNOWN = "UNKNOWN"
-
+def get_rule_definition(rule_file: str) -> RuleDefinition:
+    with open(_RULES_DIR / rule_file, "r") as f:
+        return RuleDefinition(**json.load(f))
 
 def evaluate_gh001(evidence: Optional[GH001Evidence]) -> EvaluationStatus:
-    """
-    Evaluate GH-001: Branch Protection Required.
-    
-    Conditions:
-    - required_review_approvals >= 2
-    - dismiss_stale_reviews == True
-    
-    Returns:
-        PASS: Both conditions satisfied
-        FAIL: Evidence exists but conditions violated
-        UNKNOWN: Evidence is None or required fields are unavailable
-    
-    Raises:
-        ValueError: On malformed programming/data-contract errors
-    """
-    if evidence is None:
-        return EvaluationStatus.UNKNOWN
-    
-    approvals = evidence.required_review_approvals
-    dismiss = evidence.dismiss_stale_reviews
-    
-    if approvals is None or dismiss is None:
-        return EvaluationStatus.UNKNOWN
-    
-    if approvals >= 2 and dismiss is True:
-        return EvaluationStatus.PASS
-    
-    return EvaluationStatus.FAIL
-
-
-from securecode.models.gh002 import GH002Evidence
+    """Evaluate GH-001 using canonical rule configuration."""
+    rule_def = get_rule_definition("GH-001.json")
+    return evaluate_rule(rule_def, evidence)
 
 def evaluate_gh002(evidence: Optional[GH002Evidence]) -> EvaluationStatus:
-    """
-    Evaluate GH-002: Default Branch Protection Enabled.
-    
-    Conditions:
-    - protection_enabled is True
-    
-    Returns:
-        PASS: protection_enabled is explicitly True
-        FAIL: protection_enabled is explicitly False
-        UNKNOWN: protection_enabled is None or evidence is missing
-    """
-    if evidence is None:
-        return EvaluationStatus.UNKNOWN
-        
-    if evidence.protection_enabled is None:
-        return EvaluationStatus.UNKNOWN
-        
-    if evidence.protection_enabled is True:
-        return EvaluationStatus.PASS
-        
-    return EvaluationStatus.FAIL
+    """Evaluate GH-002 using canonical rule configuration."""
+    rule_def = get_rule_definition("GH-002.json")
+    return evaluate_rule(rule_def, evidence)

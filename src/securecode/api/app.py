@@ -9,7 +9,8 @@ from securecode.api.schemas import (
     GH001EvaluationRequest,
     EvaluationResponse,
     SourceResponse,
-    EvidenceResponse
+    EvidenceResponse,
+    RuleResponse
 )
 from securecode.api.dependencies import (
     get_db_session,
@@ -38,7 +39,6 @@ def evaluate_gh001_endpoint(
     """
     Executes the GH-001 control evaluation on a GitHub repository.
     """
-    # Instantiate the repository using the session dependency
     repo = PostgresEvaluationRepository_Dependency_Wrapper(session)
     
     try:
@@ -50,22 +50,22 @@ def evaluate_gh001_endpoint(
             repository=repo
         )
     except ValueError as e:
-        # Invalid configuration or malformed evidence that is unrecoverable
         raise HTTPException(status_code=422, detail="Invalid evidence acquired") from e
     except RuntimeError as e:
-        # Network errors or Database errors
         logger.error(f"Execution failed: {e}")
-        # The adapter stringifies the HTTP status in the error, let's keep it safe
         raise HTTPException(status_code=502, detail="Infrastructure or upstream communication failure") from e
     except Exception as e:
         logger.error(f"Unexpected internal error: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
         
-    # Map domain persisted evaluation to HTTP Response Contract
-    # We safely map fields assuming the schema contract
+    rule_obj = None
+    if persisted.rule_id is not None and persisted.rule_version is not None:
+        rule_obj = RuleResponse(id=persisted.rule_id, version=persisted.rule_version)
+        
     return EvaluationResponse(
         evaluation_id=str(persisted.id),
         control_id=persisted.control_id,
+        rule=rule_obj,
         status=persisted.status.name,
         source=SourceResponse(
             type=persisted.source_type,
@@ -119,9 +119,14 @@ def evaluate_gh002_endpoint(
         logger.error(f"Unexpected internal error: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
         
+    rule_obj = None
+    if persisted.rule_id is not None and persisted.rule_version is not None:
+        rule_obj = RuleResponse(id=persisted.rule_id, version=persisted.rule_version)
+        
     return GH002EvaluationResponse(
         evaluation_id=str(persisted.id),
         control_id=persisted.control_id,
+        rule=rule_obj,
         status=persisted.status.name,
         source=SourceResponse(
             type=persisted.source_type,

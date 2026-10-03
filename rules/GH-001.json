@@ -1,0 +1,25 @@
+{
+  "rule_id": "GH-001-RULE",
+  "control_id": "GH-001",
+  "version": 1,
+  "active": true,
+  "allowlisted_fields": [
+    "required_review_approvals",
+    "dismiss_stale_reviews"
+  ],
+  "condition": {
+    "operator": "AND",
+    "conditions": [
+      {
+        "field": "required_review_approvals",
+        "operator": "GTE",
+        "value": 2
+      },
+      {
+        "field": "dismiss_stale_reviews",
+        "operator": "EQ",
+        "value": true
+      }
+    ]
+  }
+}

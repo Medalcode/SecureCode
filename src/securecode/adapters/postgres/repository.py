@@ -27,6 +27,8 @@ class PostgresEvaluationRepository(EvaluationRepository):
         source_branch: str,
         collected_at: datetime,
         evaluated_at: datetime,
+        rule_id: Optional[str] = None,
+        rule_version: Optional[int] = None,
     ) -> None:
         """Save evidence and evaluation atomically."""
         try:
@@ -47,6 +49,8 @@ class PostgresEvaluationRepository(EvaluationRepository):
             evaluation_record = EvaluationRecord(
                 id=evaluation_id,
                 control_id="GH-001",
+                rule_id=rule_id,
+                rule_version=rule_version,
                 status=status.name,
                 evaluated_at=evaluated_at,
                 evidence_id=evidence_id,
@@ -73,6 +77,8 @@ class PostgresEvaluationRepository(EvaluationRepository):
         source_branch: str,
         collected_at: datetime,
         evaluated_at: datetime,
+        rule_id: Optional[str] = None,
+        rule_version: Optional[int] = None,
     ) -> None:
         """Save GH-002 evidence and evaluation atomically."""
         try:
@@ -92,6 +98,8 @@ class PostgresEvaluationRepository(EvaluationRepository):
             evaluation_record = EvaluationRecord(
                 id=evaluation_id,
                 control_id="GH-002",
+                rule_id=rule_id,
+                rule_version=rule_version,
                 status=status.name,
                 evaluated_at=evaluated_at,
                 evidence_id=evidence_id,
@@ -134,6 +142,8 @@ class PostgresEvaluationRepository(EvaluationRepository):
         return PersistedEvaluation(
             id=record.id,
             control_id=record.control_id,
+            rule_id=record.rule_id,
+            rule_version=record.rule_version,
             status=EvaluationStatus(record.status),
             collected_at=evidence_record.collected_at,
             evaluated_at=record.evaluated_at,
