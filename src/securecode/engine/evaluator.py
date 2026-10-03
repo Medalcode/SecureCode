@@ -41,3 +41,29 @@ def evaluate_gh001(evidence: Optional[GH001Evidence]) -> EvaluationStatus:
         return EvaluationStatus.PASS
     
     return EvaluationStatus.FAIL
+
+
+from securecode.models.gh002 import GH002Evidence
+
+def evaluate_gh002(evidence: Optional[GH002Evidence]) -> EvaluationStatus:
+    """
+    Evaluate GH-002: Default Branch Protection Enabled.
+    
+    Conditions:
+    - protection_enabled is True
+    
+    Returns:
+        PASS: protection_enabled is explicitly True
+        FAIL: protection_enabled is explicitly False
+        UNKNOWN: protection_enabled is None or evidence is missing
+    """
+    if evidence is None:
+        return EvaluationStatus.UNKNOWN
+        
+    if evidence.protection_enabled is None:
+        return EvaluationStatus.UNKNOWN
+        
+    if evidence.protection_enabled is True:
+        return EvaluationStatus.PASS
+        
+    return EvaluationStatus.FAIL

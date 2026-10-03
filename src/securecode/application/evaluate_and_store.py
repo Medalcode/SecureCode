@@ -47,3 +47,48 @@ def evaluate_and_store_gh001(
         raise RuntimeError("Evaluation was saved but could not be retrieved.")
         
     return persisted
+
+from securecode.engine.evaluator import evaluate_gh002
+from securecode.adapters.github import get_gh002_evidence
+
+def evaluate_and_store_gh002(
+    owner: str,
+    repo: str,
+    token: str,
+    repository: EvaluationRepository
+) -> PersistedEvaluation:
+    """
+    Orchestrates evidence acquisition, evaluation, and persistence for GH-002.
+    """
+    collected_at = datetime.now(timezone.utc)
+    
+    # Acquire Evidence
+    evidence = get_gh002_evidence(owner, repo, token)
+    
+    evaluated_at = datetime.now(timezone.utc)
+    
+    # Evaluate deterministically
+    status = evaluate_gh002(evidence)
+    
+    # Generate IDs
+    evaluation_id = uuid4()
+    evidence_id = uuid4()
+    
+    # Persist
+    repository.save_gh002_evaluation(
+        evaluation_id=evaluation_id,
+        evidence_id=evidence_id,
+        evidence=evidence,
+        status=status,
+        source_repository=f"{owner}/{repo}",
+        source_branch=evidence.default_branch or "unknown",
+        collected_at=collected_at,
+        evaluated_at=evaluated_at
+    )
+    
+    # Retrieve to return a reconstructed instance ensuring it was safely stored
+    persisted = repository.get_evaluation(evaluation_id)
+    if not persisted:
+        raise RuntimeError("Evaluation was saved but could not be retrieved.")
+        
+    return persisted

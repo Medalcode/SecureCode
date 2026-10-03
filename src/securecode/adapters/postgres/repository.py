@@ -7,6 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from securecode.ports.evaluation_repository import EvaluationRepository, PersistedEvaluation
 from securecode.models.gh001 import GH001Evidence
+from securecode.models.gh002 import GH002Evidence
 from securecode.engine.evaluator import EvaluationStatus
 from securecode.adapters.postgres.models import EvaluationRecord, EvidenceRecord
 
@@ -62,6 +63,51 @@ class PostgresEvaluationRepository(EvaluationRepository):
             self._session.rollback()
             raise RuntimeError(f"Failed to persist evaluation: {e}") from e
 
+    def save_gh002_evaluation(
+        self,
+        evaluation_id: UUID,
+        evidence_id: UUID,
+        evidence: GH002Evidence,
+        status: EvaluationStatus,
+        source_repository: str,
+        source_branch: str,
+        collected_at: datetime,
+        evaluated_at: datetime,
+    ) -> None:
+        """Save GH-002 evidence and evaluation atomically."""
+        try:
+            raw_evidence = {
+                "default_branch": evidence.default_branch,
+                "protection_enabled": evidence.protection_enabled,
+            }
+            
+            evidence_record = EvidenceRecord(
+                id=evidence_id,
+                control_id="GH-002",
+                evidence_hash=evidence.canonical_hash(),
+                raw_evidence=raw_evidence,
+                collected_at=collected_at
+            )
+            
+            evaluation_record = EvaluationRecord(
+                id=evaluation_id,
+                control_id="GH-002",
+                status=status.name,
+                evaluated_at=evaluated_at,
+                evidence_id=evidence_id,
+                source_type="GitHub",
+                source_repository=source_repository,
+                source_branch=source_branch
+            )
+            
+            self._session.add(evidence_record)
+            self._session.add(evaluation_record)
+            self._session.commit()
+            
+        except SQLAlchemyError as e:
+            self._session.rollback()
+            raise RuntimeError(f"Failed to persist evaluation: {e}") from e
+
     def get_evaluation(self, evaluation_id: UUID) -> Optional[PersistedEvaluation]:
         """Retrieve an evaluation and reconstruct the immutable domain evidence."""
         record = self._session.query(EvaluationRecord).filter_by(id=evaluation_id).first()
@@ -71,11 +117,19 @@ class PostgresEvaluationRepository(EvaluationRepository):
         evidence_record = record.evidence
         raw = evidence_record.raw_evidence
         
-        # Reconstruct domain model safely
-        reconstructed_evidence = GH001Evidence(
-            required_review_approvals=raw.get("required_review_approvals"),
-            dismiss_stale_reviews=raw.get("dismiss_stale_reviews")
-        )
+        # Reconstruct domain model safely based on control_id
+        if record.control_id == "GH-001":
+            reconstructed_evidence = GH001Evidence(
+                required_review_approvals=raw.get("required_review_approvals"),
+                dismiss_stale_reviews=raw.get("dismiss_stale_reviews")
+            )
+        elif record.control_id == "GH-002":
+            reconstructed_evidence = GH002Evidence(
+                default_branch=raw.get("default_branch", ""),
+                protection_enabled=raw.get("protection_enabled")
+            )
+        else:
+            raise ValueError(f"Unknown control_id {record.control_id} in database")
         
         return PersistedEvaluation(
             id=record.id,

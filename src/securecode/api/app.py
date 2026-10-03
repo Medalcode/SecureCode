@@ -84,3 +84,55 @@ def evaluate_gh001_endpoint(
 def PostgresEvaluationRepository_Dependency_Wrapper(session: Session) -> EvaluationRepository:
     from securecode.adapters.postgres.repository import PostgresEvaluationRepository
     return PostgresEvaluationRepository(session)
+
+from securecode.application.evaluate_and_store import evaluate_and_store_gh002
+from securecode.api.schemas import (
+    GH002EvaluationRequest,
+    GH002EvaluationResponse,
+    GH002EvidenceResponse
+)
+
+@app.post("/api/v1/evaluations/gh-002", response_model=GH002EvaluationResponse)
+def evaluate_gh002_endpoint(
+    request: GH002EvaluationRequest,
+    session: Session = Depends(get_db_session),
+    github_token: str = Depends(get_github_token)
+):
+    """
+    Executes the GH-002 control evaluation on a GitHub repository.
+    """
+    repo = PostgresEvaluationRepository_Dependency_Wrapper(session)
+    
+    try:
+        persisted = evaluate_and_store_gh002(
+            owner=request.owner,
+            repo=request.repository,
+            token=github_token,
+            repository=repo
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail="Invalid evidence acquired") from e
+    except RuntimeError as e:
+        logger.error(f"Execution failed: {e}")
+        raise HTTPException(status_code=502, detail="Infrastructure or upstream communication failure") from e
+    except Exception as e:
+        logger.error(f"Unexpected internal error: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error") from e
+        
+    return GH002EvaluationResponse(
+        evaluation_id=str(persisted.id),
+        control_id=persisted.control_id,
+        status=persisted.status.name,
+        source=SourceResponse(
+            type=persisted.source_type,
+            repository=persisted.source_repository,
+            branch=persisted.source_branch
+        ),
+        evidence=GH002EvidenceResponse(
+            default_branch=persisted.reconstructed_evidence.default_branch,
+            protection_enabled=persisted.reconstructed_evidence.protection_enabled,
+            hash=persisted.reconstructed_evidence.canonical_hash()
+        ),
+        collected_at=persisted.collected_at.isoformat(),
+        evaluated_at=persisted.evaluated_at.isoformat()
+    )
