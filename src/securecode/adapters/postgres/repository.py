@@ -29,6 +29,7 @@ class PostgresEvaluationRepository(EvaluationRepository):
         evaluated_at: datetime,
         rule_id: Optional[str] = None,
         rule_version: Optional[int] = None,
+        requested_by_user_id: Optional[UUID] = None,
     ) -> None:
         """Save evidence and evaluation atomically."""
         try:
@@ -54,6 +55,7 @@ class PostgresEvaluationRepository(EvaluationRepository):
                 status=status.name,
                 evaluated_at=evaluated_at,
                 evidence_id=evidence_id,
+                requested_by_user_id=requested_by_user_id,
                 source_type="GitHub",
                 source_repository=source_repository,
                 source_branch=source_branch
@@ -79,6 +81,7 @@ class PostgresEvaluationRepository(EvaluationRepository):
         evaluated_at: datetime,
         rule_id: Optional[str] = None,
         rule_version: Optional[int] = None,
+        requested_by_user_id: Optional[UUID] = None,
     ) -> None:
         """Save GH-002 evidence and evaluation atomically."""
         try:
@@ -103,6 +106,7 @@ class PostgresEvaluationRepository(EvaluationRepository):
                 status=status.name,
                 evaluated_at=evaluated_at,
                 evidence_id=evidence_id,
+                requested_by_user_id=requested_by_user_id,
                 source_type="GitHub",
                 source_repository=source_repository,
                 source_branch=source_branch
@@ -148,6 +152,7 @@ class PostgresEvaluationRepository(EvaluationRepository):
             collected_at=evidence_record.collected_at,
             evaluated_at=record.evaluated_at,
             evidence_id=record.evidence_id,
+            requested_by_user_id=record.requested_by_user_id,
             source_type=record.source_type,
             source_repository=record.source_repository,
             source_branch=record.source_branch,

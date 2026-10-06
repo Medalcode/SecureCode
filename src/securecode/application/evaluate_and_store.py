@@ -1,4 +1,5 @@
-from uuid import uuid4
+from typing import Optional
+from uuid import uuid4, UUID
 from datetime import datetime, timezone
 
 from securecode.ports.evaluation_repository import EvaluationRepository, PersistedEvaluation
@@ -10,7 +11,8 @@ def evaluate_and_store_gh001(
     repo: str,
     branch: str,
     token: str,
-    repository: EvaluationRepository
+    repository: EvaluationRepository,
+    requested_by_user_id: Optional[UUID] = None
 ) -> PersistedEvaluation:
     """
     Orchestrates evidence acquisition, evaluation, and persistence.
@@ -35,7 +37,8 @@ def evaluate_and_store_gh001(
         collected_at=collected_at,
         evaluated_at=evaluated_at,
         rule_id=rule_def.rule_id,
-        rule_version=rule_def.version
+        rule_version=rule_def.version,
+        requested_by_user_id=requested_by_user_id
     )
     
     persisted = repository.get_evaluation(evaluation_id)
@@ -48,7 +51,8 @@ def evaluate_and_store_gh002(
     owner: str,
     repo: str,
     token: str,
-    repository: EvaluationRepository
+    repository: EvaluationRepository,
+    requested_by_user_id: Optional[UUID] = None
 ) -> PersistedEvaluation:
     """
     Orchestrates evidence acquisition, evaluation, and persistence for GH-002.
@@ -73,7 +77,8 @@ def evaluate_and_store_gh002(
         collected_at=collected_at,
         evaluated_at=evaluated_at,
         rule_id=rule_def.rule_id,
-        rule_version=rule_def.version
+        rule_version=rule_def.version,
+        requested_by_user_id=requested_by_user_id
     )
     
     persisted = repository.get_evaluation(evaluation_id)

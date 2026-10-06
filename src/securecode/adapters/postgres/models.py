@@ -1,12 +1,21 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import String, DateTime, ForeignKey, JSON
+from sqlalchemy import String, DateTime, ForeignKey, JSON, Boolean
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 class Base(DeclarativeBase):
     pass
+
+class User(Base):
+    __tablename__ = "users"
+    
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 class EvidenceRecord(Base):
     __tablename__ = "evidence_records"
@@ -30,6 +39,7 @@ class EvaluationRecord(Base):
     status: Mapped[str] = mapped_column(String(50), nullable=False)
     evaluated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     evidence_id: Mapped[UUID] = mapped_column(ForeignKey("evidence_records.id"), nullable=False)
+    requested_by_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=True)
     
     source_type: Mapped[str] = mapped_column(String(50), nullable=False)
     source_repository: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -37,3 +47,6 @@ class EvaluationRecord(Base):
 
     # Relationship to evidence
     evidence: Mapped["EvidenceRecord"] = relationship(back_populates="evaluations")
+    
+    # Relationship to user
+    requested_by: Mapped["User"] = relationship()

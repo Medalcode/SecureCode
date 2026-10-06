@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 import logging
@@ -15,8 +15,10 @@ from securecode.api.schemas import (
 from securecode.api.dependencies import (
     get_db_session,
     get_evaluation_repository,
-    get_github_token
+    get_github_token,
+    get_current_user
 )
+from securecode.adapters.postgres.models import User
 
 app = FastAPI(
     title="SecureCode API",
@@ -26,6 +28,32 @@ app = FastAPI(
 
 logger = logging.getLogger(__name__)
 
+from fastapi.security import OAuth2PasswordRequestForm
+from securecode.api.security import verify_password, create_access_token
+from pydantic import BaseModel
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+@app.post("/api/v1/auth/token", response_model=Token)
+def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    session: Session = Depends(get_db_session)
+):
+    user = session.query(User).filter(User.username == form_data.username).first()
+    if not user or not verify_password(form_data.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not user.active:
+        raise HTTPException(status_code=400, detail="Inactive user")
+        
+    access_token = create_access_token(str(user.id))
+    return {"access_token": access_token, "token_type": "bearer"}
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
@@ -34,7 +62,8 @@ def health_check():
 def evaluate_gh001_endpoint(
     request: GH001EvaluationRequest,
     session: Session = Depends(get_db_session),
-    github_token: str = Depends(get_github_token)
+    github_token: str = Depends(get_github_token),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Executes the GH-001 control evaluation on a GitHub repository.
@@ -47,7 +76,8 @@ def evaluate_gh001_endpoint(
             repo=request.repository,
             branch=request.branch,
             token=github_token,
-            repository=repo
+            repository=repo,
+            requested_by_user_id=current_user.id
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail="Invalid evidence acquired") from e
@@ -96,7 +126,8 @@ from securecode.api.schemas import (
 def evaluate_gh002_endpoint(
     request: GH002EvaluationRequest,
     session: Session = Depends(get_db_session),
-    github_token: str = Depends(get_github_token)
+    github_token: str = Depends(get_github_token),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Executes the GH-002 control evaluation on a GitHub repository.
@@ -108,7 +139,8 @@ def evaluate_gh002_endpoint(
             owner=request.owner,
             repo=request.repository,
             token=github_token,
-            repository=repo
+            repository=repo,
+            requested_by_user_id=current_user.id
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail="Invalid evidence acquired") from e

@@ -21,6 +21,7 @@ class PersistedEvaluation:
     source_repository: str
     source_branch: str
     reconstructed_evidence: Union[GH001Evidence, GH002Evidence]
+    requested_by_user_id: Optional[UUID] = None
 
 class EvaluationRepository(Protocol):
     """Port for persisting evaluations independent of storage mechanism."""
@@ -37,6 +38,7 @@ class EvaluationRepository(Protocol):
         evaluated_at: datetime,
         rule_id: Optional[str] = None,
         rule_version: Optional[int] = None,
+        requested_by_user_id: Optional[UUID] = None,
     ) -> None:
         """Save a GH-001 evaluation and its normalized evidence atomically."""
         ...
@@ -53,6 +55,7 @@ class EvaluationRepository(Protocol):
         evaluated_at: datetime,
         rule_id: Optional[str] = None,
         rule_version: Optional[int] = None,
+        requested_by_user_id: Optional[UUID] = None,
     ) -> None:
         """Save a GH-002 evaluation and its normalized evidence atomically."""
         ...
