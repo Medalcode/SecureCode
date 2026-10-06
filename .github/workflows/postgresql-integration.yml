@@ -50,12 +50,12 @@ jobs:
       - name: Run Traceability Demo (PostgreSQL)
         run: python scripts/traceability_demo.py
 
-      - name: Upload PostgreSQL Validation Artifact
+      - name: Upload Migration Validation Artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: securecode-postgresql-validation
-          path: artifacts/postgresql_validation.json
+          name: securecode-migration-validation
+          path: artifacts/migration_validation.json
 
       - name: Upload API Validation Artifact
         if: success()
