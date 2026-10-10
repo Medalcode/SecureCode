@@ -13,7 +13,7 @@ from securecode.api.dependencies import get_db_session
 from securecode.adapters.postgres.models import User
 from securecode.api.security import create_access_token
 
-os.environ["JWT_SECRET_KEY"] = "testsecret"
+os.environ["JWT_SECRET_KEY"] = "test-secret-key-that-is-at-least-32-bytes-long"
 os.environ["JWT_ALGORITHM"] = "HS256"
 
 from securecode.api.security import hash_password

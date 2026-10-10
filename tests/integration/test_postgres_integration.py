@@ -177,32 +177,58 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch
 from securecode.api.app import app
 from securecode.api.dependencies import get_db_session
+from securecode.adapters.postgres.models import User
+from securecode.api.security import hash_password, create_access_token
 
-def test_api_postgres_integration(engine, session):
+def test_api_postgres_integration(engine, session, monkeypatch):
+    # Ensure JWT secrets exist for this test
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-that-is-at-least-32-bytes-long")
+    monkeypatch.setenv("JWT_ALGORITHM", "HS256")
+
+    # Setup valid test user
+    test_user_id = uuid4()
+    test_user = User(
+        id=test_user_id,
+        username=f"integration_user_{uuid4().hex[:12]}",
+        password_hash=hash_password("securepassword"),
+        active=True,
+        created_at=datetime.now(timezone.utc)
+    )
+    session.add(test_user)
+    session.commit()
+
+    # Generate JWT token
+    token = create_access_token(str(test_user.id))
+    headers = {"Authorization": f"Bearer {token}"}
+
     # Override FastAPI dependency to use our Postgres test session
     app.dependency_overrides[get_db_session] = lambda: session
-    client = TestClient(app)
     
-    # We only mock the external boundary (GitHub)
-    with patch("securecode.application.evaluate_and_store.get_gh001_evidence") as mock_get_evidence:
-        mock_get_evidence.return_value = GH001Evidence(required_review_approvals=2, dismiss_stale_reviews=True)
+    try:
+        client = TestClient(app)
         
-        response = client.post("/api/v1/evaluations/gh-001", json={
-            "owner": "Medalcode",
-            "repository": "securecode",
-            "branch": "main"
-        })
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "PASS"
-        assert data["source"]["repository"] == "Medalcode/securecode"
-        assert data["evidence"]["required_review_approvals"] == 2
-        
-        # Verify it actually reached the database
-        eval_id = data["evaluation_id"]
-        record = session.query(EvaluationRecord).filter_by(id=eval_id).first()
-        assert record is not None
-        assert record.status == "PASS"
-
-    app.dependency_overrides.clear()
+        # We only mock the external boundary (GitHub)
+        with patch("securecode.application.evaluate_and_store.get_gh001_evidence") as mock_get_evidence:
+            mock_get_evidence.return_value = GH001Evidence(required_review_approvals=2, dismiss_stale_reviews=True)
+            
+            response = client.post("/api/v1/evaluations/gh-001", json={
+                "owner": "Medalcode",
+                "repository": "securecode",
+                "branch": "main"
+            }, headers=headers)
+            
+            assert response.status_code == 200
+            data = response.json()
+            assert data["status"] == "PASS"
+            assert data["source"]["repository"] == "Medalcode/securecode"
+            assert data["evidence"]["required_review_approvals"] == 2
+            
+            # Verify it actually reached the database
+            eval_id = data["evaluation_id"]
+            record = session.query(EvaluationRecord).filter_by(id=eval_id).first()
+            assert record is not None
+            assert record.status == "PASS"
+            assert record.requested_by_user_id == test_user.id
+            
+    finally:
+        app.dependency_overrides.pop(get_db_session, None)

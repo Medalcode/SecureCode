@@ -8,15 +8,14 @@ SecureCode is being developed using Specification-Driven Development (SDD).
 
 ## Current Status
 
-### First Vertical Slice: GH-001 (IMPLEMENTED)
-The first complete vertical slice is fully implemented, covering:
-- **GH-001 (Branch Protection Required)**: Deterministic evaluation engine.
-- **GitHub REST API**: Live evidence extraction and normalization.
-- **PostgreSQL Persistence**: Immutable, traceable evaluation records with canonical JSONB hashes.
-- **FastAPI**: HTTP boundaries.
+### Implemented Capabilities
+- **GH-001 (Branch Protection Required)**: Deterministic evaluation engine with peer approval & stale dismissal thresholds.
+- **GH-002 (Default Branch Protection Enabled)**: Deterministic evaluation engine for primary branch protection status.
+- **GitHub REST API Adapters**: Live evidence extraction and normalization with graceful degradation on unobservable states.
+- **PostgreSQL Persistence**: Immutable, traceable evaluation records with canonical JSONB hashes, foreign key relations, and Alembic migrations.
+- **FastAPI HTTP Boundaries**: Fully typed endpoints (`/api/v1/evaluations/gh-001`, `/api/v1/evaluations/gh-002`, `/health`).
+- **User Authentication & Traceability**: Argon2id password hashing, HS256 JWT access tokens, dependency-injected user authorization, and `requested_by_user_id` audit linkages.
 - **CI/CD**: GitHub Actions remote validation workflows covering API, SQLite integration, and containerized PostgreSQL.
-
-The next planned phase includes User Authentication (JWT) and broader Multi-Tenancy capabilities.
 
 ## Development
 

@@ -10,7 +10,7 @@ from securecode.api.security import (
 )
 from argon2.exceptions import VerifyMismatchError
 
-os.environ["JWT_SECRET_KEY"] = "testsecret"
+os.environ["JWT_SECRET_KEY"] = "test-secret-key-that-is-at-least-32-bytes-long"
 os.environ["JWT_ALGORITHM"] = "HS256"
 
 def test_password_hashing():
