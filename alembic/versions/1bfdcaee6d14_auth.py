@@ -30,11 +30,21 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('username')
     )
-    op.add_column('evaluation_records', sa.Column('requested_by_user_id', sa.Uuid(), nullable=True))
-    op.create_foreign_key('fk_evaluation_user', 'evaluation_records', 'users', ['requested_by_user_id'], ['id'])
+    # batch_alter_table wraps ADD COLUMN + ADD CONSTRAINT in a single table rebuild
+    # on SQLite (which does not support ALTER TABLE ... ADD CONSTRAINT outside of
+    # batch mode). On PostgreSQL the batch context emits the same plain ALTER TABLE
+    # statements as before, so behaviour is identical on both engines.
+    with op.batch_alter_table('evaluation_records') as batch_op:
+        batch_op.add_column(sa.Column('requested_by_user_id', sa.Uuid(), nullable=True))
+        batch_op.create_foreign_key(
+            'fk_evaluation_user', 'users',
+            ['requested_by_user_id'], ['id'],
+        )
+
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_constraint('fk_evaluation_user', 'evaluation_records', type_='foreignkey')
-    op.drop_column('evaluation_records', 'requested_by_user_id')
+    with op.batch_alter_table('evaluation_records') as batch_op:
+        batch_op.drop_constraint('fk_evaluation_user', type_='foreignkey')
+        batch_op.drop_column('requested_by_user_id')
     op.drop_table('users')
