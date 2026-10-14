@@ -3,14 +3,16 @@ import sys
 import json
 import platform
 from datetime import datetime, timezone
+from uuid import uuid4
 
 import fastapi
 import sqlalchemy
 from fastapi.testclient import TestClient
 
 from securecode.api.app import app
-from securecode.adapters.postgres.models import EvaluationRecord, EvidenceRecord, Base
+from securecode.adapters.postgres.models import EvaluationRecord, EvidenceRecord, Base, User
 from securecode.api.dependencies import get_db_session
+from securecode.api.security import hash_password, create_access_token
 
 def main():
     token = os.environ.get("VALIDATION_GITHUB_TOKEN")
@@ -25,6 +27,8 @@ def main():
         
     # We set GITHUB_TOKEN so the API will pick it up
     os.environ["GITHUB_TOKEN"] = token
+    if not os.environ.get("JWT_SECRET_KEY"):
+        os.environ["JWT_SECRET_KEY"] = "default-e2e-jwt-secret-key-32-bytes-minimum"
         
     engine = sqlalchemy.create_engine(db_url)
     SessionLocal = sqlalchemy.orm.sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -40,12 +44,31 @@ def main():
             session.close()
             
     app.dependency_overrides[get_db_session] = override_get_db
+
+    # Provision E2E test user for authenticated API requests
+    with SessionLocal() as db_session:
+        user = db_session.query(User).filter_by(username="e2e-runner").first()
+        if not user:
+            user = User(
+                id=uuid4(),
+                username="e2e-runner",
+                password_hash=hash_password("e2e-runner-password-123"),
+                active=True,
+                created_at=datetime.now(timezone.utc)
+            )
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+        user_id = user.id
+
+    access_token = create_access_token(str(user_id))
+    auth_headers = {"Authorization": f"Bearer {access_token}"}
     client = TestClient(app)
     
     cases = [
-        {"name": "PASS", "branch": "gh001-pass", "expected": "PASS"},
-        {"name": "FAIL", "branch": "gh001-fail-approvals", "expected": "FAIL"},
-        {"name": "UNKNOWN", "branch": "gh001-unknown-noprot", "expected": "UNKNOWN"},
+        {"name": "PASS", "branch": "branch-case-1-pass", "expected": "PASS"},
+        {"name": "FAIL", "branch": "branch-case-2-fail-low-approvals", "expected": "FAIL"},
+        {"name": "UNKNOWN", "branch": "branch-case-5-unprotected", "expected": "UNKNOWN"},
     ]
     
     results = {}
@@ -56,7 +79,7 @@ def main():
         status_name = case["name"]
         expected = case["expected"]
         
-        response = client.post("/api/v1/evaluations/gh-001", json={
+        response = client.post("/api/v1/evaluations/gh-001", headers=auth_headers, json={
             "owner": "Medalcode",
             "repository": "securecode-ground-truth",
             "branch": case["branch"]
@@ -100,7 +123,8 @@ def main():
                 trace_verified = (
                     eval_record.status == actual_status and
                     eval_record.source_branch == case["branch"] and
-                    eval_record.evidence.evidence_hash == data["evidence"]["hash"]
+                    eval_record.evidence.evidence_hash == data["evidence"]["hash"] and
+                    eval_record.requested_by_user_id == user_id
                 )
                 
                 # Timestamp validation

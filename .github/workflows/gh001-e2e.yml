@@ -40,6 +40,7 @@ jobs:
         env:
           DATABASE_URL: postgresql+psycopg2://securecode_test@localhost:5432/securecode_test
           VALIDATION_GITHUB_TOKEN: ${{ secrets.VALIDATION_GITHUB_TOKEN }}
+          JWT_SECRET_KEY: test-secret-key-that-is-at-least-32-bytes-long
         run: |
           if [ -z "$VALIDATION_GITHUB_TOKEN" ]; then
             echo "VALIDATION_GITHUB_TOKEN secret is not set. E2E Validation BLOCKED."
