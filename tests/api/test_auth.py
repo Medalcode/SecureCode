@@ -7,7 +7,7 @@ from uuid import uuid4
 from securecode.api.app import app
 from securecode.api.dependencies import get_db_session
 from securecode.adapters.postgres.models import User
-from securecode.api.security import hash_password
+from securecode.api.security import hash_password, create_access_token
 
 os.environ["JWT_SECRET_KEY"] = "test-secret-key-that-is-at-least-32-bytes-long"
 os.environ["JWT_ALGORITHM"] = "HS256"
@@ -113,8 +113,9 @@ def test_login_inactive_user():
         "username": "inactiveuser",
         "password": "correctpassword"
     })
-    assert response.status_code == 400
-    assert "Inactive user" in response.json()["detail"]
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Incorrect username or password"
+    assert response.headers["www-authenticate"] == "Bearer"
 
 def test_protected_endpoints_reject_unauthenticated():
     response = client.post("/api/v1/evaluations/gh-001", json={
@@ -128,4 +129,21 @@ def test_protected_endpoints_reject_unauthenticated():
         "owner": "Medalcode",
         "repository": "repo"
     })
+    assert response.status_code == 401
+
+
+@pytest.mark.parametrize("route,payload", [
+    ("/api/v1/evaluations/gh-001", {"owner": "Medalcode", "repository": "repo", "branch": "main"}),
+    ("/api/v1/evaluations/gh-002", {"owner": "Medalcode", "repository": "repo"}),
+])
+@pytest.mark.parametrize("token_kind", ["invalid", "inactive", "unknown"])
+def test_protected_endpoints_reject_invalid_or_unauthorized_token(route, payload, token_kind):
+    if token_kind == "invalid":
+        token = "invalid.jwt.token"
+    elif token_kind == "inactive":
+        token = create_access_token(str(inactive_user_id))
+    else:
+        token = create_access_token(str(uuid4()))
+
+    response = client.post(route, headers={"Authorization": f"Bearer {token}"}, json=payload)
     assert response.status_code == 401

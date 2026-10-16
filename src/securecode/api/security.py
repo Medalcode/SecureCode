@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timedelta, timezone
 import jwt
 from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError
+from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 
 # Password Hasher
 ph = PasswordHasher()
@@ -13,7 +13,7 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, password_hash: str) -> bool:
     try:
         return ph.verify(password_hash, password)
-    except VerifyMismatchError:
+    except (VerifyMismatchError, InvalidHashError, VerificationError):
         return False
 
 # JWT Configuration
@@ -24,7 +24,10 @@ def get_jwt_secret() -> str:
     return secret
 
 def get_jwt_algorithm() -> str:
-    return os.environ.get("JWT_ALGORITHM", "HS256")
+    algorithm = os.environ.get("JWT_ALGORITHM", "HS256")
+    if algorithm != "HS256":
+        raise ValueError("Unsupported JWT algorithm: only HS256 is allowed")
+    return algorithm
 
 def get_jwt_expire_minutes() -> int:
     return int(os.environ.get("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60"))

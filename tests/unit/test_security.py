@@ -64,3 +64,22 @@ def test_jwt_tampered_token():
     
     decoded = verify_access_token(tampered_token)
     assert decoded is None
+
+@pytest.mark.parametrize("algorithm", ["none", "HS384", "HS512", "RS256", "invalid"])
+def test_jwt_rejects_unsupported_algorithm(monkeypatch, algorithm):
+    monkeypatch.setenv("JWT_ALGORITHM", algorithm)
+    with pytest.raises(ValueError, match="only HS256 is allowed"):
+        create_access_token("test-user")
+    with pytest.raises(ValueError, match="only HS256 is allowed"):
+        verify_access_token("not.a.real.jwt")
+
+
+@pytest.mark.parametrize("bad_hash", ["", "not-an-argon2-hash", "$argon2id$broken"])
+def test_password_malformed_hash_returns_false(bad_hash):
+    assert verify_password("password", bad_hash) is False
+
+
+def test_jwt_hs256_remains_supported(monkeypatch):
+    monkeypatch.setenv("JWT_ALGORITHM", "HS256")
+    token = create_access_token("test-user")
+    assert verify_access_token(token) == "test-user"
