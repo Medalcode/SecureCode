@@ -27,3 +27,7 @@ Thumbs.db
 
 # Local artifacts
 artifacts/
+
+# Local database and execution logs
+securecode.db
+run_logs.txt
