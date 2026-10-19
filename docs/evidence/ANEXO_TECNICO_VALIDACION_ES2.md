@@ -4,8 +4,8 @@
 **Autores:** Jonatthan Medalla · Jose Mora  
 **Profesor Guía:** Armin Vladimir Brun Rüth  
 **Fecha de consolidación:** Octubre 2026  
-**Línea Base en Repositorio:** Rama `main` en commit `f199e8b`  
-**GitHub Actions Run ID:** [39175122486](https://github.com/Medalcode/SecureCode/actions/runs/39175122486)  
+**Línea Base en Repositorio:** Rama `main` en commit `ff384c8`  
+**GitHub Actions Run ID:** [39175122486](https://github.com/Medalcode/SecureCode/actions/runs/39175122486) / [39181442259](https://github.com/Medalcode/SecureCode/actions/runs/39181442259)  
 
 ---
 
@@ -14,8 +14,8 @@
 El presente anexo técnico constituye la **evidencia consolidada de validación y aseguramiento de calidad** para el hito **Evaluación Sumativa 2 (ES2)** de SECURECODE. Su propósito es respaldar formalmente los requerimientos funcionales, de seguridad, persistencia, rendimiento y calidad arquitectónica establecidos en la Sección V (*Plan de Pruebas y Aseguramiento de Calidad*) del informe principal.
 
 Este documento establece una **distinción metodológica fundamental**:
-1. **Métricas formales de Integración Continua (CI):** Pruebas unitarias y de integración deterministas, reproducibles de forma desatendida en el pipeline de GitHub Actions sobre contenedores PostgreSQL 15 oficiales (89% de cobertura, 95/95 pruebas aprobadas).
-2. **Evidencias experimentales de rendimiento y persistencia:** Pruebas controladas con usuarios virtuales (Locust), aislamiento en base de datos local `securecode_test` y simulación de latencia de red mediante un mock HTTP desacoplado.
+1. **Métricas formales de Integración Continua (CI):** Pruebas unitarias, de API, seguridad y persistencia deterministas, ejecutadas y reproducibles de forma desatendida en el pipeline de GitHub Actions sobre contenedores PostgreSQL 15 oficiales (89% de cobertura, 95/95 pruebas aprobadas).
+2. **Evidencias experimentales de rendimiento y persistencia:** Pruebas controladas con usuarios virtuales (Locust), aislamiento en base de datos local `securecode_test` y simulación de latencia de red mediante un mock HTTP desacoplado. Los scripts y reportes CSV correspondientes se encuentran versionados en el repositorio bajo `tests/performance/`, `scripts/` y `reports/`.
 
 ---
 
@@ -52,7 +52,7 @@ Esta triada garantiza el cumplimiento de **KPI-04** (Tasa de `UNKNOWN` correcto 
 En el marco del aseguramiento de calidad y prevención de vulnerabilidades (OWASP API Security Top 10), se aplicaron mejoras defensivas en la capa de transporte, acceso y almacenamiento de credenciales:
 
 ### 3.1. Restricción Estricta de Algoritmos Criptográficos en JWT
-* **Mitigación de vulnerabilidad de confusión de algoritmos:** El validador de tokens en `src/securecode/api/security.py` fue configurado para restringir explícitamente el conjunto de algoritmos aceptados a `algorithms=["HS256"]`.
+* **Mitigación de vulnerabilidad de confusión de algoritmos:** El validador de tokens en `src/securecode/api/security.py` restringe explícitamente el conjunto de algoritmos aceptados a `algorithms=["HS256"]`.
 * **Batería de pruebas automatizadas (`tests/unit/test_security.py`):**
   * Rechazo de algoritmo nulo (`none` attack): produce HTTP 401.
   * Rechazo de algoritmos no autorizados (`HS384`, `HS512`, `RS256` y cadenas malformadas).
@@ -66,8 +66,8 @@ En el marco del aseguramiento de calidad y prevención de vulnerabilidades (OWAS
 * **Comportamiento uniforme HTTP 401:** En `src/securecode/api/app.py`, tanto las credenciales erróneas como el acceso de cuentas inactivadas (`is_active=False`) retornan un código homogéneo `401 Unauthorized` con el encabezado estándar `WWW-Authenticate: Bearer`. Esto previene ataques de enumeración de usuarios basados en diferencias de código HTTP.
 
 ### 3.4. Higiene del Repositorio y Prevención de Fugas de Datos
-* **Actualización de `.gitignore`:** Exclusión explícita y permanente de bases de datos locales SQLite (`securecode.db`), logs de depuración (`run_logs.txt`), archivos de credenciales (`.env`) y reportes de pruebas de carga.
-* **Eliminación del historial rastreado:** Se retiraron formalmente del árbol de Git los archivos locales rastreados previamente, mitigando los hallazgos de auditoría PERF-001 y PERF-002.
+* **Actualización de `.gitignore`:** Exclusión explícita de bases de datos locales SQLite (`securecode.db`), logs de depuración (`run_logs.txt`) y archivos de credenciales (`.env`).
+* **Saneamiento de Guías de Prueba:** La guía `tests/performance/load_test_instructions.md` utiliza referencias a variables de entorno (`%DATABASE_URL%` / `$env:DATABASE_URL`) y marcadores sin credenciales en texto plano.
 
 ---
 
@@ -105,59 +105,83 @@ La suite de pruebas automatizadas se ejecuta de forma integral en cada Pull Requ
 Para validar los SLA y KPI de latencia y throughput bajo condiciones de concurrencia, se ejecutó una batería de pruebas de carga y estrés con Locust.
 
 ### 5.1. Metodología de Aislamiento Experimental
-1. **Mock de GitHub en Loopback:** Para evitar bloqueos por *Rate Limiting* de GitHub (cuota de 5,000 req/hora) y latencias erráticas de internet, se ejecutó un mock HTTP local (`127.0.0.1:8001`) con latencia artificial inyectada de **150 ms** por solicitud.
+1. **Mock de GitHub en Loopback:** Para evitar bloqueos por *Rate Limiting* de GitHub (cuota de 5.000 req/hora) y latencias erráticas de internet, se ejecutó un mock HTTP local (`127.0.0.1:8001`) con latencia artificial inyectada de **150 ms** por solicitud en el endpoint de branch protection. El parche en `run_perf_api.py` intercepta llamadas de `urllib.request` a nivel de socket confinando el tráfico al entorno local.
 2. **Aislamiento de Carga de CPU:** Las solicitudes de evaluación utilizaron tokens JWT previamente obtenidos en el evento `on_start` del usuario virtual, aislando el coste computacional de Argon2id del procesamiento propio de la regla.
-3. **Persistencia Activa:** Cada evaluación procesada fue efectivamente insertada en PostgreSQL (`securecode_test`), midiendo el overhead real de SQLAlchemy y la base de datos relacional.
+3. **Persistencia Activa:** Cada evaluación procesada fue efectivamente insertada en PostgreSQL (`securecode_test`), midiendo el comportamiento real de SQLAlchemy y la base de datos relacional.
 
 ### 5.2. Resultados por Escenario de Carga
 
-| Escenario | Concurrencia (VUsers) | Duración | Peticiones Totales (GH-001) | Throughput (RPS) | Latencia Media | Latencia p95 | Tasa de Error |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **A: Carga Nominal** | 5 | 2 min | 262 | 2,20 req/s | 165 ms | 180 ms | **0,0%** |
-| **B1: Concurrencia 10** | 10 | 1 min | 228 | 3,89 req/s | 170 ms | 200 ms | **0,0%** |
-| **B2: Concurrencia 20** | 20 | 1 min | 497 | 8,50 req/s | 168 ms | 200 ms | **0,0%** |
-| **B3: Concurrencia 30** | 30 | 1 min | 676 | 11,36 req/s | 167 ms | 180 ms | **0,0%** |
-| **C: Estrés Controlado** | 50 | 2 min | 2.432 | **20,45 req/s** | 172 ms | **300 ms** | **0,0%** |
+| Escenario | Concurrencia (VUsers) | Duración | Peticiones Totales (GH-001) | Throughput (RPS) | Latencia Media | Latencia p95 | Latencia p98 | Tasa de Error |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **A: Carga Nominal** | 5 | 2 min | 262 | 2,20 req/s | 165 ms | 180 ms | 180 ms | **0,0%** |
+| **B1: Concurrencia 10** | 10 | 1 min | 228 | 3,89 req/s | 170 ms | 200 ms | 200 ms | **0,0%** |
+| **B2: Concurrencia 20** | 20 | 1 min | 497 | 8,50 req/s | 168 ms | 200 ms | 200 ms | **0,0%** |
+| **B3: Concurrencia 30** | 30 | 1 min | 676 | 11,36 req/s | 167 ms | 180 ms | 190 ms | **0,0%** |
+| **C: Estrés Controlado** | 50 | 2 min | 2.432 | **20,45 req/s** | 172 ms | **200 ms** | **300 ms** | **0,0%** |
+
+*(Nota: Las métricas corresponden estrictamente al endpoint `POST /api/v1/evaluations/gh-001`, respaldadas en los archivos CSV de `reports/`).*
 
 ### 5.3. Hallazgos y Cumplimiento de KPI
-* **SLA de Latencia (KPI-03, p95 $\le$ 3,0 s):** Bajo la condición de estrés más exigente (50 usuarios concurrentes), la latencia percentil 95 fue de **300 ms** (0,30 s), superando con holgura la meta de 3 segundos.
-* **Overhead del Sistema:** Restando los 150 ms de latencia impuesta por el mock, el tiempo consumido conjuntamente por FastAPI, la serialización Pydantic y la transacción en PostgreSQL fue de **~150 ms en el p95**.
-* **Estabilidad del Connection Pool:** Durante las 4,104 peticiones de evaluación procesadas en las pruebas de carga, no se registró ninguna saturación ni timeout en las conexiones hacia PostgreSQL.
+* **SLA de Latencia (KPI-03, p95 $\le$ 3,0 s):** Bajo la condición de estrés más exigente (50 usuarios concurrentes), la latencia percentil 95 fue de **200 ms** (0,20 s) y el percentil 98 fue de **300 ms** (0,30 s), superando con amplia holgura la meta de 3 segundos.
+* **Comportamiento de la Distribución:** Con una mediana de 160 ms y un p95 de 200 ms frente al retardo base inyectado de 150 ms, la sobrecarga atribuible al procesamiento interno (FastAPI, serialización Pydantic y persistencia relacional en PostgreSQL) se mantuvo acotada bajo concurrencia sostenida.
+* **Estabilidad del Connection Pool:** Durante las 4.095 peticiones de evaluación procesadas en los 5 escenarios, no se registraron timeouts ni agotamiento de conexiones en el pool de SQLAlchemy.
 
 ### 5.4. Limitaciones Metodológicas de la Simulación
 * **Ausencia de latencia WAN:** La ejecución en `localhost` no refleja las fluctuaciones reales de enrutamiento internacional hacia `api.github.com`.
 * **Comportamiento del proveedor real:** El límite de tasa de la API pública de GitHub introduce restricciones operativas que requerirán en el futuro el uso de colas asíncronas y caché de evidencia.
+* **Diferenciación de Escenarios:** Los escenarios ejecutados y medidos empíricamente corresponden a cargas de 5 a 50 usuarios virtuales en un host local. Escenarios de 200 y 500 usuarios constituyen proyecciones teóricas para arquitecturas distribuidas en la nube.
 
 ---
 
 ## 6. Persistencia, Integridad Referencial y Trazabilidad (PostgreSQL)
 
 ### 6.1. Modelo Relacional y Trazabilidad Transaccional
-El almacenamiento en PostgreSQL se estructura mediante dos entidades acopladas transaccionalmente:
-* **`evidence_records`:** Almacena el payload estructurado recibido del proveedor, la fecha de recolección (`collected_at`) y el digest criptográfico `sha256_hash`.
-* **`evaluation_records`:** Registra el dictamen emitido (`status`), la regla aplicada, las marcas temporales (`evaluated_at`) y la clave foránea obligatoria `evidence_id`.
+El almacenamiento en PostgreSQL se estructura mediante dos entidades acopladas en `src/securecode/adapters/postgres/models.py`:
+* **`evidence_records`:** Almacena el payload estructurado recibido (`raw_evidence`), la fecha de recolección (`collected_at`) y el digest criptográfico `evidence_hash` (SHA-256 de 64 caracteres hexadecimales).
+* **`evaluation_records`:** Registra el dictamen emitido (`status`), la regla aplicada (`rule_id`, `rule_version`), las marcas temporales (`evaluated_at`), los metadatos de auditoría (`source_type`, `source_repository`, `source_branch`, `requested_by_user_id`) y la clave foránea obligatoria `evidence_id`.
 
-```
-  ┌─────────────────────────┐               ┌─────────────────────────┐
-  │     evidence_records    │               │    evaluation_records   │
-  ├─────────────────────────┤               ├─────────────────────────┤
-  │ id (UUID, PK)           │◄──────────────┤ evidence_id (UUID, FK)  │
-  │ payload (JSONB)         │    1 : 1      │ id (UUID, PK)           │
-  │ sha256_hash (VARCHAR)   │ (observado)   │ control_id (VARCHAR)    │
-  │ collected_at (TIMESTAMPTZ)│             │ status (VARCHAR)        │
-  └─────────────────────────┘               │ evaluated_at (TIMESTAMPTZ)
-                                            └─────────────────────────┘
+```mermaid
+erDiagram
+    evidence_records ||--o{ evaluation_records : "1 a N (modelo relacional)"
+    evidence_records {
+        uuid id PK
+        varchar control_id
+        varchar evidence_hash
+        jsonb raw_evidence
+        timestamptz collected_at
+    }
+    evaluation_records {
+        uuid id PK
+        varchar control_id
+        varchar rule_id
+        int rule_version
+        varchar status
+        timestamptz evaluated_at
+        uuid evidence_id FK
+        uuid requested_by_user_id FK
+        varchar source_type
+        varchar source_repository
+        varchar source_branch
+    }
 ```
 
-### 6.2. Verificación de Integridad y Correspondencia Empírica
+> **Aclaración de Cardinalidad:**  
+> El modelo SQLAlchemy define una relación de uno a muchos (`relationship(back_populates="evidence")`) permitiendo que múltiples evaluaciones referencien un mismo registro de evidencia histórico. En el flujo actual de evaluación implementado, cada ejecución adquiere y persiste su propia evidencia, observándose una correspondencia 1:1 en las pruebas de validación.
+
+### 6.2. Verificación de Integridad y Conciliación de Métricas
 En las pruebas controladas (PERF-004 para GH-001 y PERF-005 para GH-002) se auditó el comportamiento de la base de datos `securecode_test`:
-1. **Correspondencia observada:** Cada petición individual procesada por la API generó exactamente **+1 registro en `evaluation_records` y +1 registro en `evidence_records`**, vinculados por el mismo UUID.
-2. **Consistencia de hash:** El cálculo en memoria de SHA-256 sobre el objeto `GH001Evidence` / `GH002Evidence` coincidió bit a bit con el campo `sha256_hash` persistido.
-3. **Consistencia masiva en carga:** El recuento final en base de datos arrojó un total de 4,104 evaluaciones completadas durante la sesión de pruebas, coincidiendo exactamente con la sumatoria de peticiones registradas por los archivos CSV de Locust.
+1. **Correspondencia observada:** Cada petición individual procesada por la API generó exactamente **+1 registro en `evaluation_records` y +1 registro en `evidence_records`**, vinculados por el mismo UUID `evidence_id`.
+2. **Consistencia de hash:** El cálculo en memoria de SHA-256 sobre el objeto `GH001Evidence` / `GH002Evidence` coincidió bit a bit con el campo `evidence_hash` persistido.
+3. **Conciliación Documentada de Recuentos:**
+   * **4.095 evaluaciones:** Peticiones HTTP 200 procesadas en los 5 escenarios formales de Locust (262 nominal + 228 prog10 + 497 prog20 + 676 prog30 + 2.432 estrés).
+   * **4.104 evaluaciones:** Total acumulado generado por Locust al incorporar las 9 solicitudes del Smoke Test inicial (4.095 + 9).
+   * **4.835 registros:** Recuento acumulado total (`SELECT COUNT(*)`) en la tabla `evaluation_records` de `securecode_test`, correspondiente a las 4.104 evaluaciones de Locust más 731 registros preexistentes originados por suites de prueba unitarias, integradas y manuales previas.
+   * La persistencia quedó validada tanto por el código de respuesta HTTP 200 como por consultas SQL directas verificando la presencia física e integridad referencial de los registros.
 
 ### 6.3. Precaución Metodológica sobre Transaccionalidad
+> [!IMPORTANT]
 > **Nota de rigor técnico:**  
-> La correspondencia 1:1 observada y la integridad de claves foráneas demuestran el comportamiento correcto del repositorio SQLAlchemy en ejecuciones nominales y concurrentes exitosas. Sin embargo, **esta evidencia empírica no constituye una prueba formal de atomicidad ante fallos catastróficos** (por ejemplo, interrupción forzada del servidor de base de datos a mitad de la sentencia SQL). Dicha garantía requerirá una batería específica de pruebas de inyección de fallos y validación de rollback automático en etapas posteriores.
+> La correspondencia observada y la integridad de claves foráneas demuestran el comportamiento correcto del repositorio SQLAlchemy en ejecuciones nominales y concurrentes exitosas. Sin embargo, **esta evidencia empírica no constituye una prueba formal de atomicidad ante fallos catastróficos** (por ejemplo, interrupción forzada del servidor de base de datos a mitad de la sentencia SQL). Dicha garantía requerirá una batería específica de pruebas de inyección de fallos y validación de rollback automático en etapas posteriores.
 
 ---
 
@@ -183,22 +207,24 @@ gitGraph
    commit id: "ba049ec - Consolidación"
    checkout main
    merge integration/security-gh002 id: "f199e8b - Merge PR #4"
+   commit id: "ff384c8 - Documentación y pruebas"
 ```
 
 * **Pull Request #4 (`integration/security-gh002`):** Candidato único de integración a `main` que agrupó los cambios del PR #2 (seguridad y saneamiento) y del PR #3 (matriz automatizada GH-002), totalizando 9 archivos modificados.
 * **Fusión definitiva:** Ejecutada mediante **Merge Commit** en commit `f199e8b`, conservando la trazabilidad de los commits de auditoría.
-* **Validación post-merge:** Se ejecutó el pipeline de GitHub Actions sobre `main` (Run 39175122486), ratificando la aprobación de las 95 pruebas y el 89% de cobertura.
+* **Validación post-merge en CI:** Se ejecutó el pipeline de GitHub Actions sobre `main` (Run 39175122486), ratificando la aprobación de las 95 pruebas y el 89% de cobertura.
 * **Cierre trazable:** Los PR #2 y #3 fueron cerrados indicando explícitamente su consolidación en `main` a través del PR #4.
+* **Publicación integral:** Documentación técnica, evidencias experimentales y scripts de soporte incorporados en `main` bajo commit `ff384c8`.
 
 ---
 
 ## 8. Matriz de Contraste frente a Rúbrica y Criterios INACAP (ES2)
 
-| Criterio de Evaluación INACAP | Exigencia Rúbrica | Estado Demostrado en SECURECODE | Evidencia Técnica de Respaldo |
+| Criterio de Evaluación INACAP | Exigencia Rúbrica | Evidencia Técnica Demostrada en SECURECODE | Respaldo Verificable |
 | :--- | :--- | :--- | :--- |
-| **Batería de Pruebas de Software** | Múltiples niveles de prueba ejecutados y documentados. | **Sobresaliente:** 95 pruebas automatizadas (unitarias, integración, seguridad, matriz de estados). | CI Run 39175122486, `test_security.py`, `test_gh002_status_matrix.py`. |
-| **Aseguramiento de Calidad y Cobertura** | Cobertura de código relevante con métricas verificables. | **Sobresaliente:** Cobertura global del **89%** (superando la meta de 85%), con 100% en modelos de dominio y 95% en motor. | Reporte XML/HTML `pytest-cov`, 531 líneas auditadas. |
-| **Pruebas de Rendimiento y Estrés** | Medición de latencias, concurrencia y límites del sistema. | **Sobresaliente:** 3 escenarios en Locust (5 a 50 usuarios), p95 de 300 ms frente a meta de 3 s, 0% errores a 20.45 RPS. | `docs/evidence/performance/ES2_PERFORMANCE_RESULTS.md`, reportes CSV en `reports/`. |
-| **Seguridad de la Implementación** | Defensas aplicadas contra vulnerabilidades comunes. | **Sobresaliente:** Restricción JWT a HS256, Argon2id robustecido, mitigación de enumeración de usuarios y saneamiento de `.gitignore`. | `src/securecode/api/security.py`, `test_auth.py`, commit `f199e8b`. |
-| **Trazabilidad y Persistencia de Datos** | Almacenamiento íntegro y verificabilidad de resultados. | **Sobresaliente:** Persistencia en PostgreSQL con enlace foráneo a evidencia y hash SHA-256 verificado. | `PostgresEvaluationRepository`, recuento de 4,104 transacciones en `securecode_test`. |
-| **Ciclo de Vida y Gestión de Configuración** | Flujo de Git ordenado y auditable. | **Sobresaliente:** Estrategia basada en PRs de validación, Merge Commit y pipeline automatizado en GitHub Actions. | PR #4, commit `f199e8b`, historial de commits intacto. |
+| **Batería de Pruebas de Software** | Múltiples niveles de prueba ejecutados y documentados. | 95 pruebas automatizadas deterministas (unitarias, integración, seguridad, matriz de estados GH-002). | CI Run 39175122486, `test_security.py`, `test_gh002_status_matrix.py`. |
+| **Aseguramiento de Calidad y Cobertura** | Cobertura de código relevante con métricas verificables. | Cobertura global del **89%** (superando la meta de 85%), con 100% en modelos de dominio y 95% en motor de reglas. | Reporte XML/HTML `pytest-cov`, 531 líneas evaluadas en CI. |
+| **Pruebas de Rendimiento y Estrés** | Medición de latencias, concurrencia y límites del sistema. | 5 escenarios en Locust (5 a 50 usuarios), p95 de 200 ms (p98 de 300 ms) frente a meta SLA de 3 s, 0% errores a 20.45 RPS. | `docs/evidence/performance/ES2_PERFORMANCE_RESULTS.md`, reportes CSV en `reports/`. |
+| **Seguridad de la Implementación** | Defensas aplicadas contra vulnerabilidades comunes (OWASP). | Restricción JWT a HS256, verificación defensiva Argon2id, mitigación de enumeración de usuarios (HTTP 401 uniforme) y saneamiento de credenciales. | `src/securecode/api/security.py`, `test_auth.py`, commit `f199e8b`. |
+| **Trazabilidad y Persistencia de Datos** | Almacenamiento íntegro y verificabilidad de resultados. | Persistencia relacional en PostgreSQL con enlace foráneo a evidencia, hash SHA-256 (`evidence_hash`) y recuento conciliado (4.095 / 4.104 / 4.835). | `PostgresEvaluationRepository`, consultas SQL en `securecode_test`. |
+| **Ciclo de Vida y Gestión de Configuración** | Flujo de Git ordenado y auditable. | Estrategia basada en PRs de validación, Merge Commit, pipeline automatizado en GitHub Actions y trazabilidad de commits. | PR #4, commit `f199e8b`, historial de commits intacto en `main`. |

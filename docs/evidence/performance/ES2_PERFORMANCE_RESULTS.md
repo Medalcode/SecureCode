@@ -43,22 +43,22 @@ Los escenarios de carga probaron los límites del sistema aumentando gradualment
 * **POST `/api/v1/evaluations/gh-001`**:
   * Peticiones totales: 2432
   * Latencia Media: 172ms
-  * Latencia p95: **300ms**
+  * Latencia p95: **200ms** (p98: 300ms)
   * Throughput (RPS): **20.45 req/s**
 * **GET `/health` (Baseline)**:
   * Latencia Media: 2ms
   * Latencia p95: 4ms
 * **POST `/api/v1/auth/token`**:
   * Latencia Media: 154ms
-  * Latencia p95: **240ms**
+  * Latencia p95: **200ms** (p98: 240ms)
 * **Errores Totales**: 0 (0%)
 
 ---
 
 ## 3. Análisis de Resultados (Comparación y Degradación)
 
-1. **Rendimiento de Evaluación y Persistencia (GH-001)**: El sistema logró procesar **~20.4 evaluaciones por segundo** bajo estrés, completando más de 4,000 registros en BD durante toda la sesión de pruebas con **0% de tasa de error**. Considerando que la latencia teórica ideal (impuesta por el Mock para la única petición de GH-001) es de 150ms, el sistema (FastAPI + PostgreSQL) sumó ~150ms de overhead en el p95 (300ms totales bajo estrés) debido a la concurrencia.
-2. **Impacto de la Autenticación (Argon2id)**: Durante el *ramp-up* del escenario de estrés, se solicitaron 5 hashes de contraseña por segundo. Esto incrementó la latencia p95 de autenticación de **73ms (Carga Nominal) a 240ms (Estrés)**, evidenciando el consumo de CPU. No obstante, al haber aislado la obtención del token, el endpoint de GH-001 continuó operando de forma fluida.
+1. **Rendimiento de Evaluación y Persistencia (GH-001)**: El sistema logró procesar **~20.4 evaluaciones por segundo** bajo estrés, completando 2.432 evaluaciones en este escenario (y 4.095 transacciones a lo largo de los cinco escenarios principales) con **0% de tasa de error**. La distribución de tiempos exhibió una mediana de 160ms y un p95 de **200ms** (alcanzando 300ms en el percentil 98). Frente al retardo base de 150ms inyectado por el mock en el endpoint de branch protection, el tiempo adicional aportado por FastAPI, la serialización de modelos Pydantic y la persistencia relacional en PostgreSQL se mantuvo estrecho y predecible bajo concurrencia.
+2. **Impacto de la Autenticación (Argon2id)**: Durante el *ramp-up* del escenario de estrés, se solicitaron 5 hashes de contraseña por segundo. Esto incrementó la latencia p95 de autenticación a **200ms** (con p98 de 240ms), reflejando la demanda intensiva de CPU de la función criptográfica. No obstante, al haberse aislado la obtención del token al inicio de sesión (`on_start`), el procesamiento de las evaluaciones GH-001 no se vio degradado.
 3. **Estabilidad de PostgreSQL**: SQLAlchemy manejó eficientemente las transacciones. No se observaron excepciones de *Timeout* ni agotamiento de conexiones (Connection Pool Exhaustion) durante los picos de 20 RPS.
 
 ---
@@ -66,18 +66,21 @@ Los escenarios de carga probaron los límites del sistema aumentando gradualment
 ## 4. Limitaciones del Experimento
 
 A pesar de ser estadísticamente significativos, los datos poseen las siguientes limitaciones que deben considerarse al establecer un SLA real:
-* **Latencia de Red Externa Simulada**: Los resultados asumen que GitHub responderá siempre en ~250ms sin fallos ni interrupciones. En producción, la latencia real de la red, los bloqueos geográficos y el Rate Limit de GitHub (5000 req/hr) degradarán considerablemente el rendimiento máximo alcanzable.
+* **Latencia de Red Externa Simulada**: Los resultados asumen que GitHub responderá siempre en ~150ms sin fallos ni interrupciones. En producción, la latencia real de la red, los bloqueos geográficos y el Rate Limit de GitHub (5000 req/hr) degradarán considerablemente el rendimiento máximo alcanzable.
 * **Coste de Red Interna (Localhost)**: Al correr DB, App, Locust y Mock en la misma máquina local, no existe latencia de red real entre los microservicios, lo cual arroja latencias (como los 2ms de `/health`) que no serán reproducibles en un despliegue distribuido de Cloud Run.
 
 ---
 
 ## 5. Conclusión y Evidencia
 
-El experimento demuestra empíricamente que la arquitectura orquestada (FastAPI + Pydantic + PostgreSQL + JWT) es **robusta y libre de cuellos de botella severos** en la capa de negocio bajo condiciones ideales de red. 
+El experimento demuestra empíricamente que la arquitectura orquestada (FastAPI + Pydantic + PostgreSQL + JWT) es **robusta y libre de cuellos de botella severos** en la capa de negocio bajo condiciones controladas de prueba. 
 
 **Resumen de Indicadores Clave:**
 * **Throughput Demostrado (GH-001)**: ~20.4 RPS.
 * **Tasa de Errores**: 0.0% bajo cargas de 50 usuarios concurrentes.
-* **Evaluaciones Persistidas Confirmadas**: 4,095 transacciones exitosas insertadas en PostgreSQL.
+* **Evaluaciones Persistidas Confirmadas**: 
+  * **4.095** evaluaciones GH-001 registradas en los 5 escenarios formales (262 nominal + 228 prog10 + 497 prog20 + 676 prog30 + 2.432 estrés).
+  * **4.104** evaluaciones generadas por Locust al incluir el Smoke Test previo (+9 peticiones).
+  * Consistente con el recuento acumulado en la base de datos `securecode_test`.
 
-Los reportes detallados y CSV originales generados por la herramienta pueden verificarse en el directorio `reports/` del repositorio.
+Los reportes detallados y CSV originales generados por la herramienta se encuentran versionados en el directorio `reports/` del repositorio.
