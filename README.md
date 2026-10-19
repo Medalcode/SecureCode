@@ -18,8 +18,9 @@ SecureCode is being developed using Specification-Driven Development (SDD).
 - **CI/CD**: GitHub Actions remote validation workflows covering API, SQLite integration, and containerized PostgreSQL.
 
 ### Verification Metrics
-- **Test Suite**: 77/77 tests passing (Unit, API, and real PostgreSQL 17 Integration).
-- **Test Coverage**: 88% overall codebase coverage, with 100% coverage on core domain models and evaluators.
+- **Test Suite**: 95/95 tests passing (Unit, API, Security, GH-002 Matrix, and containerized PostgreSQL 15 Integration).
+- **Test Coverage**: 89% overall codebase coverage (531 statements evaluated in CI), with 100% coverage on core domain models and 95% on rule evaluators.
+- **CI Baseline**: GitHub Actions Run ID [39175122486](https://github.com/Medalcode/SecureCode/actions/runs/39175122486) on `main` branch.
 
 ## Development
 
