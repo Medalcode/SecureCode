@@ -1,18 +1,22 @@
 import React, { useState } from 'react';
+import { AlertCircle } from 'lucide-react';
 import { loginUser } from '../api/client';
 
 export default function LoginView({ onLoginSuccess }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setHasError(false);
     setErrorMessage('');
 
     if (!username.trim() || !password) {
-      setErrorMessage('Por favor ingrese usuario y contraseña.');
+      setHasError(true);
+      setErrorMessage('Usuario o contraseña incorrectos. Verifique sus datos.');
       return;
     }
 
@@ -21,13 +25,9 @@ export default function LoginView({ onLoginSuccess }) {
     setIsLoading(false);
 
     if (!result.success) {
-      // Conforme a la Tabla 19 del informe oficial:
-      // "Credenciales inválidas -> Aviso rojo bajo el formulario. Revisar datos y reintentar."
-      setErrorMessage(
-        result.status === 401
-          ? 'Credenciales inválidas. Revisar datos y reintentar.'
-          : (result.message || 'Error de conexión con el servicio. Reintentar más tarde.')
-      );
+      setHasError(true);
+      // Mensaje de la especificación oficial del Estado de Error
+      setErrorMessage('Usuario o contraseña incorrectos. Verifique sus datos.');
     } else {
       if (onLoginSuccess) {
         onLoginSuccess(result.data);
@@ -36,39 +36,62 @@ export default function LoginView({ onLoginSuccess }) {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 bg-[#f1f5f9]">
-      {/* Contenedor: Posición Centro, Borde Sutil, Fondo Blanco, Sombra Suave */}
-      <div className="w-full max-w-[420px] bg-white border border-slate-200/90 rounded-2xl p-8 sm:p-10 shadow-lg shadow-slate-200/60">
-        
+    <div 
+      className="min-h-screen w-full flex items-center justify-center p-4"
+      style={{ backgroundColor: '#F4F6FA' }}
+    >
+      {/* Contenedor: Posición Centro, Fondo #FFFFFF, Borde Radio 8px, Sombra Suave */}
+      <div 
+        className="w-full max-w-[400px] border border-slate-200 shadow-md p-8 sm:p-10"
+        style={{ 
+          backgroundColor: '#FFFFFF',
+          borderRadius: '8px'
+        }}
+      >
         {/* Encabezado */}
         <div className="text-center mb-8">
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-wider text-[#0f2744]">
+          <h1 
+            className="text-2xl sm:text-3xl font-extrabold tracking-wide"
+            style={{ color: '#213F8B' }}
+          >
             SECURECODE
           </h1>
-          <p className="text-sm text-slate-500 mt-2 font-normal">
+          <p 
+            className="text-sm mt-1 font-normal"
+            style={{ color: '#555555' }}
+          >
             Evaluación automatizada de controles
           </p>
         </div>
 
         {/* Formulario */}
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* Campo: Usuario */}
           <div>
             <label 
               htmlFor="username" 
-              className="block text-sm font-medium text-slate-600 mb-1.5"
+              className="block text-sm font-medium mb-1.5"
+              style={{ color: '#555555' }}
             >
               Usuario
             </label>
             <input
               id="username"
-              type="text"
+              type="email"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => {
+                setUsername(e.target.value);
+                if (hasError) setHasError(false);
+              }}
+              placeholder="auditor@empresa.com"
               disabled={isLoading}
-              autoComplete="username"
+              autoComplete="email"
               required
-              className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0f2744]/20 focus:border-[#0f2744] transition disabled:bg-slate-50 disabled:cursor-not-allowed"
+              className="w-full px-3.5 py-2.5 bg-white text-sm text-slate-800 placeholder-slate-400 focus:outline-none transition disabled:bg-slate-50"
+              style={{
+                borderRadius: '8px',
+                border: hasError ? '1px solid #D9534F' : '1px solid #D1D5DB',
+              }}
             />
           </div>
 
@@ -76,7 +99,8 @@ export default function LoginView({ onLoginSuccess }) {
           <div>
             <label 
               htmlFor="password" 
-              className="block text-sm font-medium text-slate-600 mb-1.5"
+              className="block text-sm font-medium mb-1.5"
+              style={{ color: '#555555' }}
             >
               Contraseña
             </label>
@@ -84,32 +108,56 @@ export default function LoginView({ onLoginSuccess }) {
               id="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (hasError) setHasError(false);
+              }}
+              placeholder="••••••••••••"
               disabled={isLoading}
               autoComplete="current-password"
               required
-              className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0f2744]/20 focus:border-[#0f2744] transition disabled:bg-slate-50 disabled:cursor-not-allowed"
+              className="w-full px-3.5 py-2.5 bg-white text-sm text-slate-800 placeholder-slate-400 focus:outline-none transition disabled:bg-slate-50"
+              style={{
+                borderRadius: '8px',
+                border: hasError ? '1px solid #D9534F' : '1px solid #D1D5DB',
+              }}
             />
           </div>
 
-          {/* Botón: Ingresar (Primario - Azul Marino) */}
+          {/* Botón: Ingresar */}
           <div className="pt-2">
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-2.5 px-4 bg-[#0f2744] hover:bg-[#16375f] active:bg-[#0b1c31] text-white font-medium rounded-lg text-sm transition shadow-sm disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+              className="w-full py-2.5 px-4 font-semibold text-sm transition shadow-sm hover:opacity-95 active:opacity-90 disabled:opacity-60 cursor-pointer"
+              style={{
+                backgroundColor: '#213F8B',
+                color: '#FFFFFF',
+                borderRadius: '8px',
+              }}
             >
               {isLoading ? 'Ingresando...' : 'Ingresar'}
             </button>
           </div>
-
-          {/* Aviso rojo bajo el formulario (según Tabla 19 del informe) */}
-          {errorMessage && (
-            <div className="mt-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs text-center font-medium">
-              {errorMessage}
-            </div>
-          )}
         </form>
+
+        {/* Alerta: Error de autenticación */}
+        {hasError && (
+          <div 
+            className="mt-5 p-3 flex items-center gap-2.5 text-xs animate-in fade-in duration-150"
+            style={{
+              backgroundColor: '#FDF2F2',
+              border: '1px solid #F5C6CB',
+              borderRadius: '8px',
+              color: '#C0392B',
+            }}
+          >
+            <AlertCircle className="w-4 h-4 shrink-0" style={{ color: '#C0392B' }} />
+            <span className="font-medium">
+              {errorMessage || 'Usuario o contraseña incorrectos. Verifique sus datos.'}
+            </span>
+          </div>
+        )}
 
       </div>
     </div>

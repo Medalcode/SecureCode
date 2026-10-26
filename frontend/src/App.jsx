@@ -28,7 +28,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f1f5f9] text-slate-800 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#F4F6FA] text-slate-800 flex flex-col font-sans">
       {/* En la pantalla de login mostramos el formulario centrado puro del mockup */}
       {currentStep === 'login' ? (
         <LoginView onLoginSuccess={handleLoginSuccess} />
