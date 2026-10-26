@@ -31,3 +31,8 @@ artifacts/
 # Local database and execution logs
 securecode.db
 run_logs.txt
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
