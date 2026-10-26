@@ -78,3 +78,54 @@ export async function loginUser(username, password) {
   }
 }
 
+/**
+ * Ejecutar evaluación de control (GH-001 o GH-002)
+ */
+export async function evaluateControl(controlId, payload) {
+  const token = getStoredToken();
+  const endpoint = controlId === 'GH-002'
+    ? `${API_BASE_URL}/api/v1/evaluations/gh-002`
+    : `${API_BASE_URL}/api/v1/evaluations/gh-001`;
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (response.status === 401) {
+      clearSession();
+      return {
+        success: false,
+        status: 401,
+        message: 'Sesión expirada o no autorizada. Por favor inicie sesión nuevamente.',
+      };
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        success: false,
+        status: response.status,
+        message: typeof errorData.detail === 'string' ? errorData.detail : `Error en la evaluación (HTTP ${response.status}).`,
+      };
+    }
+
+    const data = await response.json();
+    return {
+      success: true,
+      data,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      status: 0,
+      message: 'Falla de infraestructura de red o servicio no disponible. Reintentar más tarde.',
+    };
+  }
+}
