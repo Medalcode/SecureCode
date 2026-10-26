@@ -2,14 +2,13 @@ import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import LoginView from './views/LoginView';
 import { isAuthenticated } from './api/client';
-import { FileCheck2, Award, ArrowRight } from 'lucide-react';
+import { FileCheck2, Award } from 'lucide-react';
 
 export default function App() {
   const [currentStep, setCurrentStep] = useState('login');
 
   useEffect(() => {
     if (isAuthenticated()) {
-      // If already authenticated, user can start at evaluacion or login
       setCurrentStep('evaluacion');
     } else {
       setCurrentStep('login');
@@ -29,60 +28,52 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-emerald-500 selection:text-slate-950">
-      <Navbar currentStep={currentStep} onNavigate={handleNavigate} />
+    <div className="min-h-screen bg-[#f1f5f9] text-slate-800 flex flex-col font-sans">
+      {/* En la pantalla de login mostramos el formulario centrado puro del mockup */}
+      {currentStep === 'login' ? (
+        <LoginView onLoginSuccess={handleLoginSuccess} />
+      ) : (
+        <>
+          <Navbar currentStep={currentStep} onNavigate={handleNavigate} />
+          <main className="flex-1 max-w-5xl mx-auto w-full p-6 sm:p-10">
+            {currentStep === 'evaluacion' && (
+              <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm text-center">
+                <div className="w-14 h-14 rounded-2xl bg-slate-100 border border-slate-200 text-[#0f2744] flex items-center justify-center mx-auto mb-4">
+                  <FileCheck2 className="w-7 h-7" />
+                </div>
+                <h2 className="text-xl font-bold text-[#0f2744] mb-2">Pantalla de Evaluación (/evaluacion)</h2>
+                <p className="text-slate-500 text-sm max-w-lg mx-auto mb-6">
+                  Preparada para la rama <code className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-mono text-xs">feature/frontend-evaluacion</code>.
+                </p>
+                <button
+                  onClick={() => setCurrentStep('login')}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition cursor-pointer"
+                >
+                  Volver al Login
+                </button>
+              </div>
+            )}
 
-      <main className="flex-1">
-        {currentStep === 'login' && (
-          <LoginView onLoginSuccess={handleLoginSuccess} />
-        )}
-
-        {currentStep === 'evaluacion' && (
-          <div className="max-w-4xl mx-auto p-6 sm:p-12 text-center animate-in fade-in duration-200">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-mono mb-4">
-              Paso 2 / 3 · Pantalla E
-            </div>
-            <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center mx-auto mb-4">
-              <FileCheck2 className="w-8 h-8" />
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Pantalla de Evaluación (/evaluacion)</h2>
-            <p className="text-slate-400 text-sm max-w-lg mx-auto mb-6">
-              Esta pantalla se implementará en la siguiente rama <code className="text-cyan-300 font-mono">feature/frontend-evaluacion</code> para el control reactivo GH-001 y GH-002 con inyección oculta de GitHub Token.
-            </p>
-            <div className="flex justify-center gap-3">
-              <button
-                onClick={() => setCurrentStep('login')}
-                className="px-4 py-2 bg-slate-900 border border-slate-800 hover:bg-slate-800 rounded-xl text-xs font-medium text-slate-300 transition"
-              >
-                Volver al Login
-              </button>
-            </div>
-          </div>
-        )}
-
-        {currentStep === 'resultado' && (
-          <div className="max-w-4xl mx-auto p-6 sm:p-12 text-center animate-in fade-in duration-200">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono mb-4">
-              Paso 3 / 3 · Pantalla R
-            </div>
-            <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto mb-4">
-              <Award className="w-8 h-8" />
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Pantalla de Resultado (/resultado)</h2>
-            <p className="text-slate-400 text-sm max-w-lg mx-auto mb-6">
-              Esta pantalla se implementará en la rama <code className="text-emerald-300 font-mono">feature/frontend-resultado</code> para mostrar la tarjeta criptográfica con hash SHA-256 inmutable y las 4 variantes de veredicto.
-            </p>
-            <div className="flex justify-center gap-3">
-              <button
-                onClick={() => setCurrentStep('evaluacion')}
-                className="px-4 py-2 bg-slate-900 border border-slate-800 hover:bg-slate-800 rounded-xl text-xs font-medium text-slate-300 transition"
-              >
-                Ir a Evaluación
-              </button>
-            </div>
-          </div>
-        )}
-      </main>
+            {currentStep === 'resultado' && (
+              <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm text-center">
+                <div className="w-14 h-14 rounded-2xl bg-slate-100 border border-slate-200 text-[#0f2744] flex items-center justify-center mx-auto mb-4">
+                  <Award className="w-7 h-7" />
+                </div>
+                <h2 className="text-xl font-bold text-[#0f2744] mb-2">Pantalla de Resultado (/resultado)</h2>
+                <p className="text-slate-500 text-sm max-w-lg mx-auto mb-6">
+                  Preparada para la rama <code className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-mono text-xs">feature/frontend-resultado</code>.
+                </p>
+                <button
+                  onClick={() => setCurrentStep('evaluacion')}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition cursor-pointer"
+                >
+                  Ir a Evaluación
+                </button>
+              </div>
+            )}
+          </main>
+        </>
+      )}
     </div>
   );
 }

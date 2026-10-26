@@ -20,26 +20,26 @@ export default function Navbar({ currentStep = 'login', onNavigate }) {
   ];
 
   return (
-    <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-50">
+    <header className="border-b border-slate-200 bg-white sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        {/* Brand / Logo */}
+        {/* Brand */}
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-sm shadow-emerald-500/10">
-            <ShieldCheck className="w-6 h-6" />
+          <div className="h-9 w-9 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-[#0f2744]">
+            <ShieldCheck className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-lg text-slate-100 tracking-tight">SecureCode</span>
-              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-cyan-950/80 text-cyan-400 border border-cyan-800/60">
+              <span className="font-bold text-base text-[#0f2744] tracking-wider">SECURECODE</span>
+              <span className="text-[11px] px-2 py-0.5 rounded font-medium bg-slate-100 text-slate-600 border border-slate-200">
                 Flujo L.E.R.
               </span>
             </div>
-            <p className="text-xs text-slate-400">Auditoría Criptográfica SCM · INACAP</p>
+            <p className="text-[11px] text-slate-500">Evaluación automatizada de controles</p>
           </div>
         </div>
 
         {/* Steps indicator */}
-        <nav className="hidden md:flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800">
+        <nav className="hidden md:flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200">
           {steps.map((step) => {
             const Icon = step.icon;
             const isActive = currentStep === step.id;
@@ -48,12 +48,12 @@ export default function Navbar({ currentStep = 'login', onNavigate }) {
                 key={step.id}
                 disabled={step.disabled}
                 onClick={() => onNavigate && onNavigate(step.id)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                   isActive
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                    ? 'bg-white text-[#0f2744] border border-slate-200 shadow-sm font-semibold'
                     : step.disabled
-                    ? 'text-slate-600 cursor-not-allowed'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                    ? 'text-slate-400 cursor-not-allowed'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -68,12 +68,12 @@ export default function Navbar({ currentStep = 'login', onNavigate }) {
           {logged ? (
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
-                <p className="text-xs font-semibold text-slate-200">{username}</p>
-                <p className="text-[10px] text-emerald-400 font-mono">JWT HS256 ACTIVO</p>
+                <p className="text-xs font-semibold text-slate-800">{username}</p>
+                <p className="text-[10px] text-emerald-600 font-mono font-medium">Sesión Activa (JWT)</p>
               </div>
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-rose-300 bg-rose-950/30 border border-rose-800/40 hover:bg-rose-900/40 rounded-lg transition"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-700 bg-red-50 border border-red-200 hover:bg-red-100 rounded-lg transition cursor-pointer"
                 title="Cerrar sesión"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -81,10 +81,7 @@ export default function Navbar({ currentStep = 'login', onNavigate }) {
               </button>
             </div>
           ) : (
-            <span className="text-xs text-slate-500 font-mono flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-amber-400 inline-block animate-pulse"></span>
-              Sesión requerida
-            </span>
+            <span className="text-xs text-slate-500">Sin autenticar</span>
           )}
         </div>
       </div>
