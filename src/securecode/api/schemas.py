@@ -136,3 +136,24 @@ class BillingSummaryResponse(BaseModel):
     monthly_usage: MonthlyUsage
     billing_history: BillingHistory
     footer: BillingFooter
+
+# ===== Report Export & Dispatch Schemas (Fase 2) =====
+
+class ExportReportRequest(BaseModel):
+    evaluation_id: Optional[str] = None
+    evaluated_control: str = Field(..., description="e.g. GH-001 Revisión por pares")
+    repository: str = Field(..., description="e.g. acme-corp/payment-gateway (main)")
+    verdict: str = Field(..., description="e.g. PASS (CONFORME)")
+    integrity_hash: str = Field(..., description="Canonical SHA-256 evidence hash")
+    generate_pdf: bool = True
+    email: str = Field("auditor@empresa.com", description="Auditor destination email")
+
+class ExportReportResponse(BaseModel):
+    success: bool
+    title: str
+    message: str
+    dispatch_id: str
+    timestamp_utc: str
+    recipient: str
+    pdf_generated: bool
+    integrity_signature: str

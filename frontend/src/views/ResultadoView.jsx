@@ -7,11 +7,13 @@ import {
   AlertTriangle, 
   Copy, 
   Check, 
-  ArrowLeft,
-  RotateCcw,
-  History
+  ArrowLeft, 
+  RotateCcw, 
+  History,
+  FileDown
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
+import ExportAuditModal from '../components/ExportAuditModal';
 
 export default function ResultadoView({ 
   resultData, 
@@ -21,6 +23,7 @@ export default function ResultadoView({
   onNavigate
 }) {
   const [copied, setCopied] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   const handleLogout = () => {
     clearSession();
@@ -55,7 +58,7 @@ export default function ResultadoView({
     ? new Date(resultData.evaluated_at).toUTCString().replace('GMT', 'UTC')
     : new Date().toUTCString().replace('GMT', 'UTC');
 
-  const evalId = resultData?.evaluation_id || 'eval_9f8a2b3c4d5e';
+  const evalId = resultData?.evaluation_id || 'eval_9f8a2b3c';
   const evidenceHash = resultData?.evidence?.hash || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
 
   // Configuración de textos y estilos según el estado automático recibido
@@ -327,6 +330,16 @@ export default function ResultadoView({
 
               {/* Botones de Acción */}
               <div className="pt-2 space-y-2">
+                {/* Botón Principal de Exportar Reporte PDF / Despacho (Prioridad 4) */}
+                <button
+                  type="button"
+                  onClick={() => setExportModalOpen(true)}
+                  className="w-full py-2.5 px-4 font-semibold text-xs transition bg-blue-50 border border-blue-200 text-[#213F8B] hover:bg-blue-100 rounded-lg flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+                >
+                  <FileDown className="w-4 h-4 text-[#213F8B]" />
+                  <span>Exportar Reporte de Auditoría (PDF / Correo)</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={onNewEvaluation}
@@ -355,6 +368,19 @@ export default function ResultadoView({
           )}
         </div>
       </main>
+
+      {/* Modal Stitch de Exportar Reporte de Auditoría */}
+      <ExportAuditModal
+        isOpen={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        initialData={{
+          control: controlName,
+          repository: repoDisplay,
+          verdict: `${state} (${current.badge})`,
+          integrityHash: evidenceHash,
+          evaluationId: evalId
+        }}
+      />
     </div>
   );
 }

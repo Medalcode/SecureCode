@@ -236,3 +236,68 @@ export async function fetchBillingSummary() {
     };
   }
 }
+
+/**
+ * Despachar y exportar reporte formal de auditoría técnica en PDF
+ */
+export async function exportAuditReport(payload) {
+  const token = getStoredToken();
+  const endpoint = `${API_BASE_URL}/api/v1/evaluations/export`;
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (response.status === 401) {
+      clearSession();
+      return {
+        success: false,
+        status: 401,
+        message: 'Sesión expirada o no autorizada.',
+      };
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        success: false,
+        status: response.status,
+        message: typeof errorData.detail === 'string' ? errorData.detail : `Error al exportar reporte (HTTP ${response.status}).`,
+      };
+    }
+
+    const data = await response.json();
+    return {
+      success: true,
+      data,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      status: 0,
+      message: 'Falla al conectar con el servidor para exportar el reporte.',
+    };
+  }
+}
+
+/**
+ * Obtener URL de descarga directa para el PDF oficial
+ */
+export function getAuditPdfDownloadUrl({ control, repository, verdict, hash, evaluation_id, email }) {
+  const params = new URLSearchParams({
+    control: control || 'GH-001 Revisión por pares',
+    repository: repository || 'acme-corp/payment-gateway (main)',
+    verdict: verdict || 'PASS (CONFORME)',
+    integrity_hash: hash || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    evaluation_id: evaluation_id || 'eval_9f8a2b3c',
+    email: email || 'auditor@empresa.com'
+  });
+  return `${API_BASE_URL}/api/v1/evaluations/pdf?${params.toString()}`;
+}

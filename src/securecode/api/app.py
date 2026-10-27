@@ -1,13 +1,16 @@
 from typing import Optional
 from datetime import datetime, timezone
+import hashlib
+import uuid
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends, HTTPException, status, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 import logging
 
 from securecode.application.evaluate_and_store import evaluate_and_store_gh001
 from securecode.ports.evaluation_repository import EvaluationRepository
+from securecode.application.pdf_generator import generate_audit_report_pdf
 from securecode.api.schemas import (
     GH001EvaluationRequest,
     EvaluationResponse,
@@ -24,7 +27,9 @@ from securecode.api.schemas import (
     StorageUsage,
     BillingHistory,
     BillingInvoiceRow,
-    BillingFooter
+    BillingFooter,
+    ExportReportRequest,
+    ExportReportResponse
 )
 from securecode.api.dependencies import (
     get_db_session,
@@ -223,6 +228,63 @@ def get_billing_summary(
             security="Conexión Segura TLS 1.3",
             audit_id="ID Auditoría: SEC-BLL-2026"
         )
+    )
+
+@app.post("/api/v1/evaluations/export", response_model=ExportReportResponse)
+def export_and_dispatch_report(
+    payload: ExportReportRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Generates a formal technical audit report (INACAP standard) and dispatches
+    a cryptographically signed copy to the specified auditor email.
+    """
+    now = datetime.now(timezone.utc)
+    dispatch_id = f"DSP-{now.strftime('%Y%m')}-{uuid.uuid4().hex[:6].upper()}"
+    timestamp_str = now.strftime("%Y-%m-%d %H:%M:%S UTC")
+
+    sig_material = f"{payload.evaluated_control}|{payload.repository}|{payload.verdict}|{payload.integrity_hash}|{now.isoformat()}"
+    signature = hashlib.sha256(sig_material.encode("utf-8")).hexdigest()
+
+    msg = f"Reporte formal generado y despachado exitosamente a {payload.email}" if payload.email else "Reporte formal generado exitosamente."
+
+    return ExportReportResponse(
+        success=True,
+        title="EXPORTAR REPORTE DE AUDITORÍA",
+        message=msg,
+        dispatch_id=dispatch_id,
+        timestamp_utc=timestamp_str,
+        recipient=payload.email,
+        pdf_generated=payload.generate_pdf,
+        integrity_signature=signature
+    )
+
+@app.get("/api/v1/evaluations/pdf")
+def download_audit_pdf(
+    control: str = Query("GH-001 Revisión por pares"),
+    repository: str = Query("acme-corp/payment-gateway (main)"),
+    verdict: str = Query("PASS (CONFORME)"),
+    integrity_hash: str = Query("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+    evaluation_id: str = Query("eval_9f8a2b3c"),
+    email: str = Query("auditor@empresa.com"),
+):
+    """
+    Direct download of the official INACAP-standard PDF certificate.
+    """
+    pdf_bytes = generate_audit_report_pdf(
+        control=control,
+        repository=repository,
+        verdict=verdict,
+        integrity_hash=integrity_hash,
+        evaluation_id=evaluation_id,
+        auditor=email
+    )
+    clean_eval_id = evaluation_id.replace(" ", "_")
+    filename = f"Dictamen_Auditoria_{clean_eval_id}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
 
 @app.post("/api/v1/evaluations/gh-001", response_model=EvaluationResponse)

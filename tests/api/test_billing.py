@@ -65,3 +65,4 @@ def test_billing_summary_authorized():
         assert data["footer"]["audit_id"] == "ID Auditoría: SEC-BLL-2026"
     finally:
         app.dependency_overrides.clear()
+
