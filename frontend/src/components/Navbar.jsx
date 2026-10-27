@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, LogOut, Lock, FileCheck2, Award, History } from 'lucide-react';
+import { ShieldCheck, LogOut, Lock, FileCheck2, Award, History, CreditCard } from 'lucide-react';
 import { clearSession, isAuthenticated, getStoredUser } from '../api/client';
 
 export default function Navbar({ currentStep = 'login', onNavigate }) {
@@ -18,6 +18,7 @@ export default function Navbar({ currentStep = 'login', onNavigate }) {
     { id: 'evaluacion', label: '2. Evaluación (E)', icon: FileCheck2, path: '/evaluacion', disabled: !logged },
     { id: 'resultado', label: '3. Resultado (R)', icon: Award, path: '/resultado', disabled: !logged },
     { id: 'historial', label: '4. Historial (H)', icon: History, path: '/historial', disabled: !logged },
+    { id: 'facturacion', label: '5. Suscripción (B)', icon: CreditCard, path: '/billing', disabled: !logged },
   ];
 
   return (
@@ -35,10 +36,10 @@ export default function Navbar({ currentStep = 'login', onNavigate }) {
             <div className="flex items-center gap-2">
               <span className="font-bold text-base text-[#0f2744] tracking-wider">SECURECODE</span>
               <span className="text-[11px] px-2 py-0.5 rounded font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                Flujo L.E.R. + Auditoría
+                Flujo L.E.R. + Enterprise
               </span>
             </div>
-            <p className="text-[11px] text-slate-500">Evaluación y trazabilidad de controles SCM</p>
+            <p className="text-[11px] text-slate-500">Evaluación, trazabilidad y control de licencias</p>
           </div>
         </div>
 

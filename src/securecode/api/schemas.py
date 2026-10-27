@@ -65,3 +65,74 @@ class EvaluationHistoryResponse(BaseModel):
     total: int
     items: List[EvaluationHistoryItem]
     pagination_info: str
+
+# ===== Billing & Control Center Schemas (Fase 2) =====
+
+class BillingModality(BaseModel):
+    title: str
+    description: str
+    company_rut: str
+
+class CorporateAssistance(BaseModel):
+    title: str
+    description: str
+    action: str
+
+class SubscriptionPlan(BaseModel):
+    status: str
+    plan_name: str
+    badge: str
+    description: str
+    price: str
+    next_billing_date: str
+    billing_modality: BillingModality
+    corporate_assistance: CorporateAssistance
+
+class StorageUsage(BaseModel):
+    title: str
+    used: str
+    retention_policy: str
+    percentage: str
+
+class MonthlyUsage(BaseModel):
+    title: str
+    cycle: str
+    description: str
+    consumed: int
+    max: int
+    usage_percentage: str
+    available_evaluations: int
+    storage: StorageUsage
+
+class BillingInvoiceRow(BaseModel):
+    date: str
+    concept: str
+    reference: str
+    amount: str
+    status: str
+    invoice_action: str
+
+class BillingHistory(BaseModel):
+    title: str
+    subtitle: str
+    columns: List[str]
+    rows: List[BillingInvoiceRow]
+    footer_note: str
+    link: str
+
+class BillingFooter(BaseModel):
+    platform: str
+    sla: str
+    security: str
+    audit_id: str
+
+class BillingSummaryResponse(BaseModel):
+    app: str
+    navigation: str
+    title: str
+    subtitle: str
+    environment: str
+    subscription_plan: SubscriptionPlan
+    monthly_usage: MonthlyUsage
+    billing_history: BillingHistory
+    footer: BillingFooter

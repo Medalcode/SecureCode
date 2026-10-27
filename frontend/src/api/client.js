@@ -188,3 +188,51 @@ export async function fetchEvaluationsHistory({ status = null, search = '', limi
     };
   }
 }
+
+/**
+ * Obtener métricas y estado del Centro de Control y Facturación
+ */
+export async function fetchBillingSummary() {
+  const token = getStoredToken();
+  const endpoint = `${API_BASE_URL}/api/v1/billing/summary`;
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+    });
+
+    if (response.status === 401) {
+      clearSession();
+      return {
+        success: false,
+        status: 401,
+        message: 'Sesión expirada o no autorizada. Por favor inicie sesión nuevamente.',
+      };
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        success: false,
+        status: response.status,
+        message: typeof errorData.detail === 'string' ? errorData.detail : `Error al cargar métricas de facturación (HTTP ${response.status}).`,
+      };
+    }
+
+    const data = await response.json();
+    return {
+      success: true,
+      data,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      status: 0,
+      message: 'No fue posible conectar con el endpoint de facturación.',
+    };
+  }
+}

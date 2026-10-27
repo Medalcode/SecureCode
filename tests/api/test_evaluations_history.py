@@ -1,4 +1,8 @@
 import os
+os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+os.environ["JWT_SECRET_KEY"] = "test-secret-key-that-is-at-least-32-bytes-long"
+os.environ["JWT_ALGORITHM"] = "HS256"
+
 import pytest
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
@@ -6,11 +10,8 @@ from uuid import uuid4
 from datetime import datetime, timezone
 
 from securecode.api.app import app
-from securecode.api.dependencies import get_db_session
+from securecode.api.dependencies import get_current_user, get_db_session
 from securecode.api.security import create_access_token, hash_password
-
-os.environ["JWT_SECRET_KEY"] = "test-secret-key-that-is-at-least-32-bytes-long"
-os.environ["JWT_ALGORITHM"] = "HS256"
 
 class DummyUser:
     def __init__(self, id, username, password_hash, active):
@@ -39,6 +40,7 @@ class DummyRecord:
         self.evidence.evidence_hash = evidence_hash
 
 def test_list_evaluations_unauthorized():
+    app.dependency_overrides.clear()
     client = TestClient(app)
     resp = client.get("/api/v1/evaluations")
     assert resp.status_code == 401
@@ -57,7 +59,11 @@ def test_list_evaluations_authorized_success():
         evidence_hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     )
 
-    with patch("securecode.api.dependencies.get_current_user", return_value=mock_user):
+    mock_session = MagicMock()
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    app.dependency_overrides[get_db_session] = lambda: mock_session
+
+    try:
         with patch("securecode.api.app.PostgresEvaluationRepository_Dependency_Wrapper") as mock_repo_wrapper:
             mock_repo = MagicMock()
             mock_repo.list_evaluations.return_value = (1, [dummy_rec])
@@ -79,3 +85,5 @@ def test_list_evaluations_authorized_success():
             assert item["evaluation_id"].startswith("eval_")
             assert item["hash_sha256"] == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
             assert "Mostrando 1 de 1 registros" in data["pagination_info"]
+    finally:
+        app.dependency_overrides.clear()

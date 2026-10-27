@@ -3,6 +3,7 @@ import LoginView from './views/LoginView';
 import EvaluacionView from './views/EvaluacionView';
 import ResultadoView from './views/ResultadoView';
 import HistorialView from './views/HistorialView';
+import BillingView from './views/BillingView';
 import { isAuthenticated, clearSession } from './api/client';
 
 export default function App() {
@@ -72,6 +73,14 @@ export default function App() {
         <HistorialView
           onLogout={handleLogout}
           onNewEvaluation={handleNewEvaluation}
+          onNavigate={handleNavigate}
+        />
+      )}
+
+      {/* 5. Fase 2: Centro de Control y Suscripción (/billing) */}
+      {currentStep === 'facturacion' && (
+        <BillingView
+          onLogout={handleLogout}
           onNavigate={handleNavigate}
         />
       )}
