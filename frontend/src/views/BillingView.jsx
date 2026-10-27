@@ -19,7 +19,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
-import { fetchBillingSummary } from '../api/client';
+import { fetchBillingSummary, getInvoicePdfDownloadUrl } from '../api/client';
 
 const FALLBACK_BILLING = {
   app: "SECURECODE",
@@ -116,6 +116,34 @@ export default function BillingView({ onLogout, onNavigate }) {
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleDownloadInvoice = async (invoice) => {
+    if (!invoice) return;
+    try {
+      const url = getInvoicePdfDownloadUrl({
+        reference: invoice.reference,
+        date: invoice.date,
+        concept: invoice.concept,
+        amount: invoice.amount
+      });
+      const resp = await fetch(url);
+      if (resp.ok) {
+        const blob = await resp.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `Factura_${invoice.reference}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(blobUrl);
+        a.remove();
+      } else {
+        window.open(url, '_blank');
+      }
+    } catch (e) {
+      console.error("Error downloading invoice:", e);
+    }
+  };
 
   const { subscription_plan, monthly_usage, billing_history, footer } = billingData;
   const consumed = monthly_usage?.consumed || 38;
@@ -372,7 +400,7 @@ export default function BillingView({ onLogout, onNavigate }) {
                     </td>
                     <td className="py-3.5 px-4 text-right whitespace-nowrap">
                       <button
-                        onClick={() => setSelectedInvoice(row)}
+                        onClick={() => { handleDownloadInvoice(row); setSelectedInvoice(row); }}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#213F8B] bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition cursor-pointer"
                       >
                         <Download className="w-3.5 h-3.5" />
@@ -475,13 +503,13 @@ export default function BillingView({ onLogout, onNavigate }) {
               </button>
               <button
                 onClick={() => {
-                  alert(`Descarga iniciada para el comprobante ${selectedInvoice.reference}.pdf`);
+                  handleDownloadInvoice(selectedInvoice);
                   setSelectedInvoice(null);
                 }}
                 className="px-4 py-2 bg-[#213F8B] hover:bg-[#1a326f] text-white rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
               >
                 <Download className="w-3.5 h-3.5" />
-                Descargar PDF
+                Descargar Factura PDF
               </button>
             </div>
           </div>
@@ -540,4 +568,3 @@ export default function BillingView({ onLogout, onNavigate }) {
     </div>
   );
 }
-

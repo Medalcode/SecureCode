@@ -1,5 +1,5 @@
 import os
-from typing import Generator
+from typing import Generator, Optional
 from fastapi import Request
 
 from sqlalchemy import create_engine
@@ -81,3 +81,23 @@ def get_current_user(
         )
         
     return user
+
+
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token", auto_error=False)
+
+def get_optional_current_user(
+    token: Optional[str] = Depends(oauth2_scheme_optional),
+    session: Session = Depends(get_db_session)
+) -> Optional[User]:
+    if not token:
+        return None
+    try:
+        user_id = verify_access_token(token)
+        if not user_id:
+            return None
+        user = session.query(User).filter(User.id == user_id).first()
+        if user and user.active:
+            return user
+    except Exception:
+        return None
+    return None

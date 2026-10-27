@@ -301,3 +301,16 @@ export function getAuditPdfDownloadUrl({ control, repository, verdict, hash, eva
   });
   return `${API_BASE_URL}/api/v1/evaluations/pdf?${params.toString()}`;
 }
+
+/**
+ * Obtener URL de descarga directa para la Factura Electrónica (DTE) en PDF
+ */
+export function getInvoicePdfDownloadUrl({ reference, date, concept, amount }) {
+  const params = new URLSearchParams({
+    reference: reference || 'INV-2026-10-8841',
+    date: date || '01/10/2026',
+    concept: concept || 'Mensualidad SecureCode Octubre',
+    amount: amount || '$150.000 CLP'
+  });
+  return `${API_BASE_URL}/api/v1/billing/invoice-pdf?${params.toString()}`;
+}

@@ -2,6 +2,8 @@ from typing import Optional
 from datetime import datetime, timezone
 import hashlib
 import uuid
+import os
+import json
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.responses import JSONResponse, Response
@@ -10,7 +12,7 @@ import logging
 
 from securecode.application.evaluate_and_store import evaluate_and_store_gh001
 from securecode.ports.evaluation_repository import EvaluationRepository
-from securecode.application.pdf_generator import generate_audit_report_pdf
+from securecode.application.pdf_generator import generate_audit_report_pdf, generate_invoice_pdf
 from securecode.api.schemas import (
     GH001EvaluationRequest,
     EvaluationResponse,
@@ -35,7 +37,8 @@ from securecode.api.dependencies import (
     get_db_session,
     get_evaluation_repository,
     get_github_token,
-    get_current_user
+    get_current_user,
+    get_optional_current_user
 )
 from securecode.adapters.postgres.models import User, EvaluationRecord
 
@@ -246,6 +249,25 @@ def export_and_dispatch_report(
     sig_material = f"{payload.evaluated_control}|{payload.repository}|{payload.verdict}|{payload.integrity_hash}|{now.isoformat()}"
     signature = hashlib.sha256(sig_material.encode("utf-8")).hexdigest()
 
+    # Save dispatch evidence
+    try:
+        os.makedirs("artifacts/dispatched_emails", exist_ok=True)
+        rec = {
+            "dispatch_id": dispatch_id,
+            "timestamp_utc": timestamp_str,
+            "recipient": payload.email,
+            "evaluation_id": payload.evaluation_id,
+            "control": payload.evaluated_control,
+            "repository": payload.repository,
+            "verdict": payload.verdict,
+            "hash": payload.integrity_hash,
+            "signature": signature
+        }
+        with open(f"artifacts/dispatched_emails/{dispatch_id}.json", "w", encoding="utf-8") as f:
+            json.dump(rec, f, indent=2)
+    except Exception as e:
+        logger.warning(f"Could not save dispatch record: {e}")
+
     msg = f"Reporte formal generado y despachado exitosamente a {payload.email}" if payload.email else "Reporte formal generado exitosamente."
 
     return ExportReportResponse(
@@ -284,7 +306,36 @@ def download_audit_pdf(
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Access-Control-Expose-Headers": "Content-Disposition"
+        }
+    )
+
+@app.get("/api/v1/billing/invoice-pdf")
+def download_invoice_pdf(
+    reference: str = Query("INV-2026-10-8841"),
+    date: str = Query("01/10/2026"),
+    concept: str = Query("Mensualidad SecureCode Octubre"),
+    amount: str = Query("$150.000 CLP")
+):
+    """
+    Direct download of the electronic fiscal invoice (DTE) in PDF format.
+    """
+    pdf_bytes = generate_invoice_pdf(
+        invoice_number=reference,
+        date=date,
+        concept=concept,
+        amount=amount
+    )
+    filename = f"Factura_{reference}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Access-Control-Expose-Headers": "Content-Disposition"
+        }
     )
 
 @app.post("/api/v1/evaluations/gh-001", response_model=EvaluationResponse)

@@ -10,7 +10,8 @@ import {
   Check, 
   Lock, 
   Copy,
-  ExternalLink
+  ExternalLink,
+  Download
 } from 'lucide-react';
 import { exportAuditReport, getAuditPdfDownloadUrl } from '../api/client';
 
@@ -23,12 +24,12 @@ export default function ExportAuditModal({
 
   const control = initialData.control || 'GH-001 Revisión por pares';
   const repository = initialData.repository || 'acme-corp/payment-gateway (main)';
-  const verdict = initialData.verdict || 'PASS (CONFORME)';
+  const verdict = initialData.verdict || 'UNKNOWN (DESCONOCIDO)';
   const integrityHash = initialData.integrityHash || initialData.hash || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
   const evaluationId = initialData.evaluationId || initialData.evaluation_id || 'eval_9f8a2b3c';
 
   const [generatePdf, setGeneratePdf] = useState(true);
-  const [email, setEmail] = useState('auditor@empresa.com');
+  const [email, setEmail] = useState('josemorahj23@gmail.com');
   const [isLoading, setIsLoading] = useState(false);
   const [successReceipt, setSuccessReceipt] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
@@ -38,6 +39,35 @@ export default function ExportAuditModal({
     navigator.clipboard.writeText(integrityHash);
     setCopiedHash(true);
     setTimeout(() => setCopiedHash(false), 2000);
+  };
+
+  const triggerDirectPdfDownload = async () => {
+    try {
+      const downloadUrl = getAuditPdfDownloadUrl({
+        control,
+        repository,
+        verdict,
+        hash: integrityHash,
+        evaluation_id: evaluationId,
+        email: email.trim()
+      });
+      const resp = await fetch(downloadUrl);
+      if (resp.ok) {
+        const blob = await resp.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `Dictamen_Auditoria_${evaluationId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(blobUrl);
+        a.remove();
+      } else {
+        window.open(downloadUrl, '_blank');
+      }
+    } catch (e) {
+      console.error("Direct PDF trigger error:", e);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -62,21 +92,7 @@ export default function ExportAuditModal({
     if (res.success && res.data) {
       setSuccessReceipt(res.data);
       if (generatePdf) {
-        // Disparar descarga del PDF oficial INACAP
-        const downloadUrl = getAuditPdfDownloadUrl({
-          control,
-          repository,
-          verdict,
-          hash: integrityHash,
-          evaluation_id: evaluationId,
-          email: email.trim()
-        });
-        const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.download = `Dictamen_Auditoria_${evaluationId}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        await triggerDirectPdfDownload();
       }
     } else {
       setErrorMessage(res.message || 'No fue posible completar la exportación.');
@@ -127,15 +143,18 @@ export default function ExportAuditModal({
         {/* Recibo de Éxito si ya se envió */}
         {successReceipt ? (
           <div className="space-y-4 animate-in fade-in">
-            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs space-y-2">
+            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs space-y-2.5">
               <div className="flex items-center gap-2 text-emerald-800 font-bold text-sm">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                 <span>{successReceipt.message}</span>
               </div>
-              <div className="pt-2 border-t border-emerald-100 grid grid-cols-2 gap-2 text-[11px] text-emerald-900">
+              <p className="text-[11px] text-emerald-700">
+                Se ha generado el documento formal en PDF (Estándar INACAP) y se registró el despacho oficial al correo: <strong className="font-mono text-emerald-900">{successReceipt.recipient}</strong>.
+              </p>
+              <div className="pt-2 border-t border-emerald-200 grid grid-cols-2 gap-2 text-[11px] text-emerald-900">
                 <div>
                   <span className="text-emerald-700 block">Folio de Despacho:</span>
-                  <span className="font-mono font-bold">{successReceipt.dispatch_id}</span>
+                  <span className="font-mono font-bold text-emerald-950">{successReceipt.dispatch_id}</span>
                 </div>
                 <div>
                   <span className="text-emerald-700 block">Fecha y Hora UTC:</span>
@@ -143,18 +162,27 @@ export default function ExportAuditModal({
                 </div>
               </div>
               <div className="pt-2 text-[11px] text-emerald-800">
-                <span className="text-emerald-700 block">Firma Criptográfica de Integridad:</span>
-                <span className="font-mono text-[10px] break-all bg-emerald-100/70 p-1 rounded block mt-0.5 select-all">
+                <span className="text-emerald-700 block">Firma Criptográfica SHA-256 (Validez Probatoria):</span>
+                <span className="font-mono text-[10px] break-all bg-white/80 p-1.5 rounded border border-emerald-200 block mt-0.5 select-all">
                   {successReceipt.integrity_signature}
                 </span>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={triggerDirectPdfDownload}
+                className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-[#213F8B] border border-blue-200 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Descargar PDF nuevamente</span>
+              </button>
+
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 bg-[#213F8B] hover:bg-[#1a326f] text-white rounded-lg text-xs font-semibold transition cursor-pointer"
+                className="px-5 py-2 bg-[#213F8B] hover:bg-[#1a326f] text-white rounded-lg text-xs font-semibold transition cursor-pointer"
               >
                 Aceptar y Finalizar
               </button>
@@ -232,7 +260,7 @@ export default function ExportAuditModal({
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="auditor@empresa.com"
+                  placeholder="josemorahj23@gmail.com"
                   required
                   disabled={isLoading}
                   className="w-full pl-9 pr-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-800 focus:outline-none focus:border-[#213F8B] transition"

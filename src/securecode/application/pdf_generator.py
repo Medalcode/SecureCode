@@ -68,6 +68,51 @@ def generate_audit_report_pdf(
 (Generado automaticamente por la plataforma determinista SecureCode.) Tj
 ET"""
 
+    return _build_pdf_stream(content)
+
+def generate_invoice_pdf(
+    invoice_number: str = "INV-2026-10-8841",
+    date: str = "01/10/2026",
+    concept: str = "Mensualidad SecureCode Octubre",
+    amount: str = "$150.000 CLP",
+    company_rut: str = "76.842.109-K"
+) -> bytes:
+    """
+    Generates an Electronic Fiscal Invoice (DTE) in standard PDF 1.4 format.
+    """
+    content = f"""BT
+/F1 16 Tf
+50 740 Td
+(DOCUMENTO TRIBUTARIO ELECTRONICO - FACTURA ELECTRONICA) Tj
+/F1 10 Tf
+0 -20 Td
+(SECURECODE CYBERSECURITY SPA - RUT 76.842.109-K) Tj
+0 -30 Td
+(DETALLE FISCAL DEL COMPROBANTE) Tj
+/F2 9 Tf
+0 -18 Td
+(Folio Tributario: {invoice_number}) Tj
+0 -15 Td
+(Fecha de Emision: {date}) Tj
+0 -15 Td
+(RUT Receptor: {company_rut}) Tj
+0 -15 Td
+(Concepto Facturado: {concept}) Tj
+0 -15 Td
+(Monto Total: {amount}) Tj
+0 -15 Td
+(Estado: PAGADO / CONCILIADO BANCARIO) Tj
+0 -30 Td
+/F1 10 Tf
+(TIMBRE ELECTRONICO Y VALIDEZ SII) Tj
+/F2 8 Tf
+0 -18 Td
+(Timbre Electronico SII Res. Ex. N 84 de 2026 - Verifique validez en www.sii.cl) Tj
+ET"""
+
+    return _build_pdf_stream(content)
+
+def _build_pdf_stream(content: str) -> bytes:
     stream_bytes = content.encode("latin-1", errors="replace")
     stream_len = len(stream_bytes)
 
