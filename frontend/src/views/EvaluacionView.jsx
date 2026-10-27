@@ -246,3 +246,4 @@ export default function EvaluacionView({ onLogout, onEvaluationSuccess }) {
     </div>
   );
 }
+
