@@ -1,5 +1,6 @@
 @echo off
 title SecureCode - Servicios Locales
+cd /d "%~dp0"
 echo ============================================================
 echo   Iniciando SecureCode Backend (FastAPI) y Frontend (Vite)
 echo ============================================================
@@ -11,5 +12,5 @@ start "SecureCode Vite Frontend (Puerto 5173)" cmd /k "cd frontend && npm run de
 echo Servicios lanzados en ventanas independientes.
 echo Backend:  http://127.0.0.1:8000
 echo Frontend: http://localhost:5173
-echo.
+echo ============================================================
 pause
