@@ -72,18 +72,20 @@ features/
 * `BillingView.jsx` con Plan Piloto ($150.000 CLP/mes), cuotas CI/CD (38/500), storage cifrado (1.2/500 MB), DTE fiscal y ejecutivo asignado.
 * Endpoint `GET /api/v1/billing/summary` en vivo con PostgreSQL.
 
-### ✅ 3. Exportar Reporte de Auditoría PDF y Despacho (COMPLETADO)
+### ✅ 3. Exportar Reporte de Auditoría PDF y Despacho (COMPLETADO Y VERIFICADO)
 * **Frontend:** [`ExportAuditModal.jsx`](file:///c:/Users/achej/Documents/SecureCode/frontend/src/components/ExportAuditModal.jsx) con:
   * Control evaluado, repositorio, veredicto con badge y hash SHA-256 canónico con botón de copiado.
   * Checkbox: *"Generar documento formal en formato PDF (Estándar INACAP)"* (checked por defecto).
-  * Input: *"Enviar copia a correo del auditor"* (`auditor@empresa.com`).
+  * Input: *"Enviar copia a correo del auditor"* (editable, por defecto `josemorahj23@gmail.com` / `auditor@empresa.com`).
   * Nota de seguridad: *"El reporte incluye la firma criptográfica y marcas de tiempo UTC para validez probatoria."*
   * Botones: *"Cancelar"* y *"Generar PDF y Enviar"*.
-  * Integrado con botón directo en [`ResultadoView.jsx`](file:///c:/Users/achej/Documents/SecureCode/frontend/src/views/ResultadoView.jsx) y [`HistorialView.jsx`](file:///c:/Users/achej/Documents/SecureCode/frontend/src/views/HistorialView.jsx).
+  * Descarga directa y automática del archivo `.pdf` en el navegador (`URL.createObjectURL(blob)`), sin dependencias externas.
+  * Comprobante oficial de despacho en pantalla con Folio `DSP-YYYYMM-XXXXXX`, firma criptográfica SHA-256 y marca de tiempo UTC.
+  * Facturación DTE ([`BillingView.jsx`](file:///c:/Users/achej/Documents/SecureCode/frontend/src/views/BillingView.jsx)): descarga directa de comprobantes fiscales electrónicos en PDF (`Factura_INV-2026-10-8841.pdf`) con resolución SII.
 * **Backend:** 
-  * Generador puro de PDF 1.4 conforme a estándar técnico INACAP ([`pdf_generator.py`](file:///c:/Users/achej/Documents/SecureCode/src/securecode/application/pdf_generator.py)).
-  * Endpoint `POST /api/v1/evaluations/export` (firma criptográfica SHA-256, folio `DSP-YYYYMM-XXXXXX`).
-  * Endpoint `GET /api/v1/evaluations/pdf` para descarga directa con cabecera `Content-Disposition`.
+  * Generador puro de PDF 1.4 conforme a estándar técnico INACAP ([`pdf_generator.py`](file:///c:/Users/achej/Documents/SecureCode/src/securecode/application/pdf_generator.py)) y timbrado fiscal DTE.
+  * Endpoint `POST /api/v1/evaluations/export` con persistencia de evidencia en `artifacts/dispatched_emails/{dispatch_id}.json`.
+  * Endpoints `GET /api/v1/evaluations/pdf` y `GET /api/v1/billing/invoice-pdf` para descarga de archivos binarios con cabecera `Content-Disposition`.
 
 ### ⏳ 4. Banco de Pruebas Unitario "de a 1" (Último Ítem Pendiente de Fase 2)
 * Selector interactivo de casos Ground Truth (`GT-01`, `GT-02`, `GT-03`), previsualización de parámetros y botón "▶ Ejecutar Caso de Prueba" con métricas de tiempo de ejecución (ms) y concordancia.
