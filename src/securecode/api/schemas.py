@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 
 class GH001EvaluationRequest(BaseModel):
@@ -48,3 +48,20 @@ class GH002EvaluationResponse(BaseModel):
     evidence: GH002EvidenceResponse
     collected_at: str
     evaluated_at: str
+
+class EvaluationHistoryItem(BaseModel):
+    evaluation_id: str
+    date_utc: str
+    control: str
+    repository_and_branch: str
+    verdict: str
+    hash_sha256: str
+    raw_id: str
+    repository: str
+    branch: str
+    evaluated_at: str
+
+class EvaluationHistoryResponse(BaseModel):
+    total: int
+    items: List[EvaluationHistoryItem]
+    pagination_info: str

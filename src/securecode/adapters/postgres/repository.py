@@ -158,3 +158,34 @@ class PostgresEvaluationRepository(EvaluationRepository):
             source_branch=record.source_branch,
             reconstructed_evidence=reconstructed_evidence
         )
+
+    def list_evaluations(
+        self,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0
+    ) -> tuple[int, list[EvaluationRecord]]:
+        """List persisted evaluations with filtering and pagination."""
+        query = self._session.query(EvaluationRecord)
+        
+        if status and status.strip().upper() in ("PASS", "FAIL", "UNKNOWN"):
+            query = query.filter(EvaluationRecord.status == status.strip().upper())
+            
+        if search and search.strip():
+            term = f"%{search.strip().lower()}%"
+            query = query.join(EvaluationRecord.evidence).filter(
+                (EvaluationRecord.source_repository.ilike(term)) |
+                (EvaluationRecord.source_branch.ilike(term)) |
+                (EvaluationRecord.control_id.ilike(term)) |
+                (EvidenceRecord.evidence_hash.ilike(term))
+            )
+            
+        total = query.count()
+        records = (
+            query.order_by(EvaluationRecord.evaluated_at.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+        return total, records

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { clearSession, evaluateControl } from '../api/client';
 import { AlertCircle, Loader2 } from 'lucide-react';
+import Navbar from '../components/Navbar';
 
-export default function EvaluacionView({ onLogout, onEvaluationSuccess }) {
+export default function EvaluacionView({ onLogout, onEvaluationSuccess, onNavigate }) {
   const [activeTab, setActiveTab] = useState('GH-001'); // 'GH-001' | 'GH-002'
 
   // Estados del formulario
@@ -67,31 +68,8 @@ export default function EvaluacionView({ onLogout, onEvaluationSuccess }) {
       className="min-h-screen w-full flex flex-col font-sans"
       style={{ backgroundColor: '#F4F6FA' }}
     >
-      {/* Barra Superior / Encabezado */}
-      <header className="w-full bg-white border-b border-slate-200">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span 
-              className="font-extrabold text-lg tracking-wide"
-              style={{ color: '#213F8B' }}
-            >
-              SECURECODE
-            </span>
-            <span className="text-slate-300">|</span>
-            <span className="text-sm font-medium text-slate-700">
-              Evaluar control de GitHub
-            </span>
-          </div>
-
-          <button
-            onClick={handleLogout}
-            className="text-xs font-medium px-3 py-1.5 rounded transition hover:bg-slate-100 cursor-pointer"
-            style={{ color: '#555555' }}
-          >
-            Cerrar sesión
-          </button>
-        </div>
-      </header>
+      {/* Barra de Navegación Unificada Stitch */}
+      <Navbar currentStep="evaluacion" onNavigate={onNavigate} />
 
       {/* Contenedor Principal */}
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6">
@@ -242,17 +220,18 @@ export default function EvaluacionView({ onLogout, onEvaluationSuccess }) {
           )}
 
           {/* Nota al pie */}
-          <div className="mt-6 pt-4 border-t border-slate-100 text-center">
-            <p 
-              className="text-xs"
-              style={{ color: '#555555' }}
+          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span>La evaluación es de solo lectura.</span>
+            <button
+              type="button"
+              onClick={() => onNavigate && onNavigate('historial')}
+              className="text-[#213F8B] hover:underline font-medium cursor-pointer"
             >
-              La evaluación es de solo lectura sobre el repositorio.
-            </p>
+              Ver historial de evaluaciones →
+            </button>
           </div>
         </div>
       </main>
     </div>
   );
 }
-

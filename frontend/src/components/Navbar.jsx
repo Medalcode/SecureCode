@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, LogOut, Lock, FileCheck2, Award } from 'lucide-react';
+import { ShieldCheck, LogOut, Lock, FileCheck2, Award, History } from 'lucide-react';
 import { clearSession, isAuthenticated, getStoredUser } from '../api/client';
 
 export default function Navbar({ currentStep = 'login', onNavigate }) {
@@ -17,13 +17,17 @@ export default function Navbar({ currentStep = 'login', onNavigate }) {
     { id: 'login', label: '1. Login (L)', icon: Lock, path: '/login' },
     { id: 'evaluacion', label: '2. Evaluación (E)', icon: FileCheck2, path: '/evaluacion', disabled: !logged },
     { id: 'resultado', label: '3. Resultado (R)', icon: Award, path: '/resultado', disabled: !logged },
+    { id: 'historial', label: '4. Historial (H)', icon: History, path: '/historial', disabled: !logged },
   ];
 
   return (
     <header className="border-b border-slate-200 bg-white sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Brand */}
-        <div className="flex items-center gap-3">
+        <div 
+          onClick={() => logged && onNavigate && onNavigate('evaluacion')}
+          className={`flex items-center gap-3 ${logged ? 'cursor-pointer hover:opacity-90' : ''}`}
+        >
           <div className="h-9 w-9 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-[#0f2744]">
             <ShieldCheck className="w-5 h-5" />
           </div>
@@ -31,10 +35,10 @@ export default function Navbar({ currentStep = 'login', onNavigate }) {
             <div className="flex items-center gap-2">
               <span className="font-bold text-base text-[#0f2744] tracking-wider">SECURECODE</span>
               <span className="text-[11px] px-2 py-0.5 rounded font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                Flujo L.E.R.
+                Flujo L.E.R. + Auditoría
               </span>
             </div>
-            <p className="text-[11px] text-slate-500">Evaluación automatizada de controles</p>
+            <p className="text-[11px] text-slate-500">Evaluación y trazabilidad de controles SCM</p>
           </div>
         </div>
 
@@ -53,7 +57,7 @@ export default function Navbar({ currentStep = 'login', onNavigate }) {
                     ? 'bg-white text-[#0f2744] border border-slate-200 shadow-sm font-semibold'
                     : step.disabled
                     ? 'text-slate-400 cursor-not-allowed'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 cursor-pointer'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />

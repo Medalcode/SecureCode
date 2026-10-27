@@ -1,5 +1,6 @@
+from typing import Optional
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 import logging
@@ -11,7 +12,9 @@ from securecode.api.schemas import (
     EvaluationResponse,
     SourceResponse,
     EvidenceResponse,
-    RuleResponse
+    RuleResponse,
+    EvaluationHistoryItem,
+    EvaluationHistoryResponse
 )
 from securecode.api.dependencies import (
     get_db_session,
@@ -34,7 +37,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +73,57 @@ def login_for_access_token(
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+@app.get("/api/v1/evaluations", response_model=EvaluationHistoryResponse)
+def list_evaluations_endpoint(
+    status: Optional[str] = Query(None, description="Filter by status: PASS, FAIL, UNKNOWN"),
+    search: Optional[str] = Query(None, description="Search term in repository, branch, control or hash"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    List historical evaluations persisted in PostgreSQL with filtering and search.
+    """
+    repo = PostgresEvaluationRepository_Dependency_Wrapper(session)
+    filter_status = None if not status or status.upper() in ("TODOS", "ALL") else status.upper()
+    total, records = repo.list_evaluations(
+        status=filter_status,
+        search=search,
+        limit=limit,
+        offset=offset
+    )
+
+    items = []
+    for rec in records:
+        branch_part = f" ({rec.source_branch})" if rec.source_branch and rec.source_branch.lower() != "unknown" else ""
+        repo_and_branch = f"{rec.source_repository}{branch_part}"
+        eval_id = f"eval_{str(rec.id)[:8]}"
+        date_utc_str = rec.evaluated_at.strftime("%Y-%m-%d %H:%M")
+        evidence_hash = rec.evidence.evidence_hash if rec.evidence else ""
+
+        items.append(
+            EvaluationHistoryItem(
+                evaluation_id=eval_id,
+                date_utc=date_utc_str,
+                control=rec.control_id,
+                repository_and_branch=repo_and_branch,
+                verdict=rec.status,
+                hash_sha256=evidence_hash,
+                raw_id=str(rec.id),
+                repository=rec.source_repository,
+                branch=rec.source_branch or "",
+                evaluated_at=rec.evaluated_at.isoformat()
+            )
+        )
+
+    pagination_info = f"Mostrando {len(items)} de {total} registros"
+    return EvaluationHistoryResponse(
+        total=total,
+        items=items,
+        pagination_info=pagination_info
+    )
 
 @app.post("/api/v1/evaluations/gh-001", response_model=EvaluationResponse)
 def evaluate_gh001_endpoint(

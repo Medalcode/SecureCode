@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import LoginView from './views/LoginView';
 import EvaluacionView from './views/EvaluacionView';
 import ResultadoView from './views/ResultadoView';
+import HistorialView from './views/HistorialView';
 import { isAuthenticated, clearSession } from './api/client';
 
 export default function App() {
@@ -35,6 +36,10 @@ export default function App() {
     setCurrentStep('evaluacion');
   };
 
+  const handleNavigate = (step) => {
+    setCurrentStep(step);
+  };
+
   return (
     <div className="min-h-screen bg-[#F4F6FA] text-slate-800 flex flex-col font-sans">
       {/* 1. Paso L: Login (/login) */}
@@ -47,6 +52,7 @@ export default function App() {
         <EvaluacionView 
           onLogout={handleLogout} 
           onEvaluationSuccess={handleEvaluationSuccess} 
+          onNavigate={handleNavigate}
         />
       )}
 
@@ -57,6 +63,16 @@ export default function App() {
           controlId={evaluationResult?.controlId || 'GH-001'}
           onLogout={handleLogout}
           onNewEvaluation={handleNewEvaluation}
+          onNavigate={handleNavigate}
+        />
+      )}
+
+      {/* 4. Fase 2: Historial de Ejecuciones (/historial) */}
+      {currentStep === 'historial' && (
+        <HistorialView
+          onLogout={handleLogout}
+          onNewEvaluation={handleNewEvaluation}
+          onNavigate={handleNavigate}
         />
       )}
     </div>

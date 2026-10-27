@@ -8,14 +8,17 @@ import {
   Copy, 
   Check, 
   ArrowLeft,
-  RotateCcw
+  RotateCcw,
+  History
 } from 'lucide-react';
+import Navbar from '../components/Navbar';
 
 export default function ResultadoView({ 
   resultData, 
   controlId = 'GH-001', 
   onLogout, 
-  onNewEvaluation 
+  onNewEvaluation,
+  onNavigate
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -84,25 +87,27 @@ export default function ResultadoView({
       defaultBranch: resultData?.evidence?.default_branch || 'main',
     },
     UNKNOWN: {
-      description: 'Evidencia insuficiente',
-      message: 'No fue posible determinar el estado con certeza',
+      description: 'Sin datos suficientes',
       badge: 'DESCONOCIDO',
       badgeBg: '#FFFBEB',
       badgeBorder: '#FDE68A',
       badgeText: '#B45309',
-      icon: HelpCircle,
-      suggestedAction: 'Verifique permisos del token y que el repositorio y la rama existan; luego reintente.',
-      approvals: 'No disponible',
-      dismissStale: 'No disponible',
-      protectionEnabled: 'No disponible',
-      defaultBranch: 'No disponible',
+      icon: AlertTriangle,
+      suggestedAction: 'Verifique permisos del token o existencia de rama/repo.',
+      approvals: 'No configurado',
+      dismissStale: 'No configurado',
+      protectionEnabled: 'No configurado',
+      defaultBranch: resultData?.evidence?.default_branch || 'main',
     },
     ERROR: {
-      message: resultData?.message || 'Servicio no disponible. No se registró ninguna evaluación. Intente nuevamente más tarde.',
+      description: 'Servicio no disponible',
+      badge: 'ERROR SERVICIO',
       badgeBg: '#FDF2F2',
       badgeBorder: '#F5C6CB',
       badgeText: '#C0392B',
       icon: AlertTriangle,
+      suggestedAction: 'Intente nuevamente más tarde o verifique la conexión con el servidor.',
+      message: resultData?.message || 'Servicio no disponible. No se registró ninguna evaluación. Intente nuevamente más tarde.',
     }
   };
 
@@ -114,33 +119,10 @@ export default function ResultadoView({
       className="min-h-screen w-full flex flex-col font-sans"
       style={{ backgroundColor: '#F4F6FA' }}
     >
-      {/* Barra Superior / Encabezado */}
-      <header className="w-full bg-white border-b border-slate-200">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span 
-              className="font-extrabold text-lg tracking-wide"
-              style={{ color: '#213F8B' }}
-            >
-              SECURECODE
-            </span>
-            <span className="text-slate-300">|</span>
-            <span className="text-sm font-medium text-slate-700">
-              Resultado de la evaluación
-            </span>
-          </div>
+      {/* Barra de Navegación Unificada Stitch */}
+      <Navbar currentStep="resultado" onNavigate={onNavigate} />
 
-          <button
-            onClick={handleLogout}
-            className="text-xs font-medium px-3 py-1.5 rounded transition hover:bg-slate-100 cursor-pointer"
-            style={{ color: '#555555' }}
-          >
-            Cerrar sesión
-          </button>
-        </div>
-      </header>
-
-      {/* Contenedor Principal: Únicamente muestra el resultado automático de la evaluación */}
+      {/* Contenedor Principal */}
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6">
         <div 
           className="w-full max-w-[520px] bg-white border border-slate-200 shadow-md p-6 sm:p-8"
@@ -164,109 +146,136 @@ export default function ResultadoView({
                 </div>
               </div>
 
-              <button
-                onClick={onNewEvaluation}
-                className="w-full py-2.5 px-4 font-semibold text-sm transition shadow-sm hover:opacity-95 active:opacity-90 cursor-pointer flex items-center justify-center gap-2"
-                style={{
-                  backgroundColor: '#213F8B',
-                  color: '#FFFFFF',
-                  borderRadius: '8px',
-                }}
-              >
-                <RotateCcw className="w-4 h-4" />
-                <span>Reintentar</span>
-              </button>
-            </div>
-          ) : (
-            /* CASOS: PASS, FAIL Y UNKNOWN */
-            <div className="space-y-5 animate-in fade-in duration-150">
-              
-              {/* Banner de Estado (Status Banner) */}
-              <div 
-                className="p-3.5 rounded-lg flex items-center justify-between border"
-                style={{
-                  backgroundColor: current.badgeBg,
-                  borderColor: current.badgeBorder,
-                }}
-              >
-                <div className="flex items-center gap-2.5">
-                  <StateIcon className="w-5 h-5" style={{ color: current.badgeText }} />
-                  <div>
-                    <h2 
-                      className="font-bold text-sm tracking-wide"
-                      style={{ color: current.badgeText }}
-                    >
-                      {state}: {current.description}
-                    </h2>
-                    {current.message && (
-                      <p className="text-[11px] text-amber-800 font-normal mt-0.5">
-                        {current.message}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <span 
-                  className="px-2 py-0.5 text-[11px] font-extrabold uppercase rounded border tracking-wider"
+              <div className="space-y-2">
+                <button
+                  onClick={onNewEvaluation}
+                  className="w-full py-2.5 px-4 font-semibold text-sm transition shadow-sm hover:opacity-95 active:opacity-90 cursor-pointer flex items-center justify-center gap-2"
                   style={{
-                    backgroundColor: '#FFFFFF',
-                    borderColor: current.badgeBorder,
-                    color: current.badgeText,
+                    backgroundColor: '#213F8B',
+                    color: '#FFFFFF',
+                    borderRadius: '8px',
                   }}
                 >
-                  {current.badge}
-                </span>
-              </div>
+                  <RotateCcw className="w-4 h-4" />
+                  <span>Reintentar evaluación</span>
+                </button>
 
-              {/* Sección: DETALLES */}
-              <div className="border border-slate-200 rounded-lg p-3.5 bg-slate-50/50 space-y-1.5 text-xs">
-                <div className="flex justify-between py-0.5">
-                  <span style={{ color: '#555555' }}>Control:</span>
-                  <span className="font-semibold text-slate-800">{controlName}</span>
-                </div>
-                <div className="flex justify-between py-0.5">
-                  <span style={{ color: '#555555' }}>Repositorio:</span>
-                  <span className="font-mono text-slate-800">{repoDisplay}</span>
-                </div>
-                <div className="flex justify-between py-0.5">
-                  <span style={{ color: '#555555' }}>Fecha evaluación:</span>
-                  <span className="text-slate-700">{evalDate}</span>
-                </div>
+                <button
+                  onClick={() => onNavigate && onNavigate('historial')}
+                  className="w-full py-2.5 px-4 font-semibold text-xs transition border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <History className="w-4 h-4 text-slate-500" />
+                  <span>Ir al Historial de Auditorías</span>
+                </button>
               </div>
-
-              {/* Sección: EVIDENCIA OBTENIDA */}
+            </div>
+          ) : (
+            /* CASOS NORMALES: PASS, FAIL, UNKNOWN */
+            <div className="space-y-6 animate-in fade-in duration-150">
+              
+              {/* Sección: ESTADO DE LA EVALUACIÓN */}
               <div>
                 <h3 
                   className="text-[11px] font-bold tracking-wider mb-2 uppercase"
                   style={{ color: '#213F8B' }}
                 >
-                  EVIDENCIA OBTENIDA
+                  ESTADO DE LA EVALUACIÓN
                 </h3>
-                <div className="border border-slate-200 rounded-lg p-3.5 bg-white space-y-2 text-xs">
-                  {isGH002 ? (
+                <div 
+                  className="p-4 rounded-lg flex items-center justify-between border"
+                  style={{
+                    backgroundColor: current.badgeBg,
+                    borderColor: current.badgeBorder,
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <StateIcon 
+                      className="w-5 h-5" 
+                      style={{ color: current.badgeText }} 
+                    />
+                    <div>
+                      <h4 
+                        className="font-bold text-sm"
+                        style={{ color: current.badgeText }}
+                      >
+                        {state}
+                      </h4>
+                      <p 
+                        className="text-xs"
+                        style={{ color: '#555555' }}
+                      >
+                        {current.description}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Badge Conforme / No Conforme / Desconocido */}
+                  <span 
+                    className="text-xs font-bold px-2.5 py-1 rounded"
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      color: current.badgeText,
+                      border: `1px solid ${current.badgeBorder}`,
+                    }}
+                  >
+                    {current.badge}
+                  </span>
+                </div>
+              </div>
+
+              {/* Sección: METADATOS DE LA EVALUACIÓN */}
+              <div>
+                <h3 
+                  className="text-[11px] font-bold tracking-wider mb-2 uppercase"
+                  style={{ color: '#213F8B' }}
+                >
+                  METADATOS DE LA EVALUACIÓN
+                </h3>
+                <div className="border border-slate-200 rounded-lg p-3 bg-white space-y-2 text-xs">
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span style={{ color: '#555555' }}>Control:</span>
+                    <span className="font-semibold text-slate-800">{controlName}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span style={{ color: '#555555' }}>Repositorio:</span>
+                    <span className="font-medium text-slate-800">{repoDisplay}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span style={{ color: '#555555' }}>Fecha (UTC):</span>
+                    <span className="font-mono text-slate-700">{evalDate}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sección: EVIDENCIA RECOLECTADA */}
+              <div>
+                <h3 
+                  className="text-[11px] font-bold tracking-wider mb-2 uppercase"
+                  style={{ color: '#213F8B' }}
+                >
+                  EVIDENCIA RECOLECTADA
+                </h3>
+                <div className="border border-slate-200 rounded-lg p-3 bg-white space-y-2 text-xs">
+                  {!isGH002 ? (
                     <>
-                      <div className="flex justify-between py-0.5 border-b border-slate-100">
-                        <span style={{ color: '#555555' }}>Rama por defecto:</span>
-                        <span className="font-semibold text-slate-800">
-                          {current.defaultBranch}
-                        </span>
+                      <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                        <span style={{ color: '#555555' }}>Aprobaciones requeridas:</span>
+                        <span className="font-semibold text-slate-800">{current.approvals}</span>
                       </div>
-                      <div className="flex justify-between py-0.5">
-                        <span style={{ color: '#555555' }}>Protección habilitada:</span>
-                        <span className="font-semibold text-slate-800">
-                          {current.protectionEnabled}
-                        </span>
+                      <div className="flex justify-between items-center py-1">
+                        <span style={{ color: '#555555' }}>Descartar aprobaciones obsoletas:</span>
+                        <span className="font-semibold text-slate-800">{current.dismissStale}</span>
                       </div>
                     </>
                   ) : (
                     <>
-                      <div className="flex justify-between py-0.5 border-b border-slate-100">
-                        <span style={{ color: '#555555' }}>Aprobaciones requeridas (required_approvals):</span>
-                        <span className="font-semibold text-slate-800">{current.approvals}</span>
+                      <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                        <span style={{ color: '#555555' }}>Rama por defecto:</span>
+                        <span className="font-semibold text-slate-800">{current.defaultBranch}</span>
                       </div>
-                      <div className="flex justify-between py-0.5">
-                        <span style={{ color: '#555555' }}>Descartar revisiones obsoletas (dismiss_stale):</span>
-                        <span className="font-semibold text-slate-800">{current.dismissStale}</span>
+                      <div className="flex justify-between items-center py-1">
+                        <span style={{ color: '#555555' }}>Protección de rama habilitada:</span>
+                        <span className="font-semibold text-slate-800">{current.protectionEnabled}</span>
                       </div>
                     </>
                   )}
@@ -316,8 +325,8 @@ export default function ResultadoView({
                 <span style={{ color: '#555555' }}>{current.suggestedAction}</span>
               </div>
 
-              {/* Botón: Nueva Evaluación */}
-              <div className="pt-2">
+              {/* Botones de Acción */}
+              <div className="pt-2 space-y-2">
                 <button
                   type="button"
                   onClick={onNewEvaluation}
@@ -330,6 +339,15 @@ export default function ResultadoView({
                 >
                   <ArrowLeft className="w-4 h-4" />
                   <span>Nueva evaluación</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onNavigate && onNavigate('historial')}
+                  className="w-full py-2.5 px-4 font-semibold text-xs transition border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <History className="w-4 h-4 text-slate-500" />
+                  <span>Ver Historial de Auditorías</span>
                 </button>
               </div>
 

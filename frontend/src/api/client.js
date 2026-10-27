@@ -129,3 +129,62 @@ export async function evaluateControl(controlId, payload) {
     };
   }
 }
+
+/**
+ * Obtener historial de evaluaciones registradas en PostgreSQL
+ */
+export async function fetchEvaluationsHistory({ status = null, search = '', limit = 50, offset = 0 } = {}) {
+  const token = getStoredToken();
+  const params = new URLSearchParams();
+  if (status && status !== 'Todos') {
+    params.append('status', status);
+  }
+  if (search && search.trim()) {
+    params.append('search', search.trim());
+  }
+  if (limit) params.append('limit', limit);
+  if (offset) params.append('offset', offset);
+
+  const queryStr = params.toString() ? `?${params.toString()}` : '';
+  const endpoint = `${API_BASE_URL}/api/v1/evaluations${queryStr}`;
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+    });
+
+    if (response.status === 401) {
+      clearSession();
+      return {
+        success: false,
+        status: 401,
+        message: 'Sesión expirada o no autorizada. Por favor inicie sesión nuevamente.',
+      };
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        success: false,
+        status: response.status,
+        message: typeof errorData.detail === 'string' ? errorData.detail : `Error al cargar historial (HTTP ${response.status}).`,
+      };
+    }
+
+    const data = await response.json();
+    return {
+      success: true,
+      data,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      status: 0,
+      message: 'No fue posible conectar con el servidor para obtener el historial.',
+    };
+  }
+}

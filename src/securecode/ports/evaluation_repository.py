@@ -64,3 +64,12 @@ class EvaluationRepository(Protocol):
         """Retrieve an evaluation and reconstruct its evidence."""
         ...
 
+    def list_evaluations(
+        self,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0
+    ) -> tuple[int, list]:
+        """List persisted evaluations with pagination and filtering."""
+        ...
