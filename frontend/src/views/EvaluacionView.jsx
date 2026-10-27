@@ -45,7 +45,16 @@ export default function EvaluacionView({ onLogout, onEvaluationSuccess }) {
     setIsLoading(false);
 
     if (!result.success) {
-      setErrorMessage(result.message);
+      if (result.status >= 500 || result.status === 0) {
+        if (onEvaluationSuccess) {
+          onEvaluationSuccess({
+            isError: true,
+            message: 'Servicio no disponible. No se registró ninguna evaluación. Intente nuevamente más tarde.',
+          }, activeTab);
+        }
+      } else {
+        setErrorMessage(result.message);
+      }
     } else {
       if (onEvaluationSuccess) {
         onEvaluationSuccess(result.data, activeTab);

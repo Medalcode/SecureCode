@@ -19,14 +19,6 @@ export default function ResultadoView({
 }) {
   const [copied, setCopied] = useState(false);
 
-  // Determinar estado base (PASS, FAIL, UNKNOWN o ERROR)
-  const initialStatus = resultData?.status 
-    ? resultData.status.toUpperCase() 
-    : (resultData?.isError ? 'ERROR' : 'PASS');
-
-  // Permitir alternar entre las 4 variantes oficiales para demostración / presentación
-  const [activeVariant, setActiveVariant] = useState(initialStatus);
-
   const handleLogout = () => {
     clearSession();
     if (onLogout) {
@@ -41,7 +33,12 @@ export default function ResultadoView({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Metadatos calculados de la evaluación
+  // Determinar el estado REAL devuelto por la evaluación
+  const isErrorState = Boolean(resultData?.isError);
+  const rawStatus = (resultData?.status || '').toUpperCase();
+  const state = isErrorState ? 'ERROR' : (['PASS', 'FAIL', 'UNKNOWN'].includes(rawStatus) ? rawStatus : 'UNKNOWN');
+
+  // Metadatos calculados del resultado
   const isGH002 = controlId === 'GH-002' || resultData?.control_id === 'GH-002';
   const controlName = isGH002 
     ? 'GH-002 Protección de rama' 
@@ -53,15 +50,14 @@ export default function ResultadoView({
 
   const evalDate = resultData?.evaluated_at
     ? new Date(resultData.evaluated_at).toUTCString().replace('GMT', 'UTC')
-    : '2025-05-18 14:32 UTC';
+    : new Date().toUTCString().replace('GMT', 'UTC');
 
   const evalId = resultData?.evaluation_id || 'eval_9f8a2b3c4d5e';
   const evidenceHash = resultData?.evidence?.hash || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
 
-  // Configuración de las 4 variantes oficiales (Imágenes 1 a 4 del informe)
-  const variantConfig = {
+  // Configuración de textos y estilos según el estado automático recibido
+  const configByState = {
     PASS: {
-      state: 'PASS',
       description: 'Control cumple',
       badge: 'CONFORME',
       badgeBg: '#EBF7EE',
@@ -70,10 +66,11 @@ export default function ResultadoView({
       icon: CheckCircle2,
       suggestedAction: 'Sin acción correctiva requerida.',
       approvals: resultData?.evidence?.required_review_approvals ?? 2,
-      dismissStale: resultData?.evidence?.dismiss_stale_reviews ? 'Sí' : 'Sí',
+      dismissStale: resultData?.evidence?.dismiss_stale_reviews === false ? 'No' : 'Sí',
+      protectionEnabled: 'Sí',
+      defaultBranch: resultData?.evidence?.default_branch || 'main',
     },
     FAIL: {
-      state: 'FAIL',
       description: 'Control no cumple',
       badge: 'NO CONFORME',
       badgeBg: '#FDF2F2',
@@ -82,10 +79,11 @@ export default function ResultadoView({
       icon: XCircle,
       suggestedAction: 'Ajuste la configuración en GitHub y vuelva a evaluar.',
       approvals: resultData?.evidence?.required_review_approvals ?? 1,
-      dismissStale: 'No',
+      dismissStale: resultData?.evidence?.dismiss_stale_reviews ? 'Sí' : 'No',
+      protectionEnabled: 'No',
+      defaultBranch: resultData?.evidence?.default_branch || 'main',
     },
     UNKNOWN: {
-      state: 'UNKNOWN',
       description: 'Evidencia insuficiente',
       message: 'No fue posible determinar el estado con certeza',
       badge: 'DESCONOCIDO',
@@ -96,19 +94,19 @@ export default function ResultadoView({
       suggestedAction: 'Verifique permisos del token y que el repositorio y la rama existan; luego reintente.',
       approvals: 'No disponible',
       dismissStale: 'No disponible',
+      protectionEnabled: 'No disponible',
+      defaultBranch: 'No disponible',
     },
     ERROR: {
-      state: 'ERROR',
-      message: 'Servicio no disponible. No se registró ninguna evaluación. Intente nuevamente más tarde.',
+      message: resultData?.message || 'Servicio no disponible. No se registró ninguna evaluación. Intente nuevamente más tarde.',
       badgeBg: '#FDF2F2',
       badgeBorder: '#F5C6CB',
       badgeText: '#C0392B',
       icon: AlertTriangle,
-      actionText: 'Reintentar',
     }
   };
 
-  const current = variantConfig[activeVariant] || variantConfig.PASS;
+  const current = configByState[state] || configByState.UNKNOWN;
   const StateIcon = current.icon;
 
   return (
@@ -142,35 +140,14 @@ export default function ResultadoView({
         </div>
       </header>
 
-      {/* Selector de demostración de las 4 Variantes Oficiales (Tabla 19) */}
-      <div className="max-w-xl mx-auto px-4 pt-4 w-full flex items-center justify-center gap-1.5 text-xs">
-        <span className="text-slate-400 text-[11px] mr-1 hidden sm:inline">Variantes Tabla 19:</span>
-        {['PASS', 'FAIL', 'UNKNOWN', 'ERROR'].map((v) => (
-          <button
-            key={v}
-            onClick={() => setActiveVariant(v)}
-            className={`px-2.5 py-1 rounded text-[11px] font-semibold transition border cursor-pointer ${
-              activeVariant === v 
-                ? 'bg-slate-800 text-white border-slate-800 shadow-sm' 
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            {v === 'PASS' && '🟢 PASS'}
-            {v === 'FAIL' && '🔴 FAIL'}
-            {v === 'UNKNOWN' && '🟡 UNKNOWN'}
-            {v === 'ERROR' && '⚪ ERROR'}
-          </button>
-        ))}
-      </div>
-
-      {/* Contenedor Principal */}
+      {/* Contenedor Principal: Únicamente muestra el resultado automático de la evaluación */}
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6">
         <div 
           className="w-full max-w-[520px] bg-white border border-slate-200 shadow-md p-6 sm:p-8"
           style={{ borderRadius: '8px' }}
         >
-          {/* VARIANTE 4: ERROR (Servicio no disponible) */}
-          {activeVariant === 'ERROR' ? (
+          {/* CASO: ERROR (Servicio no disponible) */}
+          {state === 'ERROR' ? (
             <div className="space-y-6 animate-in fade-in duration-150">
               <div 
                 className="p-4 rounded-lg flex items-start gap-3 border"
@@ -182,7 +159,7 @@ export default function ResultadoView({
               >
                 <StateIcon className="w-5 h-5 shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="font-bold text-sm">Falla de Comunicación</h3>
+                  <h3 className="font-bold text-sm">Servicio no disponible</h3>
                   <p className="text-xs mt-1 leading-relaxed">{current.message}</p>
                 </div>
               </div>
@@ -201,7 +178,7 @@ export default function ResultadoView({
               </button>
             </div>
           ) : (
-            /* VARIANTES 1, 2 Y 3: PASS, FAIL Y UNKNOWN */
+            /* CASOS: PASS, FAIL Y UNKNOWN */
             <div className="space-y-5 animate-in fade-in duration-150">
               
               {/* Banner de Estado (Status Banner) */}
@@ -219,7 +196,7 @@ export default function ResultadoView({
                       className="font-bold text-sm tracking-wide"
                       style={{ color: current.badgeText }}
                     >
-                      {current.state}: {current.description}
+                      {state}: {current.description}
                     </h2>
                     {current.message && (
                       <p className="text-[11px] text-amber-800 font-normal mt-0.5">
@@ -271,13 +248,13 @@ export default function ResultadoView({
                       <div className="flex justify-between py-0.5 border-b border-slate-100">
                         <span style={{ color: '#555555' }}>Rama por defecto:</span>
                         <span className="font-semibold text-slate-800">
-                          {activeVariant === 'UNKNOWN' ? 'No disponible' : 'main'}
+                          {current.defaultBranch}
                         </span>
                       </div>
                       <div className="flex justify-between py-0.5">
                         <span style={{ color: '#555555' }}>Protección habilitada:</span>
                         <span className="font-semibold text-slate-800">
-                          {activeVariant === 'PASS' ? 'Sí' : activeVariant === 'FAIL' ? 'No' : 'No disponible'}
+                          {current.protectionEnabled}
                         </span>
                       </div>
                     </>
