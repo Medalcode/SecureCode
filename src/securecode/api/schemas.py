@@ -157,3 +157,5 @@ class ExportReportResponse(BaseModel):
     recipient: str
     pdf_generated: bool
     integrity_signature: str
+    delivery_mode: str = "sandbox"
+    delivery_note: Optional[str] = None

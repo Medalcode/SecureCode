@@ -149,8 +149,19 @@ export default function ExportAuditModal({
                 <span>{successReceipt.message}</span>
               </div>
               <p className="text-[11px] text-emerald-700">
-                Se ha generado el documento formal en PDF (Estándar INACAP) y se registró el despacho oficial al correo: <strong className="font-mono text-emerald-900">{successReceipt.recipient}</strong>.
+                Se ha generado el documento formal en PDF (Estándar INACAP) y se procesó el despacho al correo: <strong className="font-mono text-emerald-900">{successReceipt.recipient}</strong>.
               </p>
+
+              {successReceipt.delivery_mode === 'live' ? (
+                <div className="p-2 rounded bg-emerald-100/70 border border-emerald-300 text-[11px] text-emerald-900">
+                  <span className="font-bold">✓ Correo enviado a tu bandeja:</span> Revisa tu bandeja de entrada o spam en <strong>{successReceipt.recipient}</strong>.
+                </div>
+              ) : (
+                <div className="p-2 rounded bg-blue-50 border border-blue-200 text-[11px] text-slate-700">
+                  <span className="font-semibold text-[#213F8B] block">Modo de Trazabilidad Local (Sandbox):</span>
+                  <span>El PDF se descargó directamente en tu carpeta de <em>Descargas</em> y la evidencia quedó registrada en el servidor. Para envío directo a tu casilla de Gmail externa se requiere configurar credenciales SMTP (Contraseña de aplicación).</span>
+                </div>
+              )}
               <div className="pt-2 border-t border-emerald-200 grid grid-cols-2 gap-2 text-[11px] text-emerald-900">
                 <div>
                   <span className="text-emerald-700 block">Folio de Despacho:</span>

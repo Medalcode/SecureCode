@@ -249,6 +249,47 @@ def export_and_dispatch_report(
     sig_material = f"{payload.evaluated_control}|{payload.repository}|{payload.verdict}|{payload.integrity_hash}|{now.isoformat()}"
     signature = hashlib.sha256(sig_material.encode("utf-8")).hexdigest()
 
+    from securecode.adapters.smtp_mailer import dispatch_email
+
+    pdf_bytes = None
+    if payload.generate_pdf:
+        pdf_bytes = generate_audit_report_pdf(
+            control=payload.evaluated_control,
+            repository=payload.repository,
+            verdict=payload.verdict,
+            integrity_hash=payload.integrity_hash,
+            evaluation_id=payload.evaluation_id or "eval_audit",
+            auditor=payload.email
+        )
+
+    mail_status = {"sent": False, "mode": "sandbox", "message": "Simulación local"}
+    if payload.email:
+        email_body = f"""Estimado(a) Auditor(a),
+
+Se ha emitido un dictamen técnico formal de evaluación de control SCM en la plataforma SecureCode (Estándar INACAP ES2).
+
+• Control Evaluado: {payload.evaluated_control}
+• Repositorio: {payload.repository}
+• Veredicto: {payload.verdict}
+• Hash Canónico de Evidencia (SHA-256): {payload.integrity_hash}
+• Folio de Despacho: {dispatch_id}
+• Marca Temporal UTC: {timestamp_str}
+• Firma Criptográfica: {signature}
+
+Se adjunta el certificado oficial de auditoría en formato PDF con firma y marcas de tiempo para validez probatoria.
+
+Atentamente,
+Plataforma SecureCode - Monitoreo Continuo de Código Fuente
+"""
+        clean_eval_id = (payload.evaluation_id or "eval_audit").replace(" ", "_")
+        mail_status = dispatch_email(
+            to_email=payload.email,
+            subject=f"[SecureCode] Dictamen de Auditoría - {payload.evaluated_control} ({payload.verdict})",
+            body=email_body,
+            attachment_bytes=pdf_bytes,
+            attachment_filename=f"Dictamen_Auditoria_{clean_eval_id}.pdf"
+        )
+
     # Save dispatch evidence
     try:
         os.makedirs("artifacts/dispatched_emails", exist_ok=True)
@@ -261,14 +302,20 @@ def export_and_dispatch_report(
             "repository": payload.repository,
             "verdict": payload.verdict,
             "hash": payload.integrity_hash,
-            "signature": signature
+            "signature": signature,
+            "mail_delivery": mail_status
         }
         with open(f"artifacts/dispatched_emails/{dispatch_id}.json", "w", encoding="utf-8") as f:
             json.dump(rec, f, indent=2)
     except Exception as e:
         logger.warning(f"Could not save dispatch record: {e}")
 
-    msg = f"Reporte formal generado y despachado exitosamente a {payload.email}" if payload.email else "Reporte formal generado exitosamente."
+    if mail_status.get("sent"):
+        msg = f"Reporte formal generado y despachado exitosamente a {payload.email}"
+    elif mail_status.get("mode") == "sandbox":
+        msg = f"Reporte formal generado. Despacho registrado en trazabilidad local (Modo Sandbox para {payload.email})."
+    else:
+        msg = f"Reporte generado. {mail_status.get('message', '')}"
 
     return ExportReportResponse(
         success=True,
@@ -278,7 +325,9 @@ def export_and_dispatch_report(
         timestamp_utc=timestamp_str,
         recipient=payload.email,
         pdf_generated=payload.generate_pdf,
-        integrity_signature=signature
+        integrity_signature=signature,
+        delivery_mode=mail_status.get("mode", "sandbox"),
+        delivery_note=mail_status.get("message")
     )
 
 @app.get("/api/v1/evaluations/pdf")
