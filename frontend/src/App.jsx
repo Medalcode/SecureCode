@@ -4,6 +4,7 @@ import EvaluacionView from './views/EvaluacionView';
 import ResultadoView from './views/ResultadoView';
 import HistorialView from './views/HistorialView';
 import BillingView from './views/BillingView';
+import TestBenchView from './views/TestBenchView';
 import { isAuthenticated, clearSession } from './api/client';
 
 export default function App() {
@@ -80,6 +81,14 @@ export default function App() {
       {/* 5. Fase 2: Centro de Control y Suscripción (/billing) */}
       {currentStep === 'facturacion' && (
         <BillingView
+          onLogout={handleLogout}
+          onNavigate={handleNavigate}
+        />
+      )}
+
+      {/* 6. Fase 2: Banco de Pruebas Unitario "de a 1" (/testbench) */}
+      {currentStep === 'testbench' && (
+        <TestBenchView
           onLogout={handleLogout}
           onNavigate={handleNavigate}
         />

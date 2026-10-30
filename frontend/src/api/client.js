@@ -314,3 +314,76 @@ export function getInvoicePdfDownloadUrl({ reference, date, concept, amount }) {
   });
   return `${API_BASE_URL}/api/v1/billing/invoice-pdf?${params.toString()}`;
 }
+
+/**
+ * Obtener listado de casos del Banco de Pruebas Unitario (Ground Truth)
+ */
+export async function fetchTestBenchCases(control = null) {
+  const token = getStoredToken();
+  const queryStr = control && control !== 'Todos' ? `?control=${encodeURIComponent(control)}` : '';
+  const endpoint = `${API_BASE_URL}/api/v1/test-bench/cases${queryStr}`;
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      return { success: false, status: response.status, cases: [], total: 0 };
+    }
+
+    const data = await response.json();
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, status: 0, cases: [], total: 0 };
+  }
+}
+
+/**
+ * Ejecutar un caso de prueba individual ("de a 1") en el motor determinista
+ */
+export async function runTestBenchCase({ case_id, control_id = null, override_evidence = null }) {
+  const token = getStoredToken();
+  const endpoint = `${API_BASE_URL}/api/v1/test-bench/run`;
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        case_id,
+        control_id,
+        override_evidence
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        success: false,
+        status: response.status,
+        message: errorData.detail || `Error al ejecutar caso de prueba (HTTP ${response.status})`
+      };
+    }
+
+    const data = await response.json();
+    return {
+      success: true,
+      data
+    };
+  } catch (err) {
+    return {
+      success: false,
+      status: 0,
+      message: 'Fallo al conectar con el motor de pruebas unitarias.'
+    };
+  }
+}

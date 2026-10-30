@@ -159,3 +159,41 @@ class ExportReportResponse(BaseModel):
     integrity_signature: str
     delivery_mode: str = "sandbox"
     delivery_note: Optional[str] = None
+
+# ===== Test Bench (Banco de Pruebas "de a 1") Schemas (Fase 2) =====
+
+class TestCaseItem(BaseModel):
+    case_id: str
+    control_id: str
+    title: str
+    scenario: str
+    repository: str
+    branch: str
+    expected_status: str
+    evidence_preview: Dict[str, Any]
+    rationale: str
+
+class TestCaseListResponse(BaseModel):
+    cases: List[TestCaseItem]
+    total: int
+    controls: List[str]
+
+class TestRunRequest(BaseModel):
+    case_id: str
+    control_id: Optional[str] = None
+    override_evidence: Optional[Dict[str, Any]] = None
+
+class TestRunResponse(BaseModel):
+    case_id: str
+    control_id: str
+    expected_status: str
+    actual_status: str
+    matched: bool
+    execution_time_ms: float
+    evidence: Dict[str, Any]
+    integrity_hash: str
+    rule_applied: str
+    rule_version: int
+    evaluated_at: str
+    explanation: str
+    oracle_verdict_rationale: str

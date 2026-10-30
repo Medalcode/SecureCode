@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, LogOut, Lock, FileCheck2, Award, History, CreditCard } from 'lucide-react';
+import { ShieldCheck, LogOut, Lock, FileCheck2, Award, History, CreditCard, FlaskConical } from 'lucide-react';
 import { clearSession, isAuthenticated, getStoredUser } from '../api/client';
 
 export default function Navbar({ currentStep = 'login', onNavigate }) {
@@ -19,6 +19,7 @@ export default function Navbar({ currentStep = 'login', onNavigate }) {
     { id: 'resultado', label: '3. Resultado (R)', icon: Award, path: '/resultado', disabled: !logged },
     { id: 'historial', label: '4. Historial (H)', icon: History, path: '/historial', disabled: !logged },
     { id: 'facturacion', label: '5. Suscripción (B)', icon: CreditCard, path: '/billing', disabled: !logged },
+    { id: 'testbench', label: '6. Banco Pruebas (T)', icon: FlaskConical, path: '/testbench', disabled: !logged },
   ];
 
   return (

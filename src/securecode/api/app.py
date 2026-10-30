@@ -31,7 +31,11 @@ from securecode.api.schemas import (
     BillingInvoiceRow,
     BillingFooter,
     ExportReportRequest,
-    ExportReportResponse
+    ExportReportResponse,
+    TestCaseItem,
+    TestCaseListResponse,
+    TestRunRequest,
+    TestRunResponse
 )
 from securecode.api.dependencies import (
     get_db_session,
@@ -502,3 +506,41 @@ def evaluate_gh002_endpoint(
         collected_at=persisted.collected_at.isoformat(),
         evaluated_at=persisted.evaluated_at.isoformat()
     )
+
+
+# ===== Test Bench (Banco de Pruebas Unitario 'de a 1') Endpoints =====
+from securecode.application.test_bench import list_ground_truth_cases, run_single_test_case
+
+@app.get("/api/v1/test-bench/cases", response_model=TestCaseListResponse)
+def get_test_bench_cases(
+    control: Optional[str] = Query(None, description="Filter by control: GH-001 or GH-002")
+):
+    """
+    Retrieves the Ground Truth test cases for interactive single-case evaluation.
+    """
+    cases = list_ground_truth_cases(control_filter=control)
+    return TestCaseListResponse(
+        cases=cases,
+        total=len(cases),
+        controls=["Todos", "GH-001", "GH-002"]
+    )
+
+@app.post("/api/v1/test-bench/run", response_model=TestRunResponse)
+def execute_test_bench_case(
+    request: TestRunRequest
+):
+    """
+    Executes a single Ground Truth test case through the deterministic evaluation engine
+    measuring latency in ms, canonical SHA-256 hash, and concordance against Oracle.
+    """
+    try:
+        result = run_single_test_case(
+            case_id=request.case_id,
+            override_evidence=request.override_evidence
+        )
+        return TestRunResponse(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Test bench execution failed: {e}")
+        raise HTTPException(status_code=500, detail="Error executing test bench case")
