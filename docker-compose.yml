@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: securecode_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: securecode
+      POSTGRES_PASSWORD: securecode_password_2026
+      POSTGRES_DB: securecode_test
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U securecode -d securecode_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: securecode_app
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 8000
+      DATABASE_URL: postgresql://securecode:securecode_password_2026@db:5432/securecode_test
+      JWT_SECRET_KEY: test-secret-key-that-is-at-least-32-bytes-long
+      JWT_ALGORITHM: HS256
+      GITHUB_TOKEN: ""
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:

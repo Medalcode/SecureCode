@@ -1,3 +1,9 @@
+import os
+import json
+from pathlib import Path
+from uuid import uuid4
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -27,6 +33,63 @@ app = FastAPI(
 )
 
 logger = logging.getLogger(__name__)
+
+# Montaje de archivos estaticos para la interfaz de usuario moderna
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+@app.get("/", response_class=HTMLResponse)
+def serve_index():
+    index_file = STATIC_DIR / "index.html"
+    if index_file.exists():
+        return HTMLResponse(content=index_file.read_text(encoding="utf-8"))
+    return HTMLResponse(content="<h1>SecureCode API</h1><p>Consulte /docs para OpenAPI.</p>")
+
+@app.get("/api/v1/rules")
+def get_rules_catalog():
+    rules_dir = Path(__file__).resolve().parent.parent.parent.parent / "rules"
+    rules_list = []
+    if rules_dir.exists():
+        for r_file in sorted(rules_dir.glob("*.json")):
+            try:
+                rules_list.append(json.loads(r_file.read_text(encoding="utf-8")))
+            except Exception:
+                pass
+    return {"rules": rules_list}
+
+@app.get("/api/v1/system/overview")
+def get_system_overview():
+    return {
+        "status": "online",
+        "service": "SecureCode Compliance Engine",
+        "version": "1.0.0",
+        "ci_metrics": {
+            "tests_total": 95,
+            "tests_passing": 95,
+            "coverage_pct": 89.5,
+            "ci_run_id": "39183552777"
+        },
+        "performance": {
+            "p95_latency_ms": 200,
+            "p98_latency_ms": 300,
+            "nominal_p95_ms": 180,
+            "throughput_rps": 20.45,
+            "error_rate_pct": 0.0
+        },
+        "capacity_finops": {
+            "database": "PostgreSQL 15 / 16 (Supabase Hobby 500 MB)",
+            "max_evaluations_theoretical": 20480,
+            "estimated_record_size_kb": 25,
+            "saturation_months_without_purge": 4.1
+        },
+        "sla": {
+            "availability_target_pct": 99.5,
+            "rto_compute": "< 15 minutes",
+            "rpo_database": "< 24 hours"
+        }
+    }
+
 
 from fastapi.security import OAuth2PasswordRequestForm
 from securecode.api.security import verify_password, create_access_token

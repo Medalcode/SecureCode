@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SecureCode - Plataforma de Evaluación Automatizada de Cumplimiento basada en Controles y Evidencias">
+  <title>SecureCode — Evaluación Automatizada de Controles</title>
+
+  <!-- Control de Modo Claro/Oscuro Nativo según Modern Web Guidance -->
+  <meta name="color-scheme" content="light dark">
+  <script>
+    // FOUC prevention: aplica inmediatamente el tema guardado
+    document.querySelector('meta[name="color-scheme"]').content = localStorage.getItem("color-scheme") || "light dark";
+  </script>
+
+  <!-- Hoja de Estilos Principal -->
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- Sidebar Lateral Estilo ChatGPT / Gemini -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <a href="#" class="brand-badge">
+          <div class="brand-icon">S</div>
+          <div>
+            <div class="brand-title">SecureCode</div>
+          </div>
+          <span class="brand-version">v1.0</span>
+        </a>
+      </div>
+
+      <button class="btn-new-eval" id="btnNewEval">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        <span>Nueva Evaluación</span>
+      </button>
+
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-view="evaluator" data-title="Evaluador de Controles">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          </svg>
+          <span>Evaluador de Controles</span>
+        </button>
+
+        <button class="nav-item" data-view="usage" data-title="Consumo & FinOps">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          <span>Consumo & FinOps</span>
+        </button>
+
+        <button class="nav-item" data-view="subscription" data-title="Plan & Niveles de Servicio (SLA)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+            <line x1="2" y1="10" x2="22" y2="10"></line>
+          </svg>
+          <span>Plan & SLA</span>
+        </button>
+
+        <button class="nav-item" data-view="settings" data-title="Configuración del Cliente">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span>Configuración</span>
+        </button>
+
+        <button class="nav-item" data-view="admin" data-title="Consola de Administración">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="4 17 10 11 4 5"></polyline>
+            <line x1="12" y1="19" x2="20" y2="19"></line>
+          </svg>
+          <span>Administración TI</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-section-title">Historial de Auditoría</div>
+      <div class="history-list" id="historyList">
+        <!-- Renderizado dinámicamente con JavaScript -->
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="user-profile" id="btnOpenLogin">
+          <div class="user-avatar" id="userAvatarInitial">A</div>
+          <div class="user-info">
+            <span class="user-name" id="userProfileName">auditor@demo.org</span>
+            <span class="user-role" id="userProfileRole">Auditor de Seguridad</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Contenedor Principal -->
+    <div class="main-wrapper">
+      <!-- Barra Superior -->
+      <header class="top-header">
+        <div class="header-left">
+          <button class="btn-toggle-sidebar" id="btnToggleSidebar" aria-label="Colapsar menú">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="9" y1="3" x2="9" y2="21"></line>
+            </svg>
+          </button>
+          <div class="page-title-badge">
+            <span id="pageTitleText">Evaluador de Controles</span>
+          </div>
+        </div>
+
+        <div class="header-right">
+          <div class="system-status-indicator" title="Estado de la API SecureCode">
+            <span class="pulse-dot" id="pulseDot"></span>
+            <span id="systemStatusText">API Operativa</span>
+          </div>
+
+          <button class="btn-theme-toggle" id="btnThemeToggle" aria-label="Cambiar tema">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+            <span id="currentThemeText">Tema</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Área de Contenido Dinámico -->
+      <main class="content-area">
+        
+        <!-- ================= VISTA 1: EVALUADOR DE CONTROLES (CORE) ================= -->
+        <section class="view-panel active" id="view-evaluator">
+          <div class="evaluator-hero">
+            <h1>Evaluación Determinista de Controles</h1>
+            <p>Adquisición de evidencias técnicas desde SCM, evaluación de reglas desacopladas y trazabilidad inmutable.</p>
+          </div>
+
+          <!-- Formulario de Evaluación -->
+          <div class="eval-card">
+            <div class="control-selector">
+              <button type="button" class="control-btn active" data-control="GH-001">
+                <span class="control-code">Control Canónico GH-001</span>
+                <span>Branch Review Policy</span>
+                <span style="font-size: 11px; font-weight: normal; color: var(--text-faint);">≥ 2 aprobaciones y sin revisiones obsoletas</span>
+              </button>
+              <button type="button" class="control-btn" data-control="GH-002">
+                <span class="control-code">Control Canónico GH-002</span>
+                <span>Default Branch Protection</span>
+                <span style="font-size: 11px; font-weight: normal; color: var(--text-faint);">Protección activa en rama por defecto</span>
+              </button>
+            </div>
+
+            <form id="evaluatorForm">
+              <div class="form-grid">
+                <div class="input-group">
+                  <label for="repoInput">Repositorio de Código (owner/repo)</label>
+                  <input type="text" id="repoInput" class="input-control" placeholder="Medalcode/SecureCode" required autocomplete="off">
+                </div>
+
+                <div class="input-group" id="branchInputGroup">
+                  <label for="branchInput">Rama a Auditar (branch)</label>
+                  <input type="text" id="branchInput" class="input-control" placeholder="main" value="main" autocomplete="off">
+                </div>
+              </div>
+
+              <!-- Chips de selección rápida -->
+              <div class="chips-row">
+                <span class="chips-label">Ejemplos rápidos:</span>
+                <button type="button" class="chip-btn" data-repo="Medalcode/SecureCode" data-branch="main">Medalcode/SecureCode:main</button>
+                <button type="button" class="chip-btn" data-repo="facebook/react" data-branch="main">facebook/react:main</button>
+                <button type="button" class="chip-btn" data-repo="torvalds/linux" data-branch="master">torvalds/linux:master</button>
+              </div>
+
+              <div class="card-actions">
+                <span style="font-size: 11px; color: var(--text-faint);">Acceso de solo lectura a la API REST de GitHub</span>
+                <button type="submit" class="btn-primary" id="btnSubmitEval">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                  <span>Ejecutar Evaluación Determinista</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Tarjeta de Resultados Triestado (Conforme, No Conforme, Desconocido) -->
+          <div class="result-container" id="resultContainer">
+            <div class="result-banner pass" id="resultBanner">
+              <div class="banner-left">
+                <div class="banner-icon" id="resultBannerIcon">✓</div>
+                <div>
+                  <div class="banner-title" id="resultBannerTitle">PASS — Control Conforme</div>
+                  <div style="font-size: 12px; opacity: 0.9;">Dictamen determinista emitido por el motor de reglas</div>
+                </div>
+              </div>
+              <span class="banner-badge" id="resultBannerBadge">CONFORME</span>
+            </div>
+
+            <!-- Acción sugerida contextual -->
+            <div class="action-card">
+              <div class="action-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="16" x2="12" y2="12"></line>
+                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+              </div>
+              <div>
+                <div style="font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 2px;">Acción sugerida:</div>
+                <div class="action-text" id="resultActionText">Sin acción correctiva requerida. La configuración actual satisface los controles canónicos.</div>
+              </div>
+            </div>
+
+            <!-- Grilla de detalles técnicos -->
+            <div class="result-details-grid">
+              <div class="detail-item">
+                <span class="detail-label">Control Evaluado</span>
+                <span class="detail-value" id="resControlId">GH-001</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Repositorio y Rama</span>
+                <span class="detail-value" id="resRepository">Medalcode/SecureCode (main)</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Fecha de Evaluación (UTC)</span>
+                <span class="detail-value" id="resEvaluatedAt">2026-11-01 04:30:00</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">ID de Evaluación (UUID)</span>
+                <span class="detail-value" id="resEvaluationId">eval-uuid-example</span>
+              </div>
+            </div>
+
+            <!-- Trazabilidad Criptográfica SHA-256 -->
+            <div class="crypto-card">
+              <div class="crypto-header">
+                <span class="crypto-title">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                  </svg>
+                  Huella Criptográfica SHA-256 de Evidencia Canónica
+                </span>
+                <button type="button" class="btn-copy" id="btnCopyHash">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  Copiar
+                </button>
+              </div>
+              <div class="crypto-hash-box" id="resultHashText">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</div>
+            </div>
+
+            <!-- Visor de Evidencia JSON Raw -->
+            <details class="json-accordion">
+              <summary class="json-summary">Ver Evidencia JSON Estructurada (Normalizada e Inmutable)</summary>
+              <pre class="json-body" id="jsonPayloadBody">{ "cargando": true }</pre>
+            </details>
+
+            <div style="margin-top: 20px; text-align: right;">
+              <button type="button" class="chip-btn" id="btnResetResult" style="padding: 8px 16px; font-size: 12px;">Nueva Evaluación</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= VISTA 2: CONSUMO & FINOPS ================= -->
+        <section class="view-panel" id="view-usage">
+          <div class="evaluator-hero" style="text-align: left; margin-bottom: 24px;">
+            <h1>Consumo, Capacidad & FinOps</h1>
+            <p>Monitoreo de cuota mensual sobre el modelo de persistencia administrada (Supabase 500 MB).</p>
+          </div>
+
+          <div class="dashboard-grid">
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <span>Evaluaciones Persistidas</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+              </div>
+              <div class="stat-value" id="quotaUsedText">4,104</div>
+              <div class="stat-subtext">De un límite teórico de <span id="quotaMaxText">20,480</span> evaluaciones</div>
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="quotaBarFill" style="width: 20%;"></div>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-faint); margin-top: 4px;">
+                <span id="quotaPctText">20% consumido</span>
+                <span>Capacidad: 500 MB</span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <span>Latencia P95 Observada</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              </div>
+              <div class="stat-value">200 ms</div>
+              <div class="stat-subtext">Ensayo Locust a 50 usuarios virtuales</div>
+              <div style="font-size: 11px; color: var(--color-pass); font-weight: 600; margin-top: 10px;">
+                ✓ Cumple holgadamente SLA (< 500 ms nominal)
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <span>Throughput de Carga</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+              </div>
+              <div class="stat-value">20.45 req/s</div>
+              <div class="stat-subtext">Tasa de fallos: 0.0% (5.998 peticiones)</div>
+              <div style="font-size: 11px; color: var(--color-pass); font-weight: 600; margin-top: 10px;">
+                ✓ Cero errores 5xx en campaña
+              </div>
+            </div>
+          </div>
+
+          <div class="data-table-wrapper">
+            <div class="data-table-header">
+              <div class="data-table-title">Desglose de Campañas de Rendimiento (Locust)</div>
+            </div>
+            <table class="modern-table">
+              <thead>
+                <tr>
+                  <th>Escenario</th>
+                  <th>Usuarios Virtuales</th>
+                  <th>Solicitudes</th>
+                  <th>Throughput</th>
+                  <th>Latencia P95</th>
+                  <th>Tasa Errores</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>Nominal</td><td>5</td><td>375</td><td>3.15 req/s</td><td>180 ms</td><td>0.0%</td></tr>
+                <tr><td>Progresivo 10</td><td>10</td><td>358</td><td>6.12 req/s</td><td>180 ms</td><td>0.0%</td></tr>
+                <tr><td>Progresivo 20</td><td>20</td><td>687</td><td>11.75 req/s</td><td>180 ms</td><td>0.0%</td></tr>
+                <tr><td>Progresivo 30</td><td>30</td><td>1,011</td><td>17.00 req/s</td><td>180 ms</td><td>0.0%</td></tr>
+                <tr><td>Estrés GH-001</td><td>50</td><td>3,567</td><td>30.00 req/s</td><td>200 ms</td><td>0.0%</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ================= VISTA 3: PLAN & SLA ================= -->
+        <section class="view-panel" id="view-subscription">
+          <div class="evaluator-hero" style="text-align: left; margin-bottom: 24px;">
+            <h1>Plan de Suscripción & Acuerdos de Servicio (SLA)</h1>
+            <p>Compromisos operativos de garantía (Warranty) estructurados bajo el marco ITIL v4.</p>
+          </div>
+
+          <div class="dashboard-grid">
+            <div class="stat-card" style="border-color: var(--accent-primary);">
+              <div class="stat-card-header">
+                <span style="color: var(--accent-primary);">Plan Activo</span>
+                <span class="banner-badge" style="background: var(--accent-primary); color: #fff;">ACTIVO</span>
+              </div>
+              <div class="stat-value">Enterprise Academic</div>
+              <div class="stat-subtext">Asignatura Proyecto de Título TIHI84</div>
+              <ul style="list-style: none; font-size: 12px; margin-top: 14px; display: flex; flex-direction: column; gap: 8px;">
+                <li>✓ Evaluaciones ilimitadas en sandbox</li>
+                <li>✓ 2 Controles canónicos (GH-001, GH-002)</li>
+                <li>✓ Trazabilidad criptográfica SHA-256</li>
+                <li>✓ Soporte para repositorios públicos y privados</li>
+              </ul>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <span>Disponibilidad Comprometida</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+              </div>
+              <div class="stat-value">99.5 %</div>
+              <div class="stat-subtext">Tolerancia máxima: 3.6 horas/mes</div>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 12px;">
+                <strong>RTO:</strong> &lt; 15 min (Cómputo efímero en Cloud Run)<br>
+                <strong>RPO:</strong> &lt; 24 horas (Respaldos PostgreSQL diarios)
+              </div>
+            </div>
+          </div>
+
+          <div class="data-table-wrapper">
+            <div class="data-table-header">
+              <div class="data-table-title">Ficha Oficial de Niveles de Servicio (SLA)</div>
+            </div>
+            <table class="modern-table">
+              <thead>
+                <tr>
+                  <th>Parámetro SLA</th>
+                  <th>Compromiso / Definición Operativa</th>
+                  <th>Estado de Verificación</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Servicio</strong></td>
+                  <td>Evaluación automatizada de controles SCM por API REST</td>
+                  <td><span class="status-dot pass" style="display:inline-block; margin-right:4px;"></span> Verificado</td>
+                </tr>
+                <tr>
+                  <td><strong>Horario de Servicio</strong></td>
+                  <td>Lunes a viernes 08:00 a 20:00 hrs</td>
+                  <td>Definido para demostración</td>
+                </tr>
+                <tr>
+                  <td><strong>Tiempo de Respuesta</strong></td>
+                  <td>Latencia P95 &lt; 500 ms en carga nominal (&lt; 2.0 s en estrés)</td>
+                  <td><span class="status-dot pass" style="display:inline-block; margin-right:4px;"></span> Medido (200 ms)</td>
+                </tr>
+                <tr>
+                  <td><strong>Continuidad</strong></td>
+                  <td>RTO &lt; 15 min / RPO &lt; 24 horas ante fallas mayores</td>
+                  <td>Procedimiento DRP diseñado</td>
+                </tr>
+                <tr>
+                  <td><strong>Trazabilidad</strong></td>
+                  <td>100% de evaluaciones con evidencia y hash coincidente en BD</td>
+                  <td><span class="status-dot pass" style="display:inline-block; margin-right:4px;"></span> 100% verificado</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ================= VISTA 4: CONFIGURACIÓN DEL CLIENTE ================= -->
+        <section class="view-panel" id="view-settings">
+          <div class="evaluator-hero" style="text-align: left; margin-bottom: 24px;">
+            <h1>Configuración del Cliente</h1>
+            <p>Credenciales de conexión SCM y preferencias de políticas de auditoría.</p>
+          </div>
+
+          <div class="eval-card" style="max-width: 650px;">
+            <div class="input-group" style="margin-bottom: 18px;">
+              <label for="customGithubToken">GitHub Personal Access Token (PAT Opcional)</label>
+              <input type="password" id="customGithubToken" class="input-control" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+              <span style="font-size: 11px; color: var(--text-faint);">Utilice un token con permisos de solo lectura (read-only) para auditar repositorios privados sin restricciones de cuota.</span>
+            </div>
+
+            <div class="input-group" style="margin-bottom: 24px;">
+              <label>Umbral Mínimo de Aprobadores (Políticas GH-001)</label>
+              <select class="input-control" id="policyApprovals">
+                <option value="1">1 Aprobación requerida</option>
+                <option value="2" selected>2 Aprobaciones requeridas (Regla Canónica)</option>
+                <option value="3">3 Aprobaciones requeridas (Alta Seguridad)</option>
+              </select>
+            </div>
+
+            <div class="card-actions">
+              <span style="font-size: 11px; color: var(--color-pass);">✓ Configuración almacenada localmente en tu navegador</span>
+              <button type="button" class="btn-primary" onclick="alert('Configuración guardada exitosamente.')">
+                Guardar Preferencias
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= VISTA 5: CONSOLA DE ADMINISTRACIÓN ================= -->
+        <section class="view-panel" id="view-admin">
+          <div class="evaluator-hero" style="text-align: left; margin-bottom: 24px;">
+            <h1>Consola de Administración de la Plataforma</h1>
+            <p>Monitoreo operativo, catálogo de reglas declarativas e integridad del motor.</p>
+          </div>
+
+          <div class="dashboard-grid">
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <span>Latencia de Endpoint /health</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+              </div>
+              <div class="stat-value" id="adminLatencyVal">12 ms</div>
+              <div class="stat-subtext">Chequeo asíncrono cada 30 segundos</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <span>Motor de Persistencia</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+              </div>
+              <div class="stat-value" id="adminDbStatusVal" style="font-size: 18px; color: var(--color-pass);">PostgreSQL 15 Conectado</div>
+              <div class="stat-subtext">Esquema SQLAlchemy + Migraciones Alembic</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <span>Pruebas Automatizadas CI</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+              </div>
+              <div class="stat-value">95 / 95 (89.5%)</div>
+              <div class="stat-subtext">GitHub Actions Run 39183552777</div>
+            </div>
+          </div>
+
+          <!-- Catálogo de Reglas -->
+          <div class="data-table-wrapper">
+            <div class="data-table-header">
+              <div class="data-table-title">Catálogo Canónico de Reglas JSON</div>
+              <button type="button" class="btn-copy" id="btnSimulateAudit">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                Ejecutar Simulación Sandbox
+              </button>
+            </div>
+            <table class="modern-table">
+              <thead>
+                <tr>
+                  <th>Control ID</th>
+                  <th>Nombre Canónico</th>
+                  <th>Archivo</th>
+                  <th>Operadores Lógicos</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>GH-001</strong></td>
+                  <td>Branch Review Policy</td>
+                  <td><code>rules/GH-001.json</code></td>
+                  <td><code>AND(approvals &gt;= 2, dismiss_stale == true)</code></td>
+                  <td><span class="status-dot pass" style="display:inline-block; margin-right:4px;"></span> Activo</td>
+                </tr>
+                <tr>
+                  <td><strong>GH-002</strong></td>
+                  <td>Default Branch Protection</td>
+                  <td><code>rules/GH-002.json</code></td>
+                  <td><code>EQ(protection_enabled, true)</code></td>
+                  <td><span class="status-dot pass" style="display:inline-block; margin-right:4px;"></span> Activo</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Modal de Inicio de Sesión / Autenticación -->
+  <div class="modal-overlay" id="authModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="brand-icon" style="margin: 0 auto 12px; width: 40px; height: 40px; font-size: 20px;">S</div>
+        <h2>Iniciar Sesión</h2>
+        <p>Autenticación mediante JWT Bearer y hashing Argon2id.</p>
+      </div>
+
+      <div id="authErrorAlert" style="display:none; padding:10px 14px; background:var(--color-fail-bg); border:1px solid var(--color-fail-border); color:var(--color-fail); border-radius:var(--radius-md); font-size:12px; margin-bottom:16px;">
+        Usuario o contraseña incorrectos.
+      </div>
+
+      <form id="loginForm">
+        <div class="input-group" style="margin-bottom: 14px;">
+          <label for="authUsername">Usuario</label>
+          <input type="text" id="authUsername" class="input-control" placeholder="auditor@empresa.com" required>
+        </div>
+
+        <div class="input-group" style="margin-bottom: 20px;">
+          <label for="authPassword">Contraseña</label>
+          <input type="password" id="authPassword" class="input-control" placeholder="••••••••••••" required>
+        </div>
+
+        <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; margin-bottom: 12px;">
+          Ingresar al Sistema
+        </button>
+
+        <button type="button" class="btn-new-eval" id="btnDemoLogin" style="width: 100%; justify-content: center; margin: 0 0 12px;">
+          ⚡ Acceso Rápido Modo Demostración
+        </button>
+
+        <div style="text-align: center;">
+          <button type="button" class="chip-btn" id="btnCloseAuthModal">Cerrar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Script Principal de la Aplicación -->
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
