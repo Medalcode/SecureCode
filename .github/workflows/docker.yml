@@ -1,0 +1,55 @@
+name: Docker Build & Smoke Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  docker-smoke-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: securecode:latest
+
+      - name: Spin up container for smoke verification
+        run: |
+          docker run -d --name securecode_smoke -p 8000:8000 \
+            -e DATABASE_URL=sqlite:///./test.db \
+            -e JWT_SECRET_KEY=test-secret-key-that-is-at-least-32-bytes-long \
+            securecode:latest
+          
+          # Esperar a que el contenedor inicie
+          sleep 5
+          
+          # Verificar healthcheck
+          echo "Verificando endpoint /health..."
+          curl -f http://localhost:8000/health || exit 1
+          
+          # Verificar SPA index.html
+          echo "Verificando frontend SPA /..."
+          curl -f http://localhost:8000/ | grep -q "SecureCode" || exit 1
+          
+          # Verificar catálogo de reglas
+          echo "Verificando /api/v1/rules..."
+          curl -f http://localhost:8000/api/v1/rules || exit 1
+          
+          # Verificar telemetría del sistema
+          echo "Verificando /api/v1/system/overview..."
+          curl -f http://localhost:8000/api/v1/system/overview || exit 1
+
+          echo "Smoke test en contenedor Docker superado exitosamente!"
