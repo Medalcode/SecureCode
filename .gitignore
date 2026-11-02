@@ -31,3 +31,6 @@ artifacts/
 # Local database and execution logs
 securecode.db
 run_logs.txt
+
+local_demo.db
+*.db
