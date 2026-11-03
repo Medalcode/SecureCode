@@ -14,3 +14,7 @@ htmlcov
 tests/performance/reports
 docs/*.docx
 docs/figures
+.env
+.env.*
+*.db
+local_demo.db
