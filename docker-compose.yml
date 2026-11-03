@@ -1,18 +1,32 @@
+# SECURECODE — Docker Compose para Entorno Local
+#
+# IMPORTANTE: Este archivo NO contiene credenciales. Todas las variables
+# marcadas con `:?` son OBLIGATORIAS y deben estar definidas en el entorno
+# del shell o en un archivo .env local (nunca versionado).
+#
+# Configuración rápida para desarrollo local:
+#   cp .env.example .env
+#   # Editar .env con valores reales (NO commitear .env)
+#   docker compose up --build -d
+#
+# Para Cloud Run / Railway / Render: gestionar secretos mediante
+# Secret Manager o el panel de variables de entorno del proveedor.
+
 services:
   db:
     image: postgres:15-alpine
     container_name: securecode_postgres
     restart: always
     environment:
-      POSTGRES_USER: securecode
-      POSTGRES_PASSWORD: securecode_password_2026
-      POSTGRES_DB: securecode_test
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U securecode -d securecode_test"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-securecode} -d ${POSTGRES_DB:-securecode}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -27,13 +41,14 @@ services:
       db:
         condition: service_healthy
     environment:
-      PORT: 8000
-      DATABASE_URL: postgresql://securecode:securecode_password_2026@db:5432/securecode_test
-      JWT_SECRET_KEY: test-secret-key-that-is-at-least-32-bytes-long
-      JWT_ALGORITHM: HS256
-      GITHUB_TOKEN: ""
+      PORT: ${PORT:-8000}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
-      - "8000:8000"
+      - "${PORT:-8000}:${PORT:-8000}"
 
 volumes:
   pgdata:
