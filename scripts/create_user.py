@@ -17,6 +17,7 @@ from securecode.api.security import hash_password
 def main():
     parser = argparse.ArgumentParser(description="SecureCode User Provisioning")
     parser.add_argument("--username", required=True, help="Username to create")
+    parser.add_argument("--role", choices=["admin", "auditor"], default="auditor", help="Persisted access role")
     args = parser.parse_args()
     
     db_url = os.environ.get("DATABASE_URL")
@@ -34,8 +35,8 @@ def main():
         sys.exit(1)
         
     password = getpass.getpass("Enter password: ")
-    if not password or len(password) < 8:
-        print("ERROR: Password must be at least 8 characters")
+    if not password or len(password) < 12:
+        print("ERROR: Password must be at least 12 characters")
         sys.exit(1)
         
     confirm = getpass.getpass("Confirm password: ")
@@ -48,6 +49,7 @@ def main():
         username=args.username,
         password_hash=hash_password(password),
         active=True,
+        role=args.role,
         created_at=datetime.now(timezone.utc)
     )
     session.add(user)

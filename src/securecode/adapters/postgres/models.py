@@ -15,6 +15,9 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Roles are deliberately small and explicit. Authorization decisions never
+    # depend on client-supplied labels.
+    role: Mapped[str] = mapped_column(String(20), nullable=False, default="auditor", server_default="auditor")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 class EvidenceRecord(Base):

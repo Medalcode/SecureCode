@@ -1,6 +1,16 @@
 # Dockerfile para SecureCode
-# Optimizado para Cloud Run, Railway, Render y Docker Compose
-FROM python:3.11-slim as runtime
+# Build separado: las herramientas de compilación no llegan a la imagen final.
+FROM python:3.11-slim AS builder
+
+WORKDIR /build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+COPY requirements.txt /build/
+RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
+
+FROM python:3.11-slim AS runtime
 
 # Variables de entorno de Python
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -10,17 +20,18 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Instalar dependencias del sistema necesarias para psycopg2
+# Sólo librerías de ejecución y curl para el healthcheck. gcc/libpq-dev quedan en builder.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    libpq-dev \
-    gcc \
+    libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
 # Instalar dependencias de Python
 COPY requirements.txt /app/
+COPY --from=builder /wheels /wheels
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir /wheels/* && \
+    rm -rf /wheels
 
 # Copiar el código fuente y artefactos del proyecto
 COPY src/ /app/src/
