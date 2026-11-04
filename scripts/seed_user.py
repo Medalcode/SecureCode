@@ -113,6 +113,10 @@ def seed_user(username: str, password: str) -> None:
     engine = create_engine(db_url)
     Session = sessionmaker(bind=engine)
     session = Session()
+    role = os.environ.get("SEED_USER_ROLE", "admin").strip().lower()
+    if role not in {"admin", "auditor"}:
+        print("[ERROR] SEED_USER_ROLE debe ser 'admin' o 'auditor'.", file=sys.stderr)
+        sys.exit(1)
 
     try:
         existing = session.query(User).filter(User.username == username).first()
@@ -120,6 +124,7 @@ def seed_user(username: str, password: str) -> None:
             print(f"[INFO] El usuario '{username}' ya existe. Actualizando contraseña...")
             existing.password_hash = hash_password(password)
             existing.active = True
+            existing.role = role
         else:
             print(f"[INFO] Creando nuevo usuario '{username}'...")
             new_user = User(
@@ -127,6 +132,7 @@ def seed_user(username: str, password: str) -> None:
                 username=username,
                 password_hash=hash_password(password),
                 active=True,
+                role=role,
                 created_at=datetime.now(timezone.utc),
             )
             session.add(new_user)

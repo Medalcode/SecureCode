@@ -129,3 +129,10 @@ def get_current_user(
         )
 
     return user
+
+
+def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Allow administration routes only to persisted administrator accounts."""
+    if getattr(current_user, "role", "auditor") != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator role required")
+    return current_user

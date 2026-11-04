@@ -12,9 +12,10 @@ Desarrollada mediante metodología **SDD (Specification-Driven Development)**, a
 - **GH-002 (Default Branch Protection Enabled)**: Motor de evaluación determinista que valida si la rama principal del repositorio se encuentra protegida contra sobreescrituras directas.
 - **Adaptadores GitHub REST API**: Adquisición y normalización de evidencia en tiempo real con degradación elegante ante estados no observables (*tri-state*: `PASS`, `FAIL`, `UNKNOWN`).
 - **Persistencia Inmutable en PostgreSQL**: Almacenamiento auditable con trazabilidad criptográfica (hashing canónico SHA-256 de evidencia cruda), integridad referencial estricta y migraciones versionadas con Alembic.
-- **Autenticación y Seguridad**: Hashing de contraseñas con Argon2id, tokens de acceso JWT (HS256) con expiración configurable, vinculación de auditoría `requested_by_user_id` y rate limiting.
+- **Autenticación y Seguridad**: Hashing de contraseñas con Argon2id, tokens de acceso JWT (HS256) con expiración configurable, validación de usuarios activos, vinculación de auditoría `requested_by_user_id`, CORS de lista permitida y cabeceras de seguridad para navegador.
+- **Autorización y Auditoría**: Roles persistidos `admin` y `auditor`; sólo administradores pueden gestionar cuentas y los auditores sólo acceden a su propio historial de evaluaciones.
 - **Frontend SPA Minimalista (Estilo Gemini/ChatGPT)**: Interfaz web oscura/clara sin dependencias pesadas, con selector de controles, visor de evidencia en tiempo real, copia de hash SHA-256, telemetría del sistema, simulación en Sandbox y panel FinOps.
-- **Contenedorización para Producción**: `Dockerfile` multi-stage ligero basado en `python:3.11-slim` con usuario no privilegiado (`appuser`, UID 10001) y orquestación con `docker-compose.yml`.
+- **Contenedorización para Producción**: `Dockerfile` multi-stage basado en `python:3.11-slim`, sin compilador en runtime, con usuario no privilegiado (`appuser`, UID 10001); Compose ejecuta la API con filesystem de sólo lectura, sin capacidades Linux y sin escalamiento de privilegios.
 
 ---
 
@@ -51,6 +52,8 @@ docker compose exec api alembic upgrade head
 # 5. Crear usuario inicial (sin contraseña en CLI)
 docker compose exec api sh -c "SEED_USER_EMAIL=auditor@empresa.com SEED_USER_PASSWORD=<contraseña_segura> python scripts/seed_user.py"
 ```
+
+> El primer usuario puede inicializarse con `SEED_USER_ROLE=admin`. Las cuentas existentes pasan a `auditor` tras ejecutar la migración de roles, aplicando mínimo privilegio. Cree administradores adicionales sólo mediante una sesión administrativa autorizada.
 
 Acceder: **`http://localhost:8000/`** | Swagger: **`http://localhost:8000/docs`**
 
@@ -129,6 +132,17 @@ alembic downgrade <revision_id>
 
 ## Guía de Despliegue Seguro en Google Cloud Run
 
+### Lista de verificación antes de producción
+
+- Definir `APP_ENV=production`, `CORS_ORIGINS` con los dominios HTTPS exactos y `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` según la política de sesión.
+- Inyectar `DATABASE_URL`, `JWT_SECRET_KEY`, `GITHUB_TOKEN` y las credenciales del usuario inicial exclusivamente desde Secret Manager.
+- Ejecutar `alembic upgrade head` como Job antes de transferir tráfico.
+- Crear el usuario inicial con una contraseña única y conservar sólo el hash Argon2id; no existe acceso de demostración en producción.
+- Confirmar `/health`, el inicio de sesión y una evaluación autenticada en la revisión candidata antes de mover tráfico.
+- Configurar TLS, dominio y WAF/rate limiting en el balanceador o proveedor. El rate limiting distribuido debe vivir fuera de la memoria de una réplica de aplicación.
+
+La interfaz no acepta ni guarda PATs de GitHub. La credencial de integración se configura sólo en el entorno del servidor y debe tener permisos mínimos de lectura.
+
 ### Prerrequisitos
 
 1. Base de datos PostgreSQL accesible desde Cloud Run (Supabase, Cloud SQL, Neon, etc.).
@@ -183,6 +197,21 @@ curl https://candidate---securecode-<hash>-uc.a.run.app/health
 # Transferir el 100% del tráfico
 gcloud run services update-traffic securecode --to-latest --region us-central1
 ```
+
+### Paso 5: Validación de la revisión candidata
+
+Configure los secretos protegidos de GitHub `CANDIDATE_SMOKE_USERNAME` y `CANDIDATE_SMOKE_PASSWORD`. Luego ejecute manualmente el workflow **Candidate Deployment Smoke Test** e indique la URL HTTPS etiquetada como `candidate` de Cloud Run. El workflow verifica salud, cabeceras, inicio de sesión, identidad y acceso al historial; publica un artefacto JSON sin credenciales.
+
+También puede ejecutarse desde un entorno controlado:
+
+```bash
+SECURECODE_CANDIDATE_URL=https://candidate.example.run.app \
+SMOKE_USERNAME=auditor@empresa.com \
+SMOKE_PASSWORD='<contraseña>' \
+python scripts/verify_candidate.py
+```
+
+No transfiera tráfico hasta que este smoke test y la migración Alembic del candidato finalicen correctamente.
 
 ### Rollback de Aplicación (< 30 segundos)
 

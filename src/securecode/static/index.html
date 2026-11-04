@@ -81,7 +81,7 @@
         </button>
       </nav>
 
-      <div class="sidebar-section-title">Historial de Auditoría</div>
+      <div class="sidebar-section-title"><span>Historial de Auditoría</span><button type="button" class="history-export" id="btnExportHistory" title="Exportar historial CSV">Exportar</button></div>
       <div class="history-list" id="historyList">
         <!-- Renderizado dinámicamente con JavaScript -->
       </div>
@@ -348,6 +348,7 @@
               </tbody>
             </table>
           </div>
+
         </section>
 
         <!-- ================= VISTA 3: PLAN & SLA ================= -->
@@ -428,6 +429,7 @@
               </tbody>
             </table>
           </div>
+
         </section>
 
         <!-- ================= VISTA 4: CONFIGURACIÓN DEL CLIENTE ================= -->
@@ -439,9 +441,8 @@
 
           <div class="eval-card" style="max-width: 650px;">
             <div class="input-group" style="margin-bottom: 18px;">
-              <label for="customGithubToken">GitHub Personal Access Token (PAT Opcional)</label>
-              <input type="password" id="customGithubToken" class="input-control" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
-              <span style="font-size: 11px; color: var(--text-faint);">Utilice un token con permisos de solo lectura (read-only) para auditar repositorios privados sin restricciones de cuota.</span>
+              <label>Credencial de GitHub</label>
+              <div class="security-notice">La credencial de integración se administra sólo en el servidor mediante Secret Manager. Esta interfaz nunca almacena ni transmite PATs personales.</div>
             </div>
 
             <div class="input-group" style="margin-bottom: 24px;">
@@ -454,9 +455,9 @@
             </div>
 
             <div class="card-actions">
-              <span style="font-size: 11px; color: var(--color-pass);">✓ Configuración almacenada localmente en tu navegador</span>
-              <button type="button" class="btn-primary" onclick="alert('Configuración guardada exitosamente.')">
-                Guardar Preferencias
+              <span style="font-size: 11px; color: var(--text-faint);">Las reglas canónicas se administran mediante control de cambios.</span>
+              <button type="button" class="btn-primary" id="btnClearSession">
+                Cerrar sesión local
               </button>
             </div>
           </div>
@@ -535,6 +536,13 @@
               </tbody>
             </table>
           </div>
+
+          <div class="data-table-wrapper" id="adminUserManagement" hidden>
+            <div class="data-table-header"><div><div class="data-table-title">Usuarios y acceso</div><div class="admin-helper">Sólo los administradores pueden crear, activar o cambiar roles.</div></div><button type="button" class="btn-copy" id="btnRefreshUsers">Actualizar</button></div>
+            <div class="admin-create-row"><form id="createUserForm" class="admin-user-form"><input class="input-control" id="newUsername" type="text" placeholder="usuario@empresa.com" minlength="3" maxlength="100" required><input class="input-control" id="newUserPassword" type="password" placeholder="Contraseña temporal (12+ caracteres)" minlength="12" required><select class="input-control" id="newUserRole"><option value="auditor">Auditor</option><option value="admin">Administrador</option></select><button class="btn-primary" type="submit">Crear usuario</button></form><div class="admin-feedback" id="adminUserFeedback" role="status"></div></div>
+            <table class="modern-table"><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Creado</th><th>Acción</th></tr></thead><tbody id="adminUsersBody"></tbody></table>
+          </div>
+          <div class="security-notice" id="adminAccessNotice">Inicia sesión con una cuenta de administrador para gestionar usuarios.</div>
         </section>
 
       </main>
@@ -567,10 +575,6 @@
 
         <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; margin-bottom: 12px;">
           Ingresar al Sistema
-        </button>
-
-        <button type="button" class="btn-new-eval" id="btnDemoLogin" style="width: 100%; justify-content: center; margin: 0 0 12px;">
-          ⚡ Acceso Rápido Modo Demostración
         </button>
 
         <div style="text-align: center;">

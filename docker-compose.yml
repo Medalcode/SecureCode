@@ -37,6 +37,13 @@ services:
       dockerfile: Dockerfile
     container_name: securecode_app
     restart: always
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
     depends_on:
       db:
         condition: service_healthy
@@ -47,6 +54,7 @@ services:
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000}
     ports:
       - "${PORT:-8000}:${PORT:-8000}"
 

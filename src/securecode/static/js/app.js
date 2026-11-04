@@ -18,6 +18,7 @@
       maxQuota: 20480, // Basado en el análisis de 500 MB de Supabase en el informe ES2
       slaAvailability: '99.5%'
     },
+    accessRole: null,
     activeTab: 'evaluator',
     selectedControl: 'GH-001',
     evalHistory: JSON.parse(localStorage.getItem('securecode_history') || '[]'),
@@ -49,6 +50,7 @@
     initDashboard();
     initAdminConsole();
     initAuthModal();
+    syncAuthenticatedUser();
     checkSystemHealth();
     setInterval(checkSystemHealth, 30000);
   });
@@ -264,7 +266,6 @@
       ? { owner, repository: repo, branch: branch || 'main' }
       : { owner, repository: repo };
 
-    const customToken = localStorage.getItem('securecode_custom_gh_token');
     const headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json'
@@ -272,9 +273,6 @@
 
     if (state.token) {
       headers['Authorization'] = `Bearer ${state.token}`;
-    }
-    if (customToken) {
-      headers['X-GitHub-Token'] = customToken;
     }
 
     const res = await fetch(endpoint, {
@@ -386,6 +384,8 @@
   // --- Historial Local de Evaluaciones (Estilo Chat sidebar) ---
   function initHistory() {
     renderHistoryList();
+    loadPersistentHistory();
+    document.getElementById('btnExportHistory')?.addEventListener('click', exportHistoryCSV);
   }
 
   function addHistoryEntry(data) {
@@ -401,6 +401,56 @@
     if (state.evalHistory.length > 20) state.evalHistory.pop();
     localStorage.setItem('securecode_history', JSON.stringify(state.evalHistory));
     renderHistoryList();
+    loadPersistentHistory();
+  }
+
+  async function loadPersistentHistory() {
+    if (!state.token) return;
+    try {
+      const res = await fetch('/api/v1/evaluations/history?limit=20', {
+        headers: { 'Authorization': `Bearer ${state.token}` }
+      });
+      if (!res.ok) return;
+      const { evaluations } = await res.json();
+      state.evalHistory = evaluations.map(item => ({
+        id: item.evaluation_id,
+        control: item.control_id,
+        repo: `${item.repository}@${item.branch}`,
+        status: item.status.toLowerCase(),
+        time: new Date(item.evaluated_at).toLocaleString(),
+        data: null
+      }));
+      renderHistoryList();
+    } catch { /* La UI conserva el historial local si la red no está disponible. */ }
+  }
+
+  function escapeHTML(value) {
+    const node = document.createElement('span');
+    node.textContent = String(value ?? '');
+    return node.innerHTML;
+  }
+
+  function csvCell(value) {
+    const text = String(value ?? '');
+    // Prevent spreadsheet applications from interpreting exported audit data as formulas.
+    const safe = /^[=+\-@]/.test(text) ? `'${text}` : text;
+    return `"${safe.replaceAll('"', '""')}"`;
+  }
+
+  function exportHistoryCSV() {
+    if (state.evalHistory.length === 0) {
+      alert('No hay evaluaciones para exportar.');
+      return;
+    }
+    const header = ['evaluation_id', 'control_id', 'repository_branch', 'status', 'evaluated_at'];
+    const rows = state.evalHistory.map(item => [item.id, item.control, item.repo, item.status.toUpperCase(), item.time]);
+    const csv = [header, ...rows].map(row => row.map(csvCell).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `securecode-audit-history-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   function renderHistoryList() {
@@ -416,8 +466,8 @@
       <div class="history-item" data-idx="${idx}">
         <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
           <span class="status-dot ${item.status}"></span>
-          <span style="font-weight:600;">${item.control}</span>
-          <span style="text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${item.repo}</span>
+          <span style="font-weight:600;">${escapeHTML(item.control)}</span>
+          <span style="text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${escapeHTML(item.repo)}</span>
         </div>
         <span style="font-size:10px; color:var(--text-faint);">${item.time}</span>
       </div>
@@ -466,6 +516,8 @@
   // --- Consola de Administración ---
   function initAdminConsole() {
     const btnSimulate = document.getElementById('btnSimulateAudit');
+    const createUserForm = document.getElementById('createUserForm');
+    const btnRefreshUsers = document.getElementById('btnRefreshUsers');
     if (btnSimulate) {
       btnSimulate.addEventListener('click', () => {
         const dummy = {
@@ -487,6 +539,81 @@
         alert('Simulación determinista ejecutada exitosamente.');
       });
     }
+    if (btnRefreshUsers) btnRefreshUsers.addEventListener('click', refreshAdminUsers);
+    if (createUserForm) createUserForm.addEventListener('submit', createManagedUser);
+  }
+
+  async function refreshAdminUsers() {
+    const management = document.getElementById('adminUserManagement');
+    const notice = document.getElementById('adminAccessNotice');
+    const body = document.getElementById('adminUsersBody');
+    if (!management || !notice || !body) return;
+    if (!state.token || state.accessRole !== 'admin') {
+      management.hidden = true;
+      notice.hidden = false;
+      return;
+    }
+    try {
+      const res = await fetch('/api/v1/admin/users', { headers: { 'Authorization': `Bearer ${state.token}` } });
+      if (!res.ok) throw new Error('No autorizado');
+      const users = await res.json();
+      body.innerHTML = users.map(user => {
+        const action = user.username === state.user.username
+          ? '<span class="admin-helper">Cuenta actual</span>'
+          : `<div class="admin-action-group"><button class="btn-inline-danger" data-action="active" data-user-id="${escapeHTML(user.id)}" data-active="${user.active}">${user.active ? 'Desactivar' : 'Activar'}</button><button class="btn-copy" data-action="role" data-user-id="${escapeHTML(user.id)}" data-role="${user.role}">${user.role === 'admin' ? 'Hacer auditor' : 'Hacer admin'}</button><button class="btn-copy" data-action="password" data-user-id="${escapeHTML(user.id)}">Restablecer</button></div>`;
+        return `<tr><td>${escapeHTML(user.username)}</td><td>${user.role === 'admin' ? 'Administrador' : 'Auditor'}</td><td>${user.active ? 'Activo' : 'Inactivo'}</td><td>${new Date(user.created_at).toLocaleDateString()}</td><td>${action}</td></tr>`;
+      }).join('') || '<tr><td colspan="5">Sin usuarios registrados.</td></tr>';
+      body.querySelectorAll('[data-user-id]').forEach(button => button.addEventListener('click', () => manageUserAction(button)));
+      management.hidden = false;
+      notice.hidden = true;
+    } catch {
+      management.hidden = true;
+      notice.hidden = false;
+      notice.textContent = 'No fue posible cargar la administración de usuarios.';
+    }
+  }
+
+  async function createManagedUser(event) {
+    event.preventDefault();
+    const feedback = document.getElementById('adminUserFeedback');
+    const payload = {
+      username: document.getElementById('newUsername').value.trim(),
+      password: document.getElementById('newUserPassword').value,
+      role: document.getElementById('newUserRole').value
+    };
+    try {
+      const res = await fetch('/api/v1/admin/users', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.token}` }, body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error(res.status === 409 ? 'El usuario ya existe.' : 'No se pudo crear el usuario.');
+      event.target.reset();
+      if (feedback) feedback.textContent = 'Usuario creado correctamente.';
+      refreshAdminUsers();
+    } catch (error) {
+      if (feedback) feedback.textContent = error.message;
+    }
+  }
+
+  async function manageUserAction(button) {
+    const action = button.dataset.action;
+    const payload = action === 'active'
+      ? { active: button.dataset.active !== 'true' }
+      : action === 'role'
+        ? { role: button.dataset.role === 'admin' ? 'auditor' : 'admin' }
+        : { password: window.prompt('Nueva contraseña temporal (mínimo 12 caracteres):') };
+    if (action === 'password' && !payload.password) return;
+    if (action === 'password' && payload.password.length < 12) {
+      alert('La contraseña debe tener al menos 12 caracteres.');
+      return;
+    }
+    try {
+      const res = await fetch(`/api/v1/admin/users/${encodeURIComponent(button.dataset.userId)}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.token}` },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('No se pudo actualizar el usuario.');
+      refreshAdminUsers();
+    } catch (error) { alert(error.message); }
   }
 
   function updateAdminHealthCard() {
@@ -504,7 +631,7 @@
   function initAuthModal() {
     const modal = document.getElementById('authModal');
     const form = document.getElementById('loginForm');
-    const btnDemoLogin = document.getElementById('btnDemoLogin');
+    const btnClearSession = document.getElementById('btnClearSession');
     const btnCloseModal = document.getElementById('btnCloseAuthModal');
     const btnOpenLogin = document.getElementById('btnOpenLogin');
 
@@ -516,15 +643,13 @@
       btnCloseModal.addEventListener('click', () => closeAuthModal());
     }
 
-    if (btnDemoLogin) {
-      btnDemoLogin.addEventListener('click', async () => {
-        // En modo demostración, genera una sesión segura o usa token mock
-        state.token = 'demo-bearer-token-academic-es2';
-        state.user.username = 'auditor.demo@securecode.inacap';
-        localStorage.setItem('securecode_token', state.token);
-        localStorage.setItem('securecode_user', JSON.stringify(state.user));
+    if (btnClearSession) {
+      btnClearSession.addEventListener('click', () => {
+        state.token = null;
+        localStorage.removeItem('securecode_token');
+        localStorage.removeItem('securecode_user');
+        state.user.username = 'Sesión cerrada';
         updateUserBadge();
-        closeAuthModal();
       });
     }
 
@@ -561,6 +686,7 @@
           localStorage.setItem('securecode_user', JSON.stringify(state.user));
           updateUserBadge();
           closeAuthModal();
+          syncAuthenticatedUser();
         } catch (error) {
           if (errAlert) {
             errAlert.style.display = 'block';
@@ -571,6 +697,33 @@
     }
 
     updateUserBadge();
+  }
+
+  // La identidad presentada en la UI procede del servidor, no de datos editables del navegador.
+  async function syncAuthenticatedUser() {
+    if (!state.token) return;
+    try {
+      const res = await fetch('/api/v1/auth/me', {
+        headers: { 'Authorization': `Bearer ${state.token}` }
+      });
+      if (!res.ok) throw new Error('Sesión expirada');
+      const profile = await res.json();
+      state.user.username = profile.username;
+      state.user.role = profile.role === 'admin' ? 'Administrador de Plataforma' : 'Auditor de Seguridad';
+      state.accessRole = profile.role;
+      localStorage.setItem('securecode_user', JSON.stringify(state.user));
+      updateUserBadge();
+      loadPersistentHistory();
+      refreshAdminUsers();
+    } catch {
+      state.token = null;
+      localStorage.removeItem('securecode_token');
+      localStorage.removeItem('securecode_user');
+      state.user.username = 'Sesión requerida';
+      state.accessRole = null;
+      updateUserBadge();
+      refreshAdminUsers();
+    }
   }
 
   function openAuthModal(msg) {

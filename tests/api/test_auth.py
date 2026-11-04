@@ -93,6 +93,13 @@ def test_login_success():
     assert "access_token" in response.json()
     assert response.json()["token_type"] == "bearer"
 
+def test_current_user_profile_exposes_no_password_material():
+    token = create_access_token(str(mock_user_id))
+    response = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 200
+    assert response.json() == {"username": "testuser", "active": True, "role": "auditor"}
+
 def test_login_invalid_password():
     response = client.post("/api/v1/auth/token", data={
         "username": "testuser",

@@ -1,0 +1,35 @@
+name: Candidate Deployment Smoke Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_url:
+        description: "HTTPS URL of the Cloud Run candidate revision"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify-candidate:
+    runs-on: ubuntu-latest
+    environment: candidate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify candidate without exposing credentials
+        env:
+          SECURECODE_CANDIDATE_URL: ${{ inputs.candidate_url }}
+          SMOKE_USERNAME: ${{ secrets.CANDIDATE_SMOKE_USERNAME }}
+          SMOKE_PASSWORD: ${{ secrets.CANDIDATE_SMOKE_PASSWORD }}
+        run: python scripts/verify_candidate.py
+      - name: Upload verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-smoke-validation
+          path: artifacts/candidate_smoke_validation.json
+          if-no-files-found: error
