@@ -35,6 +35,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # Copiar el código fuente y artefactos del proyecto
 COPY src/ /app/src/
+COPY scripts/ /app/scripts/
 COPY rules/ /app/rules/
 COPY alembic/ /app/alembic/
 COPY alembic.ini /app/
