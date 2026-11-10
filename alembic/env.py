@@ -30,6 +30,14 @@ if not db_url:
     # Use a dummy SQLite URL for generating offline migrations if DATABASE_URL is missing
     # This prevents alembic revision --autogenerate from crashing if no env var is set
     db_url = "sqlite:///./securecode.db"
+
+# The container includes psycopg2-binary.  Neon exposes a bare postgresql://
+# connection string, which otherwise makes SQLAlchemy try the unavailable
+# psycopg v3 driver during online migrations.
+if db_url.startswith("postgres://"):
+    db_url = "postgresql://" + db_url[len("postgres://"):]
+if db_url.startswith("postgresql://"):
+    db_url = "postgresql+psycopg2://" + db_url[len("postgresql://"):]
     
 config.set_main_option("sqlalchemy.url", db_url)
 

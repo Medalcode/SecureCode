@@ -14,13 +14,15 @@ def _normalize_database_url(url: str) -> str:
     """
     Normalize a database URL to the format expected by SQLAlchemy.
 
-    Some providers (e.g. Heroku, older Supabase connection strings) return
-    'postgres://' which SQLAlchemy >= 1.4 does not accept.  This function
-    rewrites that prefix to 'postgresql://' while leaving every other URL
-    scheme untouched (sqlite://, postgresql+psycopg2://, etc.).
+    Some providers return ``postgres://`` or a bare ``postgresql://`` URL.
+    The production image intentionally ships ``psycopg2-binary`` (not the
+    separate psycopg v3 package), so PostgreSQL URLs must explicitly select
+    the matching SQLAlchemy dialect.  Other schemes stay untouched.
     """
     if url.startswith("postgres://"):
-        return "postgresql://" + url[len("postgres://"):]
+        url = "postgresql://" + url[len("postgres://"):]
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg2://" + url[len("postgresql://"):]
     return url
 
 

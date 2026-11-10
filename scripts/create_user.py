@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 
 from securecode.adapters.postgres.models import User
+from securecode.api.dependencies import _normalize_database_url
 from securecode.api.security import hash_password
 
 def main():
@@ -25,7 +26,7 @@ def main():
         print("ERROR: DATABASE_URL not set")
         sys.exit(1)
         
-    engine = create_engine(db_url)
+    engine = create_engine(_normalize_database_url(db_url))
     Session = sessionmaker(bind=engine)
     session = Session()
     

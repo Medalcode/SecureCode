@@ -27,6 +27,26 @@ def test_executor_fail():
     evidence = GH001Evidence(required_review_approvals=1, dismiss_stale_reviews=True)
     assert evaluate_rule(rule, evidence) == EvaluationStatus.FAIL
 
+
+def test_executor_never_treats_boolean_as_a_number():
+    rule = RuleDefinition(
+        rule_id="test", control_id="c1", version=1,
+        allowlisted_fields=["dismiss_stale_reviews"],
+        condition=Condition(field="dismiss_stale_reviews", operator="GTE", value=1),
+    )
+    evidence = GH001Evidence(required_review_approvals=2, dismiss_stale_reviews=True)
+    assert evaluate_rule(rule, evidence) == EvaluationStatus.UNKNOWN
+
+
+def test_executor_never_equates_boolean_with_integer():
+    rule = RuleDefinition(
+        rule_id="test", control_id="c1", version=1,
+        allowlisted_fields=["dismiss_stale_reviews"],
+        condition=Condition(field="dismiss_stale_reviews", operator="EQ", value=1),
+    )
+    evidence = GH001Evidence(required_review_approvals=2, dismiss_stale_reviews=True)
+    assert evaluate_rule(rule, evidence) == EvaluationStatus.UNKNOWN
+
 def test_executor_unknown_due_to_none():
     rule = RuleDefinition(
         rule_id="test",

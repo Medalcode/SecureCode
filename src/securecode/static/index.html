@@ -14,7 +14,7 @@
   </script>
 
   <!-- Hoja de Estilos Principal -->
-  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="stylesheet" href="/static/css/app.css?v=20261107-ui-hardening">
 </head>
 <body>
 
@@ -88,10 +88,10 @@
 
       <div class="sidebar-footer">
         <div class="user-profile" id="btnOpenLogin">
-          <div class="user-avatar" id="userAvatarInitial">A</div>
+          <div class="user-avatar" id="userAvatarInitial">?</div>
           <div class="user-info">
-            <span class="user-name" id="userProfileName">auditor@demo.org</span>
-            <span class="user-role" id="userProfileRole">Auditor de Seguridad</span>
+            <span class="user-name" id="userProfileName">Iniciar sesión</span>
+            <span class="user-role" id="userProfileRole">Acceso seguro requerido</span>
           </div>
         </div>
       </div>
@@ -142,35 +142,37 @@
         <!-- ================= VISTA 1: EVALUADOR DE CONTROLES (CORE) ================= -->
         <section class="view-panel active" id="view-evaluator">
           <div class="evaluator-hero">
-            <h1>Evaluación Determinista de Controles</h1>
-            <p>Adquisición de evidencias técnicas desde SCM, evaluación de reglas desacopladas y trazabilidad inmutable.</p>
+            <span class="eyebrow">SecureCode Trust Console</span>
+            <h1>Confianza verificable<br><em>para cada cambio.</em></h1>
+            <p>Convierte las políticas de tu repositorio en evidencia técnica, dictámenes reproducibles y una trazabilidad que tu equipo puede comprobar.</p>
+            <div class="hero-signals" aria-label="Resumen de capacidades">
+              <span><b id="activeControlsCount">03</b> controles activos</span>
+              <span><b>SHA-256</b> evidencia sellada</span>
+              <span><i></i> motor operativo</span>
+            </div>
           </div>
 
           <!-- Formulario de Evaluación -->
           <div class="eval-card">
-            <div class="control-selector">
-              <button type="button" class="control-btn active" data-control="GH-001">
-                <span class="control-code">Control Canónico GH-001</span>
-                <span>Branch Review Policy</span>
-                <span style="font-size: 11px; font-weight: normal; color: var(--text-faint);">≥ 2 aprobaciones y sin revisiones obsoletas</span>
-              </button>
-              <button type="button" class="control-btn" data-control="GH-002">
-                <span class="control-code">Control Canónico GH-002</span>
-                <span>Default Branch Protection</span>
-                <span style="font-size: 11px; font-weight: normal; color: var(--text-faint);">Protección activa en rama por defecto</span>
-              </button>
+            <div class="eval-card-intro">
+              <span class="section-kicker">Iniciar verificación</span>
+              <p>Selecciona un control y el repositorio que quieres contrastar contra su política.</p>
             </div>
+            <div class="control-selector" id="controlSelector" role="radiogroup" aria-label="Control canónico a evaluar"></div>
+            <p class="control-help" id="evaluatorControlHelp">GH-001 contrasta revisiones aprobadas y el descarte de revisiones obsoletas para la rama indicada.</p>
 
             <form id="evaluatorForm">
               <div class="form-grid">
                 <div class="input-group">
                   <label for="repoInput">Repositorio de Código (owner/repo)</label>
-                  <input type="text" id="repoInput" class="input-control" placeholder="Medalcode/SecureCode" required autocomplete="off">
+                  <input type="text" id="repoInput" class="input-control" placeholder="Medalcode/SecureCode o https://github.com/Medalcode/SecureCode" required autocomplete="off" aria-describedby="repoInputHelp">
+                  <span class="input-help" id="repoInputHelp">Acepta <code>owner/repo</code> o una URL completa de GitHub.</span>
                 </div>
 
                 <div class="input-group" id="branchInputGroup">
                   <label for="branchInput">Rama a Auditar (branch)</label>
-                  <input type="text" id="branchInput" class="input-control" placeholder="main" value="main" autocomplete="off">
+                  <input type="text" id="branchInput" class="input-control" placeholder="main" value="main" autocomplete="off" aria-describedby="branchInputHelp">
+                  <span class="input-help" id="branchInputHelp">Se valida el formato de referencia de GitHub antes de consultar la API.</span>
                 </div>
               </div>
 
@@ -183,7 +185,11 @@
               </div>
 
               <div class="card-actions">
-                <span style="font-size: 11px; color: var(--text-faint);">Acceso de solo lectura a la API REST de GitHub</span>
+                <div>
+                  <span style="font-size: 11px; color: var(--text-faint);">Acceso de solo lectura a la API REST de GitHub</span>
+                  <p class="form-feedback" id="evaluatorFeedback" role="status" aria-live="polite"></p>
+                </div>
+                <button type="button" class="chip-btn" id="btnCancelEval" hidden>Cancelar</button>
                 <button type="submit" class="btn-primary" id="btnSubmitEval">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polygon points="5 3 19 12 5 21 5 3"></polygon>
@@ -222,11 +228,28 @@
               </div>
             </div>
 
+            <!-- Explicación legible de los criterios y valores observados -->
+            <section class="verification-breakdown" aria-labelledby="verificationBreakdownTitle">
+              <div class="verification-breakdown-heading">
+                <div>
+                  <span class="section-kicker">Desglose de verificación</span>
+                  <h2 id="verificationBreakdownTitle">Criterios contrastados</h2>
+                </div>
+                <span class="verification-source" id="verificationSource">Fuente: API REST de GitHub</span>
+              </div>
+              <p class="verification-summary" id="verificationSummary">Preparando el detalle de la evidencia...</p>
+              <div class="verification-checks" id="verificationChecks"></div>
+            </section>
+
             <!-- Grilla de detalles técnicos -->
             <div class="result-details-grid">
               <div class="detail-item">
                 <span class="detail-label">Control Evaluado</span>
                 <span class="detail-value" id="resControlId">GH-001</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Regla Canónica</span>
+                <span class="detail-value" id="resRuleVersion">GH-001-RULE · v1</span>
               </div>
               <div class="detail-item">
                 <span class="detail-label">Repositorio y Rama</span>
@@ -252,13 +275,16 @@
                   </svg>
                   Huella Criptográfica SHA-256 de Evidencia Canónica
                 </span>
-                <button type="button" class="btn-copy" id="btnCopyHash">
+                <div class="crypto-actions">
+                  <button type="button" class="btn-copy" id="btnCopyVerificationLink" title="Copiar enlace de verificación pública">Verificar</button>
+                  <button type="button" class="btn-copy" id="btnCopyHash">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                   </svg>
                   Copiar
-                </button>
+                  </button>
+                </div>
               </div>
               <div class="crypto-hash-box" id="resultHashText">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</div>
             </div>
@@ -266,7 +292,7 @@
             <!-- Visor de Evidencia JSON Raw -->
             <details class="json-accordion">
               <summary class="json-summary">Ver Evidencia JSON Estructurada (Normalizada e Inmutable)</summary>
-              <pre class="json-body" id="jsonPayloadBody">{ "cargando": true }</pre>
+              <pre class="json-body json-placeholder" id="jsonPayloadBody">La evidencia estructurada aparecerá aquí después de una evaluación.</pre>
             </details>
 
             <div style="margin-top: 20px; text-align: right;">
@@ -279,23 +305,30 @@
         <section class="view-panel" id="view-usage">
           <div class="evaluator-hero" style="text-align: left; margin-bottom: 24px;">
             <h1>Consumo, Capacidad & FinOps</h1>
-            <p>Monitoreo de cuota mensual sobre el modelo de persistencia administrada (Supabase 500 MB).</p>
+            <p>Consumo de evaluaciones persistidas en Neon y preferencias de alerta por cuenta.</p>
           </div>
-
+          <div class="security-notice" id="finopsAccessNotice">Inicia sesión para consultar el consumo y guardar tus preferencias FinOps.</div>
+          <div id="finopsPanel" hidden>
           <div class="dashboard-grid">
+            <div class="stat-card finops-highlight">
+              <div class="stat-card-header"><span>Gasto de infraestructura GCP</span><span class="banner-badge" id="billingStatusBadge">SIN CONEXIÓN</span></div>
+              <div class="stat-value" id="projectedChargeText">No disponible</div>
+              <div class="stat-subtext">Cloud Billing no está conectado a SecureCode</div>
+              <div class="finops-note">No se muestra una estimación ficticia. El importe real se revisa en Google Cloud Billing.</div>
+            </div>
             <div class="stat-card">
               <div class="stat-card-header">
                 <span>Evaluaciones Persistidas</span>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
               </div>
-              <div class="stat-value" id="quotaUsedText">4,104</div>
-              <div class="stat-subtext">De un límite teórico de <span id="quotaMaxText">20,480</span> evaluaciones</div>
+              <div class="stat-value" id="quotaUsedText">—</div>
+              <div class="stat-subtext"><span id="usageScopeLabel">Cuenta</span> · período desde <span id="usagePeriodStart">—</span></div>
               <div class="progress-bar-bg">
-                <div class="progress-bar-fill" id="quotaBarFill" style="width: 20%;"></div>
+                <div class="progress-bar-fill" id="quotaBarFill" style="width: 0%;"></div>
               </div>
               <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-faint); margin-top: 4px;">
-                <span id="quotaPctText">20% consumido</span>
-                <span>Capacidad: 500 MB</span>
+                <span id="quotaPctText">Cargando consumo verificable</span>
+                <span>Total: <span id="quotaMaxText">—</span></span>
               </div>
             </div>
 
@@ -305,9 +338,9 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
               </div>
               <div class="stat-value">200 ms</div>
-              <div class="stat-subtext">Ensayo Locust a 50 usuarios virtuales</div>
+              <div class="stat-subtext">Resultado histórico de prueba de carga</div>
               <div style="font-size: 11px; color: var(--color-pass); font-weight: 600; margin-top: 10px;">
-                ✓ Cumple holgadamente SLA (< 500 ms nominal)
+                Referencia de ensayo; no es monitoreo en tiempo real
               </div>
             </div>
 
@@ -317,11 +350,28 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
               </div>
               <div class="stat-value">20.45 req/s</div>
-              <div class="stat-subtext">Tasa de fallos: 0.0% (5.998 peticiones)</div>
+              <div class="stat-subtext">Resultado histórico de prueba de carga</div>
               <div style="font-size: 11px; color: var(--color-pass); font-weight: 600; margin-top: 10px;">
-                ✓ Cero errores 5xx en campaña
+                No representa tráfico productivo actual
               </div>
             </div>
+          </div>
+
+          <div class="finops-control-card">
+            <div>
+              <span class="section-kicker">Control de gasto</span>
+              <h2>Alerta de presupuesto mensual</h2>
+              <p>Guarda un umbral personal para la futura integración con Cloud Billing. Sin esa fuente, no se generan alertas automáticas de gasto.</p>
+            </div>
+            <div class="finops-form">
+              <label for="budgetLimitInput">Presupuesto CLP</label>
+              <select id="budgetLimitInput" class="input-control"><option value="10">$10 CLP</option><option value="50">$50 CLP</option><option value="100">$100 CLP</option><option value="200">$200 CLP</option><option value="500">$500 CLP</option><option value="1000" selected>$1.000 CLP</option></select>
+              <label for="budgetAlertSelect">Avisar al llegar a</label>
+              <select id="budgetAlertSelect" class="input-control"><option value="50">50 %</option><option value="80" selected>80 %</option><option value="100">100 %</option></select>
+              <label class="finops-toggle"><input id="budgetAlertEnabled" type="checkbox" checked> Mantener alerta habilitada</label>
+              <button type="button" class="btn-primary" id="btnSaveBudget">Guardar control</button>
+            </div>
+            <div class="finops-feedback" id="budgetFeedback" aria-live="polite"></div>
           </div>
 
           <div class="data-table-wrapper">
@@ -348,7 +398,7 @@
               </tbody>
             </table>
           </div>
-
+          </div>
         </section>
 
         <!-- ================= VISTA 3: PLAN & SLA ================= -->
@@ -358,33 +408,41 @@
             <p>Compromisos operativos de garantía (Warranty) estructurados bajo el marco ITIL v4.</p>
           </div>
 
-          <div class="dashboard-grid">
-            <div class="stat-card" style="border-color: var(--accent-primary);">
-              <div class="stat-card-header">
-                <span style="color: var(--accent-primary);">Plan Activo</span>
-                <span class="banner-badge" style="background: var(--accent-primary); color: #fff;">ACTIVO</span>
+          <div class="subscription-access-notice security-notice" id="subscriptionAccessNotice">Inicia sesión para consultar o administrar el ciclo de tu suscripción.</div>
+          <div id="subscriptionPanel" hidden>
+            <div class="dashboard-grid">
+              <div class="stat-card" style="border-color: var(--accent-primary);">
+                <div class="stat-card-header"><span style="color: var(--accent-primary);">Plan activo</span><span class="banner-badge" style="background: var(--accent-primary); color: #fff;">VIGENTE</span></div>
+                <div class="stat-value" id="activePlanName">—</div>
+                <div class="stat-subtext" id="subscriptionPeriodText">Cargando período…</div>
+                <ul class="subscription-feature-list" id="activePlanFeatures"></ul>
               </div>
-              <div class="stat-value">Enterprise Academic</div>
-              <div class="stat-subtext">Asignatura Proyecto de Título TIHI84</div>
-              <ul style="list-style: none; font-size: 12px; margin-top: 14px; display: flex; flex-direction: column; gap: 8px;">
-                <li>✓ Evaluaciones ilimitadas en sandbox</li>
-                <li>✓ 2 Controles canónicos (GH-001, GH-002)</li>
-                <li>✓ Trazabilidad criptográfica SHA-256</li>
-                <li>✓ Soporte para repositorios públicos y privados</li>
-              </ul>
+              <div class="stat-card">
+                <div class="stat-card-header"><span>Estado comercial</span><span class="banner-badge" id="billingModeBadge">—</span></div>
+                <div class="stat-value" style="font-size: 22px;" id="subscriptionChangeStatus">—</div>
+                <div class="stat-subtext" id="subscriptionChangeHelp">Cargando reglas de cambio…</div>
+                <div class="subscription-disclaimer">Esta demostración no integra pasarela de pago ni genera cargos. Los montos son proyecciones comerciales del informe ES2.</div>
+              </div>
             </div>
 
-            <div class="stat-card">
-              <div class="stat-card-header">
-                <span>Disponibilidad Comprometida</span>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            <section class="plan-selector-card" aria-labelledby="planSelectorTitle">
+              <div class="plan-selector-heading">
+                <div><span class="section-kicker">Catálogo comercial propuesto</span><h2 id="planSelectorTitle">Planes de SecureCode</h2><p>Los cambios son confirmados, se registran en el historial y aplican un período de 30 días.</p></div>
+                <span class="verification-source" id="planSaveStatus">Cargando suscripción…</span>
               </div>
-              <div class="stat-value">99.5 %</div>
-              <div class="stat-subtext">Tolerancia máxima: 3.6 horas/mes</div>
-              <div style="font-size: 12px; color: var(--text-muted); margin-top: 12px;">
-                <strong>RTO:</strong> &lt; 15 min (Cómputo efímero en Cloud Run)<br>
-                <strong>RPO:</strong> &lt; 24 horas (Respaldos PostgreSQL diarios)
+              <div class="plan-options" id="planOptions"></div>
+              <div class="plan-details" id="planDetails"></div>
+              <div class="subscription-confirmation" id="subscriptionConfirmPanel" hidden>
+                <h3 id="subscriptionConfirmTitle">Confirmar cambio</h3>
+                <p id="subscriptionConfirmDescription"></p>
+                <label><input id="subscriptionConfirmCheckbox" type="checkbox"> Entiendo que este cambio inicia un nuevo período de 30 días y no genera un cobro automático.</label>
+                <div class="card-actions"><button type="button" class="chip-btn" id="btnCancelSubscriptionChange">Cancelar</button><button type="button" class="btn-primary" id="btnConfirmSubscriptionChange" disabled>Confirmar cambio de plan</button></div>
               </div>
+            </section>
+
+            <div class="data-table-wrapper">
+              <div class="data-table-header"><div><div class="data-table-title">Historial de suscripción</div><div class="admin-helper">Cambios confirmados asociados a tu cuenta.</div></div></div>
+              <table class="modern-table"><thead><tr><th>Fecha</th><th>Evento</th><th>Plan anterior</th><th>Plan vigente</th><th>Período</th></tr></thead><tbody id="subscriptionHistoryBody"></tbody></table>
             </div>
           </div>
 
@@ -404,27 +462,27 @@
                 <tr>
                   <td><strong>Servicio</strong></td>
                   <td>Evaluación automatizada de controles SCM por API REST</td>
-                  <td><span class="status-dot pass" style="display:inline-block; margin-right:4px;"></span> Verificado</td>
+                  <td>Implementado en la plataforma</td>
                 </tr>
                 <tr>
                   <td><strong>Horario de Servicio</strong></td>
                   <td>Lunes a viernes 08:00 a 20:00 hrs</td>
-                  <td>Definido para demostración</td>
+                  <td>Objetivo operativo de demostración</td>
                 </tr>
                 <tr>
                   <td><strong>Tiempo de Respuesta</strong></td>
                   <td>Latencia P95 &lt; 500 ms en carga nominal (&lt; 2.0 s en estrés)</td>
-                  <td><span class="status-dot pass" style="display:inline-block; margin-right:4px;"></span> Medido (200 ms)</td>
+                  <td>Meta de diseño; se mide en monitoreo</td>
                 </tr>
                 <tr>
                   <td><strong>Continuidad</strong></td>
                   <td>RTO &lt; 15 min / RPO &lt; 24 horas ante fallas mayores</td>
-                  <td>Procedimiento DRP diseñado</td>
+                  <td>Objetivo documentado; sujeto a operación productiva</td>
                 </tr>
                 <tr>
                   <td><strong>Trazabilidad</strong></td>
                   <td>100% de evaluaciones con evidencia y hash coincidente en BD</td>
-                  <td><span class="status-dot pass" style="display:inline-block; margin-right:4px;"></span> 100% verificado</td>
+                  <td>Verificable por hash y endpoint público</td>
                 </tr>
               </tbody>
             </table>
@@ -436,31 +494,30 @@
         <section class="view-panel" id="view-settings">
           <div class="evaluator-hero" style="text-align: left; margin-bottom: 24px;">
             <h1>Configuración del Cliente</h1>
-            <p>Credenciales de conexión SCM y preferencias de políticas de auditoría.</p>
+            <p>Preferencias personales, valores predeterminados de auditoría y avisos dentro de la aplicación.</p>
           </div>
 
-          <div class="eval-card" style="max-width: 650px;">
-            <div class="input-group" style="margin-bottom: 18px;">
-              <label>Credencial de GitHub</label>
-              <div class="security-notice">La credencial de integración se administra sólo en el servidor mediante Secret Manager. Esta interfaz nunca almacena ni transmite PATs personales.</div>
-            </div>
-
-            <div class="input-group" style="margin-bottom: 24px;">
-              <label>Umbral Mínimo de Aprobadores (Políticas GH-001)</label>
-              <select class="input-control" id="policyApprovals">
-                <option value="1">1 Aprobación requerida</option>
-                <option value="2" selected>2 Aprobaciones requeridas (Regla Canónica)</option>
-                <option value="3">3 Aprobaciones requeridas (Alta Seguridad)</option>
-              </select>
-            </div>
-
-            <div class="card-actions">
-              <span style="font-size: 11px; color: var(--text-faint);">Las reglas canónicas se administran mediante control de cambios.</span>
-              <button type="button" class="btn-primary" id="btnClearSession">
-                Cerrar sesión local
-              </button>
-            </div>
+          <div class="settings-layout" id="clientSettingsPanel" hidden>
+            <form class="eval-card settings-form" id="clientSettingsForm" novalidate>
+              <div class="settings-form-heading"><span class="section-kicker">Preferencias de evaluación</span><p>Se aplican como valores iniciales; no modifican evidencia histórica ni reglas canónicas.</p></div>
+              <div class="form-grid">
+                <div class="input-group"><label for="settingsRepository">Repositorio predeterminado</label><input class="input-control" id="settingsRepository" type="text" placeholder="owner/repo" maxlength="200" autocomplete="off"><span class="input-help">Opcional. Formato GitHub: <code>owner/repo</code>.</span></div>
+                <div class="input-group"><label for="settingsBranch">Rama predeterminada</label><input class="input-control" id="settingsBranch" type="text" value="main" maxlength="255" autocomplete="off"><span class="input-help">Se utilizará como sugerencia al abrir una evaluación.</span></div>
+                <div class="input-group"><label for="settingsLocale">Formato regional preferido</label><select class="input-control" id="settingsLocale"><option value="es-CL">Español (Chile)</option><option value="en-US">English (US)</option></select><span class="input-help">Se conserva para fechas y exportaciones de tu cuenta.</span></div>
+                <div class="input-group"><label for="settingsTimezone">Zona horaria</label><select class="input-control" id="settingsTimezone"><option value="America/Santiago">Santiago, Chile (GMT-3/-4)</option><option value="UTC">UTC</option><option value="America/Argentina/Buenos_Aires">Buenos Aires (GMT-3)</option><option value="America/Sao_Paulo">São Paulo (GMT-3)</option></select></div>
+                <div class="input-group"><label for="settingsTheme">Tema</label><select class="input-control" id="settingsTheme"><option value="system">Sistema</option><option value="light">Claro</option><option value="dark">Oscuro</option></select></div>
+              </div>
+              <fieldset class="settings-notifications"><legend>Avisos dentro de SecureCode</legend><label><input id="notifyEvaluationCompleted" type="checkbox"> Evaluación finalizada</label><label><input id="notifyEvaluationFailure" type="checkbox"> Evaluación no conforme o sin evidencia</label><label><input id="notifyWeeklyDigest" type="checkbox"> Resumen semanal de actividad</label><span class="input-help">Las preferencias se guardan; no se envían correos ni se integran canales externos sin configuración adicional.</span></fieldset>
+              <div class="settings-feedback" id="settingsFeedback" role="status" aria-live="polite"></div>
+              <div class="card-actions"><span style="font-size: 11px; color: var(--text-faint);">Los cambios quedan asociados a tu cuenta autenticada.</span><button type="submit" class="btn-primary" id="btnSaveClientSettings">Guardar preferencias</button></div>
+            </form>
+            <aside class="settings-sidebar">
+              <div class="security-notice"><strong>Integración GitHub protegida</strong><br>La credencial de servicio reside sólo en Secret Manager. Esta pantalla no acepta, almacena ni muestra tokens personales.</div>
+              <div class="security-notice"><strong>Políticas canónicas protegidas</strong><br>GH-001, GH-002 y GH-003 se versionan mediante cambios revisables. Una preferencia de usuario no puede reducir sus exigencias.</div>
+              <button type="button" class="chip-btn" id="btnClearSession">Cerrar sesión en este dispositivo</button>
+            </aside>
           </div>
+          <div class="security-notice" id="settingsAccessNotice">Inicia sesión para administrar tus preferencias personales.</div>
         </section>
 
         <!-- ================= VISTA 5: CONSOLA DE ADMINISTRACIÓN ================= -->
@@ -494,8 +551,8 @@
                 <span>Pruebas Automatizadas CI</span>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
               </div>
-              <div class="stat-value">95 / 95 (89.5%)</div>
-              <div class="stat-subtext">GitHub Actions Run 39183552777</div>
+              <div class="stat-value">Validación local verificada</div>
+              <div class="stat-subtext">La cobertura y resultados CI se consultan desde el pipeline; no se presentan métricas estáticas como telemetría.</div>
             </div>
           </div>
 
@@ -533,14 +590,38 @@
                   <td><code>EQ(protection_enabled, true)</code></td>
                   <td><span class="status-dot pass" style="display:inline-block; margin-right:4px;"></span> Activo</td>
                 </tr>
+                <tr>
+                  <td><strong>GH-003</strong></td>
+                  <td>Signed Commit Enforcement</td>
+                  <td><code>rules/GH-003.json</code></td>
+                  <td><code>EQ(required_signatures_enabled, true)</code></td>
+                  <td><span class="status-dot pass" style="display:inline-block; margin-right:4px;"></span> Activo</td>
+                </tr>
               </tbody>
             </table>
           </div>
 
           <div class="data-table-wrapper" id="adminUserManagement" hidden>
-            <div class="data-table-header"><div><div class="data-table-title">Usuarios y acceso</div><div class="admin-helper">Sólo los administradores pueden crear, activar o cambiar roles.</div></div><button type="button" class="btn-copy" id="btnRefreshUsers">Actualizar</button></div>
-            <div class="admin-create-row"><form id="createUserForm" class="admin-user-form"><input class="input-control" id="newUsername" type="text" placeholder="usuario@empresa.com" minlength="3" maxlength="100" required><input class="input-control" id="newUserPassword" type="password" placeholder="Contraseña temporal (12+ caracteres)" minlength="12" required><select class="input-control" id="newUserRole"><option value="auditor">Auditor</option><option value="admin">Administrador</option></select><button class="btn-primary" type="submit">Crear usuario</button></form><div class="admin-feedback" id="adminUserFeedback" role="status"></div></div>
-            <table class="modern-table"><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Creado</th><th>Acción</th></tr></thead><tbody id="adminUsersBody"></tbody></table>
+            <div class="data-table-header"><div><div class="data-table-title">Gestión de cuentas (CRUD)</div><div class="admin-helper">Crea cuentas internas, consulta su estado, actualiza su rol o contraseña y desactiva acceso de forma recuperable. Sólo administradores autorizados pueden operar este módulo.</div></div><button type="button" class="btn-copy" id="btnRefreshUsers">Actualizar</button></div>
+            <div class="admin-account-summary" aria-label="Resumen de cuentas"><div><span>Total</span><strong id="adminTotalUsers">—</strong></div><div><span>Activas</span><strong id="adminActiveUsers">—</strong></div><div><span>Administradores</span><strong id="adminAdminUsers">—</strong></div></div>
+            <div class="admin-create-row">
+              <div class="admin-create-intro"><span class="section-kicker">Nueva cuenta interna</span><h2>Registrar acceso con privilegio mínimo</h2><p>El correo identifica la cuenta. La contraseña temporal se cifra con Argon2id y nunca se almacena ni vuelve a mostrar en la interfaz.</p></div>
+              <form id="createUserForm" class="admin-user-form" novalidate>
+                <div class="input-group"><label for="newUsername">Correo corporativo</label><input class="input-control" id="newUsername" type="email" placeholder="persona@empresa.com" autocomplete="email" maxlength="100" required><span class="input-help">Será normalizado a minúsculas y usado para iniciar sesión.</span></div>
+                <div class="input-group"><label for="newUserPassword">Contraseña temporal</label><div class="password-control"><input class="input-control" id="newUserPassword" type="password" placeholder="12+ caracteres" autocomplete="new-password" minlength="12" required aria-describedby="newUserPasswordPolicy"><button type="button" class="password-toggle" data-password-toggle="newUserPassword">Mostrar</button></div></div>
+                <div class="input-group"><label for="newUserPasswordConfirm">Confirmar contraseña</label><div class="password-control"><input class="input-control" id="newUserPasswordConfirm" type="password" placeholder="Repite la contraseña temporal" autocomplete="new-password" minlength="12" required><button type="button" class="password-toggle" data-password-toggle="newUserPasswordConfirm">Mostrar</button></div><span class="input-help" id="newUserPasswordMatch"></span></div>
+                <div class="input-group"><label for="newUserRole">Rol inicial</label><select class="input-control" id="newUserRole"><option value="auditor">Auditor — evalúa y consulta su propia evidencia</option><option value="admin">Administrador — gestiona cuentas y plataforma</option></select><span class="input-help" id="newUserRoleHelp">Principio de mínimo privilegio: asigna Auditor salvo necesidad administrativa justificada.</span></div>
+                <div class="password-policy" id="newUserPasswordPolicy" aria-live="polite"><span data-rule="length">○ 12 o más caracteres</span><span data-rule="lower">○ Una minúscula</span><span data-rule="upper">○ Una mayúscula</span><span data-rule="number">○ Un número</span><span data-rule="symbol">○ Un símbolo</span></div>
+                <label class="admin-confirmation" id="newAdminAcknowledgement" hidden><input type="checkbox" id="newAdminAcknowledgementCheck"> Confirmo que esta cuenta requiere privilegios de administración.</label>
+                <div class="admin-form-actions"><div class="admin-feedback" id="adminUserFeedback" role="status" aria-live="polite"></div><button class="btn-primary" id="btnCreateUser" type="submit">Crear cuenta</button></div>
+              </form>
+            </div>
+            <div class="admin-filter-row" aria-label="Filtros de usuarios"><input class="input-control" id="adminUserSearch" type="search" placeholder="Buscar por correo" autocomplete="off"><select class="input-control" id="adminRoleFilter"><option value="">Todos los roles</option><option value="admin">Administradores</option><option value="auditor">Auditores</option></select><select class="input-control" id="adminStatusFilter"><option value="">Todos los estados</option><option value="active">Activos</option><option value="inactive">Desactivados</option></select><span class="admin-helper" id="adminUserCount"></span></div>
+            <table class="modern-table"><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Última actividad</th><th>Acciones</th></tr></thead><tbody id="adminUsersBody"></tbody></table>
+          </div>
+          <div class="data-table-wrapper" id="adminAuditTrail" hidden>
+            <div class="data-table-header"><div><div class="data-table-title">Trazabilidad administrativa</div><div class="admin-helper">Eventos de ciclo de vida de cuentas. No contiene contraseñas, tokens ni datos sensibles.</div></div></div>
+            <table class="modern-table"><thead><tr><th>Fecha</th><th>Acción</th><th>Ejecutada por</th><th>Cuenta afectada</th><th>Detalle</th></tr></thead><tbody id="adminAuditBody"></tbody></table>
           </div>
           <div class="security-notice" id="adminAccessNotice">Inicia sesión con una cuenta de administrador para gestionar usuarios.</div>
         </section>
@@ -556,10 +637,6 @@
         <div class="brand-icon" style="margin: 0 auto 12px; width: 40px; height: 40px; font-size: 20px;">S</div>
         <h2>Iniciar Sesión</h2>
         <p>Autenticación mediante JWT Bearer y hashing Argon2id.</p>
-      </div>
-
-      <div id="authErrorAlert" style="display:none; padding:10px 14px; background:var(--color-fail-bg); border:1px solid var(--color-fail-border); color:var(--color-fail); border-radius:var(--radius-md); font-size:12px; margin-bottom:16px;">
-        Usuario o contraseña incorrectos.
       </div>
 
       <form id="loginForm">
@@ -584,7 +661,20 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="passwordResetModal" aria-hidden="true">
+    <div class="modal-card modal-card-compact" role="dialog" aria-modal="true" aria-labelledby="passwordResetTitle">
+      <div class="modal-header"><div class="brand-icon" style="margin: 0 auto 12px; width: 40px; height: 40px; font-size: 20px;">↺</div><h2 id="passwordResetTitle">Restablecer contraseña</h2><p id="passwordResetDescription">Define una nueva contraseña temporal para la cuenta seleccionada.</p></div>
+      <form id="passwordResetForm" novalidate>
+        <div class="input-group" style="margin-bottom: 14px;"><label for="resetUserPassword">Nueva contraseña temporal</label><div class="password-control"><input type="password" id="resetUserPassword" class="input-control" autocomplete="new-password" minlength="12" required><button type="button" class="password-toggle" data-password-toggle="resetUserPassword">Mostrar</button></div></div>
+        <div class="input-group"><label for="resetUserPasswordConfirm">Confirmar contraseña</label><div class="password-control"><input type="password" id="resetUserPasswordConfirm" class="input-control" autocomplete="new-password" minlength="12" required><button type="button" class="password-toggle" data-password-toggle="resetUserPasswordConfirm">Mostrar</button></div><span class="input-help" id="resetUserPasswordMatch"></span></div>
+        <div class="password-policy" id="resetUserPasswordPolicy" aria-live="polite"><span data-rule="length">○ 12 o más caracteres</span><span data-rule="lower">○ Una minúscula</span><span data-rule="upper">○ Una mayúscula</span><span data-rule="number">○ Un número</span><span data-rule="symbol">○ Un símbolo</span></div>
+        <div class="admin-feedback" id="passwordResetFeedback" role="status" aria-live="polite"></div>
+        <div class="modal-actions"><button type="button" class="chip-btn" id="btnCancelPasswordReset">Cancelar</button><button type="submit" class="btn-primary" id="btnConfirmPasswordReset">Confirmar restablecimiento</button></div>
+      </form>
+    </div>
+  </div>
+
   <!-- Script Principal de la Aplicación -->
-  <script src="/static/js/app.js"></script>
+  <script src="/static/js/app.js?v=20261109-account-crud-professional"></script>
 </body>
 </html>
