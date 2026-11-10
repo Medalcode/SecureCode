@@ -21,19 +21,19 @@ from unittest.mock import patch, MagicMock
 # ---------------------------------------------------------------------------
 
 def test_normalize_postgres_prefix():
-    """Prefijo 'postgres://' debe convertirse a 'postgresql://'."""
+    """Prefijo postgres:// selecciona el driver psycopg2 instalado."""
     from securecode.api.dependencies import _normalize_database_url
     url = "postgres://user:pass@host:5432/db"
     result = _normalize_database_url(url)
-    assert result == "postgresql://user:pass@host:5432/db"
+    assert result == "postgresql+psycopg2://user:pass@host:5432/db"
 
 
-def test_normalize_postgresql_prefix_unchanged():
-    """Prefijo 'postgresql://' ya válido no debe modificarse."""
+def test_normalize_postgresql_prefix_selects_psycopg2():
+    """Una URL bare postgresql:// no intenta importar psycopg v3."""
     from securecode.api.dependencies import _normalize_database_url
     url = "postgresql://user:pass@host:5432/db"
     result = _normalize_database_url(url)
-    assert result == url
+    assert result == "postgresql+psycopg2://user:pass@host:5432/db"
 
 
 def test_normalize_postgresql_psycopg2_unchanged():
@@ -57,7 +57,7 @@ def test_normalize_postgres_preserves_query_params():
     from securecode.api.dependencies import _normalize_database_url
     url = "postgres://user:pass@host:6543/db?sslmode=require"
     result = _normalize_database_url(url)
-    assert result.startswith("postgresql://")
+    assert result.startswith("postgresql+psycopg2://")
     assert "sslmode=require" in result
 
 
@@ -143,8 +143,8 @@ def test_engine_postgres_url_normalized(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgres://user:pass@host:5432/db")
 
     url = deps.get_database_url()
-    assert url.startswith("postgresql://"), (
-        "URL normalizada debe empezar con 'postgresql://'"
+    assert url.startswith("postgresql+psycopg2://"), (
+        "URL normalizada debe seleccionar el driver psycopg2 empaquetado"
     )
 
     deps._engine = None

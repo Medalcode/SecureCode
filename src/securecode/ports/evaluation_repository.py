@@ -6,6 +6,7 @@ from uuid import UUID
 from securecode.engine.evaluator import EvaluationStatus
 from securecode.models.gh001 import GH001Evidence
 from securecode.models.gh002 import GH002Evidence
+from securecode.models.gh003 import GH003Evidence
 
 @dataclass
 class PersistedEvaluation:
@@ -20,7 +21,7 @@ class PersistedEvaluation:
     source_type: str
     source_repository: str
     source_branch: str
-    reconstructed_evidence: Union[GH001Evidence, GH002Evidence]
+    reconstructed_evidence: Union[GH001Evidence, GH002Evidence, GH003Evidence]
     requested_by_user_id: Optional[UUID] = None
 
 class EvaluationRepository(Protocol):
@@ -58,6 +59,23 @@ class EvaluationRepository(Protocol):
         requested_by_user_id: Optional[UUID] = None,
     ) -> None:
         """Save a GH-002 evaluation and its normalized evidence atomically."""
+        ...
+
+    def save_gh003_evaluation(
+        self,
+        evaluation_id: UUID,
+        evidence_id: UUID,
+        evidence: GH003Evidence,
+        status: EvaluationStatus,
+        source_repository: str,
+        source_branch: str,
+        collected_at: datetime,
+        evaluated_at: datetime,
+        rule_id: Optional[str] = None,
+        rule_version: Optional[int] = None,
+        requested_by_user_id: Optional[UUID] = None,
+    ) -> None:
+        """Save a GH-003 evaluation and its normalized evidence atomically."""
         ...
 
     def get_evaluation(self, evaluation_id: UUID) -> Optional[PersistedEvaluation]:

@@ -9,7 +9,8 @@ from securecode.api.app import app
 from securecode.engine.evaluator import EvaluationStatus
 from securecode.ports.evaluation_repository import PersistedEvaluation
 from securecode.models.gh001 import GH001Evidence
-from securecode.api.dependencies import get_db_session
+from securecode.models.gh003 import GH003Evidence
+from securecode.api.dependencies import get_db_session, get_current_user
 from securecode.adapters.postgres.models import User
 from securecode.api.security import create_access_token
 
@@ -122,6 +123,49 @@ def test_gh001_unknown(mock_eval):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "UNKNOWN"
+
+
+@patch("securecode.api.app.evaluate_and_store_gh003")
+def test_gh003_signed_commit_policy(mock_eval):
+    evidence = GH003Evidence(branch="main", required_signatures_enabled=True)
+    persisted = mock_persisted_evaluation(EvaluationStatus.PASS, evidence)
+    persisted.control_id = "GH-003"
+    persisted.rule_id = "GH-003-RULE"
+    mock_eval.return_value = persisted
+
+    response = client.post("/api/v1/evaluations/gh-003", headers=auth_headers, json={
+        "owner": "Medalcode", "repository": "repo", "branch": "main"
+    })
+
+    assert response.status_code == 200
+    assert response.json()["control_id"] == "GH-003"
+    assert response.json()["evidence"]["required_signatures_enabled"] is True
+
+
+@patch("securecode.api.app.PostgresEvaluationRepository_Dependency_Wrapper")
+def test_evaluation_detail_returns_immutable_evidence(mock_repository_factory):
+    """A history selection must retrieve the originally persisted evidence."""
+    evidence = GH001Evidence(required_review_approvals=2, dismiss_stale_reviews=True)
+    persisted = mock_persisted_evaluation(EvaluationStatus.PASS, evidence)
+    stored_record = MagicMock(requested_by_user_id=mock_user_id)
+    session = MagicMock()
+    session.query.return_value.filter.return_value.first.return_value = stored_record
+    repository = mock_repository_factory.return_value
+    repository.get_evaluation.return_value = persisted
+
+    app.dependency_overrides[get_db_session] = lambda: session
+    app.dependency_overrides[get_current_user] = lambda: MagicMock(id=mock_user_id, role="admin")
+    try:
+        response = client.get(f"/api/v1/evaluations/{persisted.id}")
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["evaluation_id"] == str(persisted.id)
+    assert data["evidence"]["required_review_approvals"] == 2
+    assert data["evidence"]["dismiss_stale_reviews"] is True
+    assert len(data["evidence"]["hash"]) == 64
 
 @patch("securecode.api.app.evaluate_and_store_gh001")
 def test_gh001_infrastructure_failure(mock_eval):

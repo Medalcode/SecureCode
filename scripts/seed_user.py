@@ -33,6 +33,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from securecode.adapters.postgres.models import User
+from securecode.api.dependencies import _normalize_database_url
 from securecode.api.security import hash_password
 
 
@@ -110,7 +111,7 @@ def seed_user(username: str, password: str) -> None:
         print("[ERROR] La variable DATABASE_URL no está configurada.", file=sys.stderr)
         sys.exit(1)
 
-    engine = create_engine(db_url)
+    engine = create_engine(_normalize_database_url(db_url))
     Session = sessionmaker(bind=engine)
     session = Session()
     role = os.environ.get("SEED_USER_ROLE", "admin").strip().lower()

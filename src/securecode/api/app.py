@@ -1,7 +1,9 @@
 import os
 import json
+import re
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi import FastAPI, Depends, HTTPException, status, Request, Query
@@ -27,7 +29,10 @@ from securecode.api.dependencies import (
     get_current_user,
     require_admin,
 )
-from securecode.adapters.postgres.models import User, EvaluationRecord
+from securecode.adapters.postgres.models import (
+    User, EvaluationRecord, UserAuditEvent, UserSettings,
+    UserSubscription, SubscriptionEvent, UserFinOpsSettings,
+)
 
 app = FastAPI(
     title="SecureCode API",
@@ -65,7 +70,7 @@ if allowed_origins:
         CORSMiddleware,
         allow_origins=allowed_origins,
         allow_credentials=False,
-        allow_methods=["GET", "POST"],
+        allow_methods=["GET", "POST", "PATCH"],
         allow_headers=["Authorization", "Content-Type"],
     )
 
@@ -85,6 +90,11 @@ def serve_index():
 
 @app.get("/api/v1/rules")
 def get_rules_catalog():
+    """Publish only the canonical rule catalog used by the evaluator UI.
+
+    The client consumes this endpoint to avoid claiming controls that are not
+    actually present in the deployed rule set.
+    """
     rules_dir = Path(__file__).resolve().parent.parent.parent.parent / "rules"
     rules_list = []
     if rules_dir.exists():
@@ -93,7 +103,11 @@ def get_rules_catalog():
                 rules_list.append(json.loads(r_file.read_text(encoding="utf-8")))
             except Exception:
                 pass
-    return {"rules": rules_list}
+    return {
+        "rules": rules_list,
+        "active_controls": len(rules_list),
+        "catalog_version": "1",
+    }
 
 @app.get("/api/v1/system/overview")
 def get_system_overview():
@@ -108,11 +122,10 @@ def get_system_overview():
             "ci_run_id": "39183552777"
         },
         "performance": {
-            "p95_latency_ms": 200,
-            "p98_latency_ms": 300,
-            "nominal_p95_ms": 180,
-            "throughput_rps": 20.45,
-            "error_rate_pct": 0.0
+            "measurement_state": "not_live",
+            "scope": "Las métricas de rendimiento se documentan como pruebas controladas, no como telemetría de producción.",
+            "p95_latency_ms": None,
+            "throughput_rps": None,
         },
         "capacity_finops": {
             "database": "PostgreSQL 15 / 16 (Supabase Hobby 500 MB)",
@@ -132,8 +145,12 @@ from fastapi.security import OAuth2PasswordRequestForm
 from securecode.api.security import verify_password, create_access_token, hash_password
 from pydantic import BaseModel, Field
 from uuid import uuid4
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Literal
+
+# Equalize the expensive password-verification path for unknown usernames.
+# This reduces timing-based account enumeration without persisting a fake user.
+_DUMMY_PASSWORD_HASH = hash_password("securecode-login-timing-placeholder")
 
 class Token(BaseModel):
     access_token: str
@@ -164,14 +181,221 @@ class UserResponse(BaseModel):
     active: bool
     role: Literal["admin", "auditor"]
     created_at: datetime
+    updated_at: datetime | None = None
+    last_login_at: datetime | None = None
+
+
+class UserAuditEventResponse(BaseModel):
+    id: str
+    action: str
+    actor_username: str | None = None
+    target_username: str | None = None
+    details: dict
+    created_at: datetime
+
+
+class ClientSettingsUpdateRequest(BaseModel):
+    default_repository: str | None = Field(default=None, max_length=200)
+    default_branch: str | None = Field(default=None, min_length=1, max_length=255)
+    locale: Literal["es-CL", "en-US"] | None = None
+    timezone: str | None = Field(default=None, min_length=1, max_length=64)
+    theme: Literal["system", "light", "dark"] | None = None
+    notify_evaluation_completed: bool | None = None
+    notify_evaluation_failure: bool | None = None
+    notify_weekly_digest: bool | None = None
+
+
+class ClientSettingsResponse(BaseModel):
+    default_repository: str | None
+    default_branch: str
+    locale: Literal["es-CL", "en-US"]
+    timezone: str
+    theme: Literal["system", "light", "dark"]
+    notify_evaluation_completed: bool
+    notify_evaluation_failure: bool
+    notify_weekly_digest: bool
+    updated_at: datetime | None = None
+
+
+class SubscriptionChangeRequest(BaseModel):
+    plan_id: Literal["pro", "premium"]
+    confirmation: bool = False
+
+
+class SubscriptionEventResponse(BaseModel):
+    id: str
+    previous_plan_id: str | None
+    new_plan_id: str
+    occurred_at: datetime
+    effective_from: datetime
+    effective_until: datetime
+    event_type: str
+
+
+class SubscriptionResponse(BaseModel):
+    plan_id: Literal["pro", "premium"]
+    started_at: datetime
+    expires_at: datetime
+    last_changed_at: datetime
+    can_change: bool
+    next_change_at: datetime
+    billing_mode: Literal["demo_non_billable"]
+    catalog: list[dict]
+
+
+class FinOpsSettingsUpdateRequest(BaseModel):
+    budget_clp: Literal[10, 50, 100, 200, 500, 1000]
+    alert_threshold_pct: Literal[50, 80, 100]
+    alert_enabled: bool
+
+
+class FinOpsResponse(BaseModel):
+    scope: Literal["account", "platform"]
+    period_start: datetime
+    evaluations_current_period: int
+    evaluations_all_time: int
+    budget_clp: int
+    alert_threshold_pct: int
+    alert_enabled: bool
+    billing_data_state: Literal["not_connected"]
+    observed_spend_clp: None = None
+    updated_at: datetime | None = None
+
+
+_EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+_SUBSCRIPTION_PERIOD = timedelta(days=30)
+_PLAN_CATALOG = {
+    "pro": {
+        "id": "pro",
+        "name": "Pro",
+        "price_clp": 150025,
+        "features": ["3 controles canónicos", "Evidencia SHA-256", "Historial y exportación CSV"],
+    },
+    "premium": {
+        "id": "premium",
+        "name": "Premium",
+        "price_clp": 375064,
+        "features": ["Todo lo incluido en Pro", "Capacidad ampliada según contrato", "Soporte prioritario según contrato"],
+    },
+}
+
+
+def _normalise_username(value: str) -> str:
+    username = value.strip().lower()
+    if not _EMAIL_PATTERN.fullmatch(username):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="El usuario debe ser un correo electrónico válido")
+    return username
+
+
+def _validate_password_strength(password: str) -> None:
+    if not (len(password) >= 12 and re.search(r"[a-z]", password) and re.search(r"[A-Z]", password) and re.search(r"\d", password) and re.search(r"[^A-Za-z0-9]", password)):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="La contraseña debe tener 12+ caracteres, mayúscula, minúscula, número y símbolo",
+        )
+
+
+def _record_user_audit(session: Session, actor_id: UUID | None, target_id: UUID | None, action: str, details: dict) -> None:
+    """Record account lifecycle changes without persisting credentials or tokens."""
+    session.add(UserAuditEvent(
+        id=uuid4(), actor_user_id=actor_id, target_user_id=target_id,
+        action=action, details=details, created_at=datetime.now(timezone.utc),
+    ))
+
+
+def _settings_response(settings: UserSettings | None) -> dict:
+    """Produce safe defaults even before a user saves preferences for the first time."""
+    if settings is None:
+        return {
+            "default_repository": None, "default_branch": "main", "locale": "es-CL",
+            "timezone": "America/Santiago", "theme": "system",
+            "notify_evaluation_completed": True, "notify_evaluation_failure": True,
+            "notify_weekly_digest": False, "updated_at": None,
+        }
+    return {
+        "default_repository": settings.default_repository, "default_branch": settings.default_branch,
+        "locale": settings.locale, "timezone": settings.timezone, "theme": settings.theme,
+        "notify_evaluation_completed": settings.notify_evaluation_completed,
+        "notify_evaluation_failure": settings.notify_evaluation_failure,
+        "notify_weekly_digest": settings.notify_weekly_digest, "updated_at": settings.updated_at,
+    }
+
+
+def _ensure_subscription(session: Session, user_id: UUID) -> UserSubscription:
+    subscription = session.query(UserSubscription).filter(UserSubscription.user_id == user_id).first()
+    if subscription:
+        return subscription
+    now = datetime.now(timezone.utc)
+    subscription = UserSubscription(
+        user_id=user_id, plan_id="pro", started_at=now,
+        expires_at=now + _SUBSCRIPTION_PERIOD, last_changed_at=now,
+    )
+    session.add(subscription)
+    session.add(SubscriptionEvent(
+        id=uuid4(), user_id=user_id, previous_plan_id=None, new_plan_id="pro",
+        occurred_at=now, effective_from=now, effective_until=subscription.expires_at,
+        event_type="initialized",
+    ))
+    session.commit()
+    session.refresh(subscription)
+    return subscription
+
+
+def _subscription_response(subscription: UserSubscription) -> dict:
+    next_change_at = subscription.last_changed_at + _SUBSCRIPTION_PERIOD
+    return {
+        "plan_id": subscription.plan_id,
+        "started_at": subscription.started_at,
+        "expires_at": subscription.expires_at,
+        "last_changed_at": subscription.last_changed_at,
+        "can_change": datetime.now(timezone.utc) >= next_change_at,
+        "next_change_at": next_change_at,
+        "billing_mode": "demo_non_billable",
+        "catalog": list(_PLAN_CATALOG.values()),
+    }
+
+
+def _ensure_finops_settings(session: Session, user_id: UUID) -> UserFinOpsSettings:
+    settings = session.query(UserFinOpsSettings).filter(UserFinOpsSettings.user_id == user_id).first()
+    if settings:
+        return settings
+    settings = UserFinOpsSettings(user_id=user_id, budget_clp=1000, alert_threshold_pct=80, alert_enabled=True)
+    session.add(settings)
+    session.commit()
+    session.refresh(settings)
+    return settings
+
+
+def _period_start_utc(now: datetime | None = None) -> datetime:
+    current = now or datetime.now(timezone.utc)
+    return current.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
+def _finops_response(session: Session, current_user: User, settings: UserFinOpsSettings) -> dict:
+    query = session.query(EvaluationRecord)
+    scope = "platform" if getattr(current_user, "role", "auditor") == "admin" else "account"
+    if scope == "account":
+        query = query.filter(EvaluationRecord.requested_by_user_id == current_user.id)
+    period_start = _period_start_utc()
+    all_time = query.count()
+    period_count = query.filter(EvaluationRecord.evaluated_at >= period_start).count()
+    return {
+        "scope": scope, "period_start": period_start,
+        "evaluations_current_period": period_count, "evaluations_all_time": all_time,
+        "budget_clp": settings.budget_clp, "alert_threshold_pct": settings.alert_threshold_pct,
+        "alert_enabled": settings.alert_enabled, "billing_data_state": "not_connected",
+        "observed_spend_clp": None, "updated_at": settings.updated_at,
+    }
 
 @app.post("/api/v1/auth/token", response_model=Token)
 def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_db_session)
 ):
-    user = session.query(User).filter(User.username == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.password_hash):
+    normalized_username = form_data.username.strip().lower()
+    user = session.query(User).filter(User.username == normalized_username).first()
+    password_valid = verify_password(form_data.password, user.password_hash if user else _DUMMY_PASSWORD_HASH)
+    if not user or not password_valid:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -183,7 +407,16 @@ def login_for_access_token(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
+    # Last-login metadata is operational, never used as an authorization decision.
+    user.last_login_at = datetime.now(timezone.utc)
+    if hasattr(session, "commit"):
+        try:
+            session.commit()
+        except Exception:
+            if hasattr(session, "rollback"):
+                session.rollback()
+            logger.warning("Could not update last_login_at for authenticated user")
+
     access_token = create_access_token(str(user.id))
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -198,6 +431,167 @@ def get_current_user_profile(current_user: User = Depends(get_current_user)):
     }
 
 
+@app.get("/api/v1/settings", response_model=ClientSettingsResponse)
+def get_client_settings(
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the authenticated user's own non-sensitive preferences."""
+    settings = session.query(UserSettings).filter(UserSettings.user_id == current_user.id).first()
+    return _settings_response(settings)
+
+
+@app.patch("/api/v1/settings", response_model=ClientSettingsResponse)
+def update_client_settings(
+    request: ClientSettingsUpdateRequest,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Persist user preferences without exposing integration credentials or changing canonical rules."""
+    incoming = request.model_dump(exclude_unset=True)
+    if not incoming:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se recibió ninguna preferencia para actualizar")
+
+    repository = incoming.get("default_repository")
+    if repository is not None:
+        repository = repository.strip()
+        if repository and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,99}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}", repository):
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="El repositorio debe usar el formato owner/repo")
+        incoming["default_repository"] = repository or None
+
+    branch = incoming.get("default_branch")
+    if branch is not None:
+        branch = branch.strip()
+        if not branch or any(character.isspace() for character in branch):
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="La rama no puede estar vacía ni contener espacios")
+        incoming["default_branch"] = branch
+
+    timezone_name = incoming.get("timezone")
+    if timezone_name is not None:
+        try:
+            ZoneInfo(timezone_name)
+        except ZoneInfoNotFoundError as error:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="La zona horaria indicada no es válida") from error
+
+    settings = session.query(UserSettings).filter(UserSettings.user_id == current_user.id).first()
+    if settings is None:
+        settings = UserSettings(user_id=current_user.id)
+        session.add(settings)
+    changes: dict[str, object] = {}
+    for field, value in incoming.items():
+        previous = getattr(settings, field)
+        if previous != value:
+            changes[field] = {"from": previous, "to": value}
+            setattr(settings, field, value)
+    if not changes:
+        return _settings_response(settings)
+    settings.updated_at = datetime.now(timezone.utc)
+    _record_user_audit(session, current_user.id, current_user.id, "client_settings_updated", changes)
+    session.commit()
+    session.refresh(settings)
+    return _settings_response(settings)
+
+
+@app.get("/api/v1/subscription", response_model=SubscriptionResponse)
+def get_subscription(
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the authenticated account's current 30-day demo subscription."""
+    return _subscription_response(_ensure_subscription(session, current_user.id))
+
+
+@app.patch("/api/v1/subscription", response_model=SubscriptionResponse)
+def change_subscription(
+    request: SubscriptionChangeRequest,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Confirm one subscription change per 30-day period; this endpoint never bills."""
+    if not request.confirmation:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Debes confirmar el cambio de plan")
+    subscription = _ensure_subscription(session, current_user.id)
+    if request.plan_id == subscription.plan_id:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="El plan seleccionado ya está activo")
+    now = datetime.now(timezone.utc)
+    next_change_at = subscription.last_changed_at + _SUBSCRIPTION_PERIOD
+    if now < next_change_at:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"El próximo cambio estará disponible el {next_change_at.isoformat()}",
+        )
+    previous_plan_id = subscription.plan_id
+    subscription.plan_id = request.plan_id
+    subscription.started_at = now
+    subscription.expires_at = now + _SUBSCRIPTION_PERIOD
+    subscription.last_changed_at = now
+    session.add(SubscriptionEvent(
+        id=uuid4(), user_id=current_user.id, previous_plan_id=previous_plan_id,
+        new_plan_id=request.plan_id, occurred_at=now, effective_from=subscription.started_at,
+        effective_until=subscription.expires_at, event_type="plan_changed",
+    ))
+    _record_user_audit(session, current_user.id, current_user.id, "subscription_changed", {
+        "from": previous_plan_id, "to": request.plan_id, "billing_mode": "demo_non_billable",
+    })
+    session.commit()
+    session.refresh(subscription)
+    return _subscription_response(subscription)
+
+
+@app.get("/api/v1/subscription/history", response_model=list[SubscriptionEventResponse])
+def subscription_history(
+    limit: int = Query(default=20, ge=1, le=100),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """List only the current user's confirmed subscription lifecycle events."""
+    events = (
+        session.query(SubscriptionEvent)
+        .filter(SubscriptionEvent.user_id == current_user.id)
+        .order_by(SubscriptionEvent.occurred_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [{
+        "id": str(event.id), "previous_plan_id": event.previous_plan_id,
+        "new_plan_id": event.new_plan_id, "occurred_at": event.occurred_at,
+        "effective_from": event.effective_from, "effective_until": event.effective_until,
+        "event_type": event.event_type,
+    } for event in events]
+
+
+@app.get("/api/v1/finops", response_model=FinOpsResponse)
+def get_finops(
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Return measurable evaluation consumption and non-billable FinOps preferences."""
+    settings = _ensure_finops_settings(session, current_user.id)
+    return _finops_response(session, current_user, settings)
+
+
+@app.patch("/api/v1/finops", response_model=FinOpsResponse)
+def update_finops(
+    request: FinOpsSettingsUpdateRequest,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Persist alert preferences; never imply a connection to Cloud Billing."""
+    settings = _ensure_finops_settings(session, current_user.id)
+    changes: dict[str, object] = {}
+    for field, value in request.model_dump().items():
+        previous = getattr(settings, field)
+        if previous != value:
+            changes[field] = {"from": previous, "to": value}
+            setattr(settings, field, value)
+    if changes:
+        settings.updated_at = datetime.now(timezone.utc)
+        _record_user_audit(session, current_user.id, current_user.id, "finops_preferences_updated", changes)
+        session.commit()
+        session.refresh(settings)
+    return _finops_response(session, current_user, settings)
+
+
 def _user_response(user: User) -> dict:
     return {
         "id": str(user.id),
@@ -205,6 +599,8 @@ def _user_response(user: User) -> dict:
         "active": user.active,
         "role": getattr(user, "role", "auditor"),
         "created_at": user.created_at,
+        "updated_at": getattr(user, "updated_at", user.created_at),
+        "last_login_at": getattr(user, "last_login_at", None),
     }
 
 
@@ -222,7 +618,8 @@ def create_user(
     session: Session = Depends(get_db_session),
     _: User = Depends(require_admin),
 ):
-    username = request.username.strip().lower()
+    username = _normalise_username(request.username)
+    _validate_password_strength(request.password)
     if session.query(User).filter(User.username == username).first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists")
     user = User(
@@ -234,6 +631,7 @@ def create_user(
         created_at=datetime.now(timezone.utc),
     )
     session.add(user)
+    _record_user_audit(session, _.id, user.id, "account_created", {"role": user.role, "active": True})
     session.commit()
     session.refresh(user)
     return _user_response(user)
@@ -251,15 +649,50 @@ def update_user(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     if str(user.id) == str(current_admin.id) and (request.active is False or request.role == "auditor"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Administrators cannot remove their own access")
+    removes_admin_access = user.role == "admin" and user.active and (request.active is False or request.role == "auditor")
+    if removes_admin_access:
+        active_admins = session.query(User).filter(User.role == "admin", User.active.is_(True)).count()
+        if active_admins <= 1:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Debe existir al menos un administrador activo")
+    changes: dict[str, object] = {}
     if request.active is not None:
+        if user.active != request.active:
+            changes["active"] = {"from": user.active, "to": request.active}
         user.active = request.active
     if request.role is not None:
+        if user.role != request.role:
+            changes["role"] = {"from": user.role, "to": request.role}
         user.role = request.role
     if request.password is not None:
+        _validate_password_strength(request.password)
         user.password_hash = hash_password(request.password)
+        changes["password_reset"] = True
+    if not changes:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se recibió ningún cambio para aplicar")
+    user.updated_at = datetime.now(timezone.utc)
+    _record_user_audit(session, current_admin.id, user.id, "account_updated", changes)
     session.commit()
     session.refresh(user)
     return _user_response(user)
+
+
+@app.get("/api/v1/admin/user-audit-events", response_model=list[UserAuditEventResponse])
+def list_user_audit_events(
+    limit: int = Query(default=50, ge=1, le=100),
+    session: Session = Depends(get_db_session),
+    _: User = Depends(require_admin),
+):
+    """Expose an administrator-only, credential-free account audit trail."""
+    events = session.query(UserAuditEvent).order_by(UserAuditEvent.created_at.desc()).limit(limit).all()
+    user_ids = {event.actor_user_id for event in events if event.actor_user_id} | {event.target_user_id for event in events if event.target_user_id}
+    users = session.query(User).filter(User.id.in_(user_ids)).all() if user_ids else []
+    usernames = {user.id: user.username for user in users}
+    return [{
+        "id": str(event.id), "action": event.action,
+        "actor_username": usernames.get(event.actor_user_id),
+        "target_username": usernames.get(event.target_user_id),
+        "details": event.details, "created_at": event.created_at,
+    } for event in events]
 
 
 @app.get("/api/v1/evaluations/history")
@@ -286,6 +719,84 @@ def evaluation_history(
             }
             for record in records
         ]
+    }
+
+
+@app.get("/api/v1/evaluations/{evaluation_id}")
+def evaluation_detail(
+    evaluation_id: UUID,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the immutable evidence for one evaluation, subject to ownership."""
+    record = session.query(EvaluationRecord).filter(EvaluationRecord.id == evaluation_id).first()
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluation not found")
+
+    is_admin = getattr(current_user, "role", "auditor") == "admin"
+    if not is_admin and record.requested_by_user_id != current_user.id:
+        # Do not disclose the existence of another auditor's evaluation.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluation not found")
+
+    persisted = PostgresEvaluationRepository_Dependency_Wrapper(session).get_evaluation(evaluation_id)
+    if not persisted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluation not found")
+
+    if persisted.control_id == "GH-001":
+        evidence = {
+            "required_review_approvals": persisted.reconstructed_evidence.required_review_approvals,
+            "dismiss_stale_reviews": persisted.reconstructed_evidence.dismiss_stale_reviews,
+        }
+    elif persisted.control_id == "GH-002":
+        evidence = {
+            "default_branch": persisted.reconstructed_evidence.default_branch,
+            "protection_enabled": persisted.reconstructed_evidence.protection_enabled,
+        }
+    else:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Unsupported control")
+
+    evidence["hash"] = persisted.reconstructed_evidence.canonical_hash()
+    return {
+        "evaluation_id": str(persisted.id),
+        "control_id": persisted.control_id,
+        "rule": (
+            {"id": persisted.rule_id, "version": persisted.rule_version}
+            if persisted.rule_id is not None and persisted.rule_version is not None
+            else None
+        ),
+        "status": persisted.status.name,
+        "source": {
+            "type": persisted.source_type,
+            "repository": persisted.source_repository,
+            "branch": persisted.source_branch,
+        },
+        "evidence": evidence,
+        "collected_at": persisted.collected_at.isoformat(),
+        "evaluated_at": persisted.evaluated_at.isoformat(),
+    }
+
+
+@app.get("/api/v1/verify/{evaluation_id}")
+def verify_evidence_public(
+    evaluation_id: UUID,
+    session: Session = Depends(get_db_session),
+):
+    """Publicly verify integrity without disclosing repository or user data."""
+    record = session.query(EvaluationRecord).filter(EvaluationRecord.id == evaluation_id).first()
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evidence not found")
+    persisted = PostgresEvaluationRepository_Dependency_Wrapper(session).get_evaluation(evaluation_id)
+    if not persisted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evidence not found")
+    computed_hash = persisted.reconstructed_evidence.canonical_hash()
+    return {
+        "evaluation_id": str(persisted.id),
+        "control_id": persisted.control_id,
+        "status": persisted.status.name,
+        "evidence_hash": record.evidence.evidence_hash,
+        "integrity_valid": record.evidence.evidence_hash == computed_hash,
+        "collected_at": persisted.collected_at.isoformat(),
+        "evaluated_at": persisted.evaluated_at.isoformat(),
     }
 
 @app.get("/health")
@@ -355,6 +866,12 @@ from securecode.api.schemas import (
     GH002EvaluationResponse,
     GH002EvidenceResponse
 )
+from securecode.application.evaluate_and_store import evaluate_and_store_gh003
+from securecode.api.schemas import (
+    GH003EvaluationRequest,
+    GH003EvaluationResponse,
+    GH003EvidenceResponse,
+)
 
 @app.post("/api/v1/evaluations/gh-002", response_model=GH002EvaluationResponse)
 def evaluate_gh002_endpoint(
@@ -406,4 +923,49 @@ def evaluate_gh002_endpoint(
         ),
         collected_at=persisted.collected_at.isoformat(),
         evaluated_at=persisted.evaluated_at.isoformat()
+    )
+
+
+@app.post("/api/v1/evaluations/gh-003", response_model=GH003EvaluationResponse)
+def evaluate_gh003_endpoint(
+    request: GH003EvaluationRequest,
+    session: Session = Depends(get_db_session),
+    github_token: str = Depends(get_github_token),
+    current_user: User = Depends(get_current_user),
+):
+    """Verify that the selected GitHub branch requires signed commits."""
+    repository = PostgresEvaluationRepository_Dependency_Wrapper(session)
+    try:
+        persisted = evaluate_and_store_gh003(
+            owner=request.owner,
+            repo=request.repository,
+            branch=request.branch,
+            token=github_token,
+            repository=repository,
+            requested_by_user_id=current_user.id,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail="Invalid evidence acquired") from error
+    except RuntimeError as error:
+        logger.error("GH-003 execution failed: %s", error)
+        raise HTTPException(status_code=502, detail="Infrastructure or upstream communication failure") from error
+    except Exception as error:
+        logger.error("Unexpected GH-003 error: %s", error)
+        raise HTTPException(status_code=500, detail="Internal Server Error") from error
+
+    rule = RuleResponse(id=persisted.rule_id, version=persisted.rule_version) if persisted.rule_id and persisted.rule_version else None
+    evidence = persisted.reconstructed_evidence
+    return GH003EvaluationResponse(
+        evaluation_id=str(persisted.id),
+        control_id=persisted.control_id,
+        rule=rule,
+        status=persisted.status.name,
+        source=SourceResponse(type=persisted.source_type, repository=persisted.source_repository, branch=persisted.source_branch),
+        evidence=GH003EvidenceResponse(
+            branch=evidence.branch,
+            required_signatures_enabled=evidence.required_signatures_enabled,
+            hash=evidence.canonical_hash(),
+        ),
+        collected_at=persisted.collected_at.isoformat(),
+        evaluated_at=persisted.evaluated_at.isoformat(),
     )

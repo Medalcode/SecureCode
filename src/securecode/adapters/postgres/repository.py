@@ -8,6 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from securecode.ports.evaluation_repository import EvaluationRepository, PersistedEvaluation
 from securecode.models.gh001 import GH001Evidence
 from securecode.models.gh002 import GH002Evidence
+from securecode.models.gh003 import GH003Evidence
 from securecode.engine.evaluator import EvaluationStatus
 from securecode.adapters.postgres.models import EvaluationRecord, EvidenceRecord
 
@@ -120,6 +121,52 @@ class PostgresEvaluationRepository(EvaluationRepository):
             self._session.rollback()
             raise RuntimeError(f"Failed to persist evaluation: {e}") from e
 
+    def save_gh003_evaluation(
+        self,
+        evaluation_id: UUID,
+        evidence_id: UUID,
+        evidence: GH003Evidence,
+        status: EvaluationStatus,
+        source_repository: str,
+        source_branch: str,
+        collected_at: datetime,
+        evaluated_at: datetime,
+        rule_id: Optional[str] = None,
+        rule_version: Optional[int] = None,
+        requested_by_user_id: Optional[UUID] = None,
+    ) -> None:
+        """Save signed-commit enforcement evidence atomically."""
+        try:
+            evidence_record = EvidenceRecord(
+                id=evidence_id,
+                control_id="GH-003",
+                evidence_hash=evidence.canonical_hash(),
+                raw_evidence={
+                    "branch": evidence.branch,
+                    "required_signatures_enabled": evidence.required_signatures_enabled,
+                },
+                collected_at=collected_at,
+            )
+            evaluation_record = EvaluationRecord(
+                id=evaluation_id,
+                control_id="GH-003",
+                rule_id=rule_id,
+                rule_version=rule_version,
+                status=status.name,
+                evaluated_at=evaluated_at,
+                evidence_id=evidence_id,
+                requested_by_user_id=requested_by_user_id,
+                source_type="GitHub",
+                source_repository=source_repository,
+                source_branch=source_branch,
+            )
+            self._session.add(evidence_record)
+            self._session.add(evaluation_record)
+            self._session.commit()
+        except SQLAlchemyError as e:
+            self._session.rollback()
+            raise RuntimeError(f"Failed to persist evaluation: {e}") from e
+
     def get_evaluation(self, evaluation_id: UUID) -> Optional[PersistedEvaluation]:
         """Retrieve an evaluation and reconstruct the immutable domain evidence."""
         record = self._session.query(EvaluationRecord).filter_by(id=evaluation_id).first()
@@ -139,6 +186,11 @@ class PostgresEvaluationRepository(EvaluationRepository):
             reconstructed_evidence = GH002Evidence(
                 default_branch=raw.get("default_branch", ""),
                 protection_enabled=raw.get("protection_enabled")
+            )
+        elif record.control_id == "GH-003":
+            reconstructed_evidence = GH003Evidence(
+                branch=raw.get("branch", record.source_branch),
+                required_signatures_enabled=raw.get("required_signatures_enabled"),
             )
         else:
             raise ValueError(f"Unknown control_id {record.control_id} in database")

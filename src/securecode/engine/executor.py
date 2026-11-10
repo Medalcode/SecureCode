@@ -14,10 +14,15 @@ def evaluate_condition(cond: Condition, evidence: Any) -> EvaluationStatus:
         
     expected_value = cond.value
     
-    # Type checking if possible
-    if type(actual_value) != type(expected_value):
-        # We might have int vs float, but let's be strict for our use case (bool, int)
-        if not (isinstance(actual_value, (int, float)) and isinstance(expected_value, (int, float))):
+    # Python considers bool a subclass of int. It must never satisfy a numeric
+    # rule (for example, True must not pass GTE 1 or EQ 1).
+    actual_is_number = isinstance(actual_value, (int, float)) and not isinstance(actual_value, bool)
+    expected_is_number = isinstance(expected_value, (int, float)) and not isinstance(expected_value, bool)
+    if cond.operator == "GTE" and not (actual_is_number and expected_is_number):
+        return EvaluationStatus.UNKNOWN
+    if cond.operator == "EQ" and type(actual_value) is not type(expected_value):
+        # Numeric equality permits only real numeric values, never booleans.
+        if not (actual_is_number and expected_is_number):
             return EvaluationStatus.UNKNOWN
             
     if cond.operator == "EQ":

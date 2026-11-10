@@ -160,7 +160,7 @@ python -c "import secrets; print(secrets.token_hex(32))" | \
 echo -n "postgresql://user:pass@host:6543/db?sslmode=require" | \
   gcloud secrets create securecode-db-url --data-file=-
 
-# GitHub Token (PAT con permisos read:org, repo)
+# GitHub Token (PAT de grano fino, limitado a repositorios auditados, con Metadata: Read y Administration: Read)
 echo -n "ghp_..." | \
   gcloud secrets create securecode-github-token --data-file=-
 ```

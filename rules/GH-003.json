@@ -1,0 +1,15 @@
+{
+  "rule_id": "GH-003-RULE",
+  "control_id": "GH-003",
+  "version": 1,
+  "active": true,
+  "allowlisted_fields": [
+    "branch",
+    "required_signatures_enabled"
+  ],
+  "condition": {
+    "field": "required_signatures_enabled",
+    "operator": "EQ",
+    "value": true
+  }
+}
