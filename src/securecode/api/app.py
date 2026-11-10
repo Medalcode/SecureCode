@@ -639,7 +639,7 @@ def create_user(
 
 @app.patch("/api/v1/admin/users/{user_id}", response_model=UserResponse)
 def update_user(
-    user_id: str,
+    user_id: UUID,
     request: UserUpdateRequest,
     session: Session = Depends(get_db_session),
     current_admin: User = Depends(require_admin),

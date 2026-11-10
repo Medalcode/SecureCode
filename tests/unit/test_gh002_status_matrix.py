@@ -44,7 +44,8 @@ def test_gh002_acquisition_and_evaluation_matrix(
 ):
     requested_urls = []
 
-    def github_response(request):
+    def github_response(request, timeout=None):
+        assert timeout == 10.0
         url = request.full_url
         requested_urls.append(url)
         if url == "https://api.github.com/repos/owner/repo":

@@ -1,8 +1,18 @@
 import json
+import os
 import urllib.request
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from securecode.models.gh001 import GH001Evidence
+
+
+def _github_timeout_seconds() -> float:
+    """Bound outbound GitHub calls so a degraded upstream cannot pin a worker."""
+    try:
+        value = float(os.environ.get("GITHUB_API_TIMEOUT_SECONDS", "10"))
+    except ValueError:
+        return 10.0
+    return min(max(value, 1.0), 60.0)
 
 
 def _repository_api_url(owner: str, repo: str) -> str:
@@ -13,7 +23,7 @@ def _repository_api_url(owner: str, repo: str) -> str:
 def _branch_api_url(owner: str, repo: str, branch: str) -> str:
     return f"{_repository_api_url(owner, repo)}/branches/{quote(branch, safe='')}"
 
-def get_gh001_evidence(owner: str, repo: str, branch: str, token: str = None) -> GH001Evidence:
+def get_gh001_evidence(owner: str, repo: str, branch: str, token: str | None = None) -> GH001Evidence:
     """
     Fetch branch protection evidence for GH-001 from GitHub API.
     
@@ -37,7 +47,7 @@ def get_gh001_evidence(owner: str, repo: str, branch: str, token: str = None) ->
 
     def fetch_json(url: str) -> tuple[int, dict | None]:
         try:
-            with urllib.request.urlopen(urllib.request.Request(url, headers=headers)) as response:
+            with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=_github_timeout_seconds()) as response:
                 payload = json.loads(response.read().decode("utf-8"))
                 if not isinstance(payload, dict):
                     raise ValueError("Expected JSON object from GitHub API")
@@ -77,7 +87,7 @@ def get_gh001_evidence(owner: str, repo: str, branch: str, token: str = None) ->
 from securecode.models.gh002 import GH002Evidence
 from securecode.models.gh003 import GH003Evidence
 
-def get_gh002_evidence(owner: str, repo: str, token: str = None) -> GH002Evidence:
+def get_gh002_evidence(owner: str, repo: str, token: str | None = None) -> GH002Evidence:
     """
     Fetch default branch protection evidence for GH-002 from GitHub API.
     
@@ -96,7 +106,7 @@ def get_gh002_evidence(owner: str, repo: str, token: str = None) -> GH002Evidenc
     def fetch_json(url):
         req = urllib.request.Request(url, headers=headers)
         try:
-            with urllib.request.urlopen(req) as response:
+            with urllib.request.urlopen(req, timeout=_github_timeout_seconds()) as response:
                 return response.code, json.loads(response.read().decode('utf-8'))
         except HTTPError as e:
             if e.code >= 500:
@@ -136,7 +146,7 @@ def get_gh002_evidence(owner: str, repo: str, token: str = None) -> GH002Evidenc
         return GH002Evidence(default_branch=default_branch, protection_enabled=None)
 
 
-def get_gh003_evidence(owner: str, repo: str, branch: str, token: str = None) -> GH003Evidence:
+def get_gh003_evidence(owner: str, repo: str, branch: str, token: str | None = None) -> GH003Evidence:
     """Fetch the GitHub branch setting that requires signed commits.
 
     A 404 is a reliable non-conformance only after GitHub confirms that the
@@ -153,7 +163,7 @@ def get_gh003_evidence(owner: str, repo: str, branch: str, token: str = None) ->
     def fetch_status(url: str) -> int:
         request = urllib.request.Request(url, headers=headers)
         try:
-            with urllib.request.urlopen(request) as response:
+            with urllib.request.urlopen(request, timeout=_github_timeout_seconds()) as response:
                 return response.status
         except HTTPError as error:
             if error.code >= 500:

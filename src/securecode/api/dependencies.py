@@ -90,7 +90,7 @@ def get_evaluation_repository(session: Session = None) -> EvaluationRepository:
     return PostgresEvaluationRepository(session)
 
 
-def get_github_token() -> str:
+def get_github_token() -> str | None:
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
         # We allow none and it will result in UNKNOWN or 401 later in the adapter

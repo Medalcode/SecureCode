@@ -153,3 +153,13 @@ def test_gh002_upstream_server_errors_are_not_misclassified_as_unknown(mock_urlo
 
     with pytest.raises(RuntimeError, match="unexpected HTTP status: 503"):
         get_gh002_evidence("owner", "repo")
+
+
+def test_github_requests_use_a_bounded_timeout(mock_urlopen):
+    mock_urlopen.side_effect = _observable_branch_responses({
+        "required_pull_request_reviews": {"required_approving_review_count": 2, "dismiss_stale_reviews": True}
+    })
+
+    get_gh001_evidence("owner", "repo", "main")
+
+    assert all(call.kwargs["timeout"] == 10.0 for call in mock_urlopen.call_args_list)
