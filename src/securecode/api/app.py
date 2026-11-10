@@ -33,6 +33,9 @@ from securecode.adapters.postgres.models import (
     User, EvaluationRecord, UserAuditEvent, UserSettings,
     UserSubscription, SubscriptionEvent, UserFinOpsSettings,
 )
+from securecode.models.gh001 import GH001Evidence
+from securecode.models.gh002 import GH002Evidence
+from securecode.models.gh003 import GH003Evidence
 
 app = FastAPI(
     title="SecureCode API",
@@ -110,16 +113,15 @@ def get_rules_catalog():
     }
 
 @app.get("/api/v1/system/overview")
-def get_system_overview():
+def get_system_overview(_: User = Depends(require_admin)):
+    """Administrative status only; CI and billing are not live telemetry sources."""
     return {
         "status": "online",
         "service": "SecureCode Compliance Engine",
         "version": "1.0.0",
         "ci_metrics": {
-            "tests_total": 95,
-            "tests_passing": 95,
-            "coverage_pct": 89.5,
-            "ci_run_id": "39183552777"
+            "measurement_state": "not_connected",
+            "note": "Consulta GitHub Actions para resultados y cobertura vigentes.",
         },
         "performance": {
             "measurement_state": "not_live",
@@ -127,12 +129,7 @@ def get_system_overview():
             "p95_latency_ms": None,
             "throughput_rps": None,
         },
-        "capacity_finops": {
-            "database": "PostgreSQL 15 / 16 (Supabase Hobby 500 MB)",
-            "max_evaluations_theoretical": 20480,
-            "estimated_record_size_kb": 25,
-            "saturation_months_without_purge": 4.1
-        },
+        "capacity_finops": {"measurement_state": "not_connected"},
         "sla": {
             "availability_target_pct": 99.5,
             "rto_compute": "< 15 minutes",
@@ -742,20 +739,26 @@ def evaluation_detail(
     if not persisted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluation not found")
 
-    if persisted.control_id == "GH-001":
+    reconstructed = persisted.reconstructed_evidence
+    if persisted.control_id == "GH-001" and isinstance(reconstructed, GH001Evidence):
         evidence = {
-            "required_review_approvals": persisted.reconstructed_evidence.required_review_approvals,
-            "dismiss_stale_reviews": persisted.reconstructed_evidence.dismiss_stale_reviews,
+            "required_review_approvals": reconstructed.required_review_approvals,
+            "dismiss_stale_reviews": reconstructed.dismiss_stale_reviews,
         }
-    elif persisted.control_id == "GH-002":
+    elif persisted.control_id == "GH-002" and isinstance(reconstructed, GH002Evidence):
         evidence = {
-            "default_branch": persisted.reconstructed_evidence.default_branch,
-            "protection_enabled": persisted.reconstructed_evidence.protection_enabled,
+            "default_branch": reconstructed.default_branch,
+            "protection_enabled": reconstructed.protection_enabled,
+        }
+    elif persisted.control_id == "GH-003" and isinstance(reconstructed, GH003Evidence):
+        evidence = {
+            "branch": reconstructed.branch,
+            "required_signatures_enabled": reconstructed.required_signatures_enabled,
         }
     else:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Unsupported control")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stored evaluation evidence is inconsistent")
 
-    evidence["hash"] = persisted.reconstructed_evidence.canonical_hash()
+    evidence["hash"] = reconstructed.canonical_hash()
     return {
         "evaluation_id": str(persisted.id),
         "control_id": persisted.control_id,

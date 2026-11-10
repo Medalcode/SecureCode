@@ -6,7 +6,8 @@ from securecode.api.security import (
     hash_password,
     verify_password,
     create_access_token,
-    verify_access_token
+    verify_access_token,
+    get_jwt_secret,
 )
 from argon2.exceptions import VerifyMismatchError
 
@@ -83,3 +84,9 @@ def test_jwt_hs256_remains_supported(monkeypatch):
     monkeypatch.setenv("JWT_ALGORITHM", "HS256")
     token = create_access_token("test-user")
     assert verify_access_token(token) == "test-user"
+
+
+def test_jwt_secret_requires_production_safe_minimum_length(monkeypatch):
+    monkeypatch.setenv("JWT_SECRET_KEY", "short")
+    with pytest.raises(ValueError, match="at least 32 characters"):
+        get_jwt_secret()

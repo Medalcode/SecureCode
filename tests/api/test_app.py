@@ -167,6 +167,29 @@ def test_evaluation_detail_returns_immutable_evidence(mock_repository_factory):
     assert data["evidence"]["dismiss_stale_reviews"] is True
     assert len(data["evidence"]["hash"]) == 64
 
+
+@patch("securecode.api.app.PostgresEvaluationRepository_Dependency_Wrapper")
+def test_evaluation_detail_supports_gh003_evidence(mock_repository_factory):
+    evidence = GH003Evidence(branch="main", required_signatures_enabled=True)
+    persisted = mock_persisted_evaluation(EvaluationStatus.PASS, evidence)
+    persisted.control_id = "GH-003"
+    persisted.rule_id = "GH-003-RULE"
+    stored_record = MagicMock(requested_by_user_id=mock_user_id)
+    session = MagicMock()
+    session.query.return_value.filter.return_value.first.return_value = stored_record
+    mock_repository_factory.return_value.get_evaluation.return_value = persisted
+
+    app.dependency_overrides[get_db_session] = lambda: session
+    app.dependency_overrides[get_current_user] = lambda: MagicMock(id=mock_user_id, role="admin")
+    try:
+        response = client.get(f"/api/v1/evaluations/{persisted.id}")
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert response.status_code == 200
+    assert response.json()["evidence"]["required_signatures_enabled"] is True
+    assert response.json()["evidence"]["branch"] == "main"
+
 @patch("securecode.api.app.evaluate_and_store_gh001")
 def test_gh001_infrastructure_failure(mock_eval):
     mock_eval.side_effect = RuntimeError("Database connection failed")

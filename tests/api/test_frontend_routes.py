@@ -34,12 +34,4 @@ def test_rules_catalog_endpoint():
 
 def test_system_overview_endpoint():
     response = client.get("/api/v1/system/overview")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "online"
-    assert data["ci_metrics"]["tests_passing"] == 95
-    assert data["ci_metrics"]["coverage_pct"] == 89.5
-    assert "performance" in data
-    assert data["performance"]["measurement_state"] == "not_live"
-    assert data["performance"]["p95_latency_ms"] is None
-    assert data["performance"]["throughput_rps"] is None
+    assert response.status_code == 401

@@ -21,6 +21,8 @@ def get_jwt_secret() -> str:
     secret = os.environ.get("JWT_SECRET_KEY")
     if not secret:
         raise ValueError("JWT_SECRET_KEY environment variable is not set")
+    if len(secret) < 32:
+        raise ValueError("JWT_SECRET_KEY must contain at least 32 characters")
     return secret
 
 def get_jwt_algorithm() -> str:
