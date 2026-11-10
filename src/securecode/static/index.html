@@ -618,6 +618,12 @@
             </div>
             <div class="admin-filter-row" aria-label="Filtros de usuarios"><input class="input-control" id="adminUserSearch" type="search" placeholder="Buscar por correo" autocomplete="off"><select class="input-control" id="adminRoleFilter"><option value="">Todos los roles</option><option value="admin">Administradores</option><option value="auditor">Auditores</option></select><select class="input-control" id="adminStatusFilter"><option value="">Todos los estados</option><option value="active">Activos</option><option value="inactive">Desactivados</option></select><span class="admin-helper" id="adminUserCount"></span></div>
             <table class="modern-table"><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Última actividad</th><th>Acciones</th></tr></thead><tbody id="adminUsersBody"></tbody></table>
+            <section class="repository-scope-panel" id="repositoryAuthorizationManagement">
+              <div><span class="section-kicker">Alcance de repositorios</span><h2>Autorizaciones por cuenta</h2><p>Los auditores sólo pueden evaluar repositorios activos asignados aquí. Los administradores conservan acceso operativo a la plataforma.</p></div>
+              <form id="repositoryAuthorizationForm" class="repository-authorization-form" novalidate><select class="input-control" id="authorizationUserId" required></select><input class="input-control" id="authorizationRepository" placeholder="owner/repo" maxlength="201" required><button class="btn-primary" type="submit">Autorizar repositorio</button></form>
+              <div class="admin-feedback" id="repositoryAuthorizationFeedback" role="status" aria-live="polite"></div>
+              <table class="modern-table"><thead><tr><th>Cuenta</th><th>Repositorio</th><th>Estado</th><th>Acción</th></tr></thead><tbody id="repositoryAuthorizationsBody"></tbody></table>
+            </section>
           </div>
           <div class="data-table-wrapper" id="adminAuditTrail" hidden>
             <div class="data-table-header"><div><div class="data-table-title">Trazabilidad administrativa</div><div class="admin-helper">Eventos de ciclo de vida de cuentas. No contiene contraseñas, tokens ni datos sensibles.</div></div></div>
@@ -675,6 +681,6 @@
   </div>
 
   <!-- Script Principal de la Aplicación -->
-  <script src="/static/js/app.js?v=20261109-account-crud-professional"></script>
+  <script src="/static/js/app.js?v=20261109-repository-scope"></script>
 </body>
 </html>

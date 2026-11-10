@@ -1014,6 +1014,10 @@ body {
 }
 
 .admin-filter-row .input-control { min-width: 0; }
+.repository-scope-panel { padding: 22px 20px; border-top: 1px solid var(--border-subtle); background: var(--bg-primary); }
+.repository-scope-panel h2 { margin: 5px 0; font-size: 18px; }
+.repository-scope-panel p { margin: 0 0 16px; color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+.repository-authorization-form { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto; gap: 10px; margin-bottom: 10px; }
 
 .settings-layout {
   display: grid;
@@ -1199,6 +1203,7 @@ body {
     padding: 20px 16px;
   }
   .admin-user-form { grid-template-columns: 1fr; }
+  .repository-authorization-form { grid-template-columns: 1fr; }
   .admin-account-summary { grid-template-columns: 1fr; }
   .admin-account-summary div { border-right: 0; border-bottom: 1px solid var(--border-subtle); }
   .admin-account-summary div:last-child { border-bottom: 0; }

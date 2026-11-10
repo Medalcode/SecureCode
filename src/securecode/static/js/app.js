@@ -1036,6 +1036,7 @@
     }
     if (btnRefreshUsers) btnRefreshUsers.addEventListener('click', refreshAdminUsers);
     if (createUserForm) createUserForm.addEventListener('submit', createManagedUser);
+    document.getElementById('repositoryAuthorizationForm')?.addEventListener('submit', saveRepositoryAuthorization);
     document.getElementById('passwordResetForm')?.addEventListener('submit', submitPasswordReset);
     document.getElementById('btnCancelPasswordReset')?.addEventListener('click', closePasswordResetModal);
     document.getElementById('newUserPassword')?.addEventListener('input', () => updatePasswordFormState('newUserPassword', 'newUserPasswordConfirm', 'newUserPasswordPolicy', 'newUserPasswordMatch'));
@@ -1066,6 +1067,8 @@
       if (!res.ok) throw new Error('No autorizado');
       state.adminUsers = await res.json();
       renderAdminUsers();
+      renderAuthorizationUserOptions();
+      loadRepositoryAuthorizations();
       refreshUserAuditEvents();
       management.hidden = false;
       notice.hidden = true;
@@ -1103,6 +1106,69 @@
         return `<tr><td>${escapeHTML(user.username)}</td><td>${user.role === 'admin' ? 'Administrador' : 'Auditor'}</td><td>${user.active ? 'Activo' : 'Desactivado'}</td><td>${activity ? new Date(activity).toLocaleString() : 'Sin registros'}</td><td>${action}</td></tr>`;
       }).join('') || '<tr><td colspan="5">No hay cuentas que coincidan con los filtros.</td></tr>';
     body.querySelectorAll('[data-user-id]').forEach(button => button.addEventListener('click', () => manageUserAction(button)));
+  }
+
+  function renderAuthorizationUserOptions() {
+    const select = document.getElementById('authorizationUserId');
+    if (!select) return;
+    const current = select.value;
+    const auditors = state.adminUsers.filter(user => user.role === 'auditor' && user.active);
+    select.innerHTML = auditors.map(user => `<option value="${escapeHTML(user.id)}">${escapeHTML(user.username)}</option>`).join('') || '<option value="">No hay auditores activos</option>';
+    if (auditors.some(user => user.id === current)) select.value = current;
+  }
+
+  async function loadRepositoryAuthorizations() {
+    const body = document.getElementById('repositoryAuthorizationsBody');
+    if (!body || !state.token || state.accessRole !== 'admin') return;
+    try {
+      const res = await fetch('/api/v1/admin/repository-authorizations', { headers: { Authorization: `Bearer ${state.token}` } });
+      if (!res.ok) throw new Error('No se pudieron cargar las autorizaciones.');
+      const authorizations = await res.json();
+      body.innerHTML = authorizations.map(item => `<tr><td>${escapeHTML(item.username || item.user_id)}</td><td><code>${escapeHTML(item.repository)}</code></td><td>${item.active ? 'Activa' : 'Revocada'}</td><td><button type="button" class="btn-copy" data-repository-authorization-id="${escapeHTML(item.id)}" data-active="${item.active}">${item.active ? 'Revocar' : 'Reactivar'}</button></td></tr>`).join('') || '<tr><td colspan="4">Aún no hay repositorios autorizados.</td></tr>';
+      body.querySelectorAll('[data-repository-authorization-id]').forEach(button => button.addEventListener('click', () => updateRepositoryAuthorization(button)));
+    } catch (error) {
+      setRepositoryAuthorizationFeedback(error.message, 'error');
+    }
+  }
+
+  async function saveRepositoryAuthorization(event) {
+    event.preventDefault();
+    const userId = document.getElementById('authorizationUserId').value;
+    const repository = document.getElementById('authorizationRepository').value.trim();
+    if (!userId || !normalizeGithubRepository(repository)) {
+      setRepositoryAuthorizationFeedback('Selecciona un auditor e ingresa un repositorio válido en formato owner/repo.', 'error');
+      return;
+    }
+    try {
+      const res = await fetch('/api/v1/admin/repository-authorizations', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.token}` },
+        body: JSON.stringify({ user_id: userId, repository })
+      });
+      if (!res.ok) throw new Error(await getApiError(res, 'No se pudo autorizar el repositorio.'));
+      document.getElementById('authorizationRepository').value = '';
+      setRepositoryAuthorizationFeedback('Repositorio autorizado y registrado en la trazabilidad.', 'success');
+      await loadRepositoryAuthorizations();
+    } catch (error) { setRepositoryAuthorizationFeedback(error.message, 'error'); }
+  }
+
+  async function updateRepositoryAuthorization(button) {
+    const active = button.dataset.active !== 'true';
+    try {
+      const res = await fetch(`/api/v1/admin/repository-authorizations/${encodeURIComponent(button.dataset.repositoryAuthorizationId)}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.token}` },
+        body: JSON.stringify({ active })
+      });
+      if (!res.ok) throw new Error(await getApiError(res, 'No se pudo actualizar la autorización.'));
+      setRepositoryAuthorizationFeedback(active ? 'Autorización reactivada.' : 'Autorización revocada.', 'success');
+      await loadRepositoryAuthorizations();
+    } catch (error) { setRepositoryAuthorizationFeedback(error.message, 'error'); }
+  }
+
+  function setRepositoryAuthorizationFeedback(message = '', tone = '') {
+    const feedback = document.getElementById('repositoryAuthorizationFeedback');
+    if (!feedback) return;
+    feedback.textContent = message;
+    feedback.dataset.tone = tone;
   }
 
   async function refreshUserAuditEvents() {

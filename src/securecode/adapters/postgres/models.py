@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import String, DateTime, ForeignKey, JSON, Boolean
+from sqlalchemy import String, DateTime, ForeignKey, JSON, Boolean, UniqueConstraint, Index
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -92,6 +92,23 @@ class UserFinOpsSettings(Base):
     budget_clp: Mapped[int] = mapped_column(nullable=False, default=1000, server_default="1000")
     alert_threshold_pct: Mapped[int] = mapped_column(nullable=False, default=80, server_default="80")
     alert_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+
+class RepositoryAuthorization(Base):
+    """Explicit repository scope assigned to an auditor by an administrator."""
+
+    __tablename__ = "repository_authorizations"
+    __table_args__ = (
+        UniqueConstraint("user_id", "repository", name="uq_repository_authorization_user_repository"),
+        Index("ix_repository_authorizations_user_active", "user_id", "active"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    repository: Mapped[str] = mapped_column(String(201), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
 class EvidenceRecord(Base):

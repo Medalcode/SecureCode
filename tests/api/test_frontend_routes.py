@@ -17,6 +17,8 @@ def test_root_serves_html():
     assert 'id="newUserPasswordConfirm"' in response.text
     assert 'id="passwordResetModal"' in response.text
     assert 'id="newAdminAcknowledgement"' in response.text
+    assert 'id="repositoryAuthorizationManagement"' in response.text
+    assert 'id="repositoryAuthorizationForm"' in response.text
     assert "Validación local verificada" in response.text
 
 def test_rules_catalog_endpoint():

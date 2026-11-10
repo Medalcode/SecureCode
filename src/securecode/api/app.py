@@ -31,7 +31,7 @@ from securecode.api.dependencies import (
 )
 from securecode.adapters.postgres.models import (
     User, EvaluationRecord, UserAuditEvent, UserSettings,
-    UserSubscription, SubscriptionEvent, UserFinOpsSettings,
+    UserSubscription, SubscriptionEvent, UserFinOpsSettings, RepositoryAuthorization,
 )
 from securecode.models.gh001 import GH001Evidence
 from securecode.models.gh002 import GH002Evidence
@@ -191,6 +191,25 @@ class UserAuditEventResponse(BaseModel):
     created_at: datetime
 
 
+class RepositoryAuthorizationRequest(BaseModel):
+    user_id: UUID
+    repository: str = Field(min_length=3, max_length=201)
+
+
+class RepositoryAuthorizationUpdateRequest(BaseModel):
+    active: bool
+
+
+class RepositoryAuthorizationResponse(BaseModel):
+    id: str
+    user_id: str
+    username: str | None = None
+    repository: str
+    active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
 class ClientSettingsUpdateRequest(BaseModel):
     default_repository: str | None = Field(default=None, max_length=200)
     default_branch: str | None = Field(default=None, min_length=1, max_length=255)
@@ -282,6 +301,30 @@ def _normalise_username(value: str) -> str:
     if not _EMAIL_PATTERN.fullmatch(username):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="El usuario debe ser un correo electrónico válido")
     return username
+
+
+def _normalise_repository(value: str) -> str:
+    repository = value.strip()
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,99}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}", repository):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="El repositorio debe usar el formato owner/repo")
+    return repository
+
+
+def _require_repository_authorization(session: Session, current_user: User, owner: str, repository: str) -> None:
+    """Auditors require explicit active scope; admins retain platform operations."""
+    if getattr(current_user, "role", "auditor") == "admin":
+        return
+    canonical = _normalise_repository(f"{owner}/{repository}")
+    authorization = session.query(RepositoryAuthorization).filter(
+        RepositoryAuthorization.user_id == current_user.id,
+        RepositoryAuthorization.repository == canonical,
+        RepositoryAuthorization.active.is_(True),
+    ).first()
+    if authorization is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tu cuenta no está autorizada para evaluar este repositorio. Solicita acceso a un administrador.",
+        )
 
 
 def _validate_password_strength(password: str) -> None:
@@ -692,6 +735,87 @@ def list_user_audit_events(
     } for event in events]
 
 
+def _repository_authorization_response(authorization: RepositoryAuthorization, username: str | None = None) -> dict:
+    return {
+        "id": str(authorization.id), "user_id": str(authorization.user_id), "username": username,
+        "repository": authorization.repository, "active": authorization.active,
+        "created_at": authorization.created_at, "updated_at": authorization.updated_at,
+    }
+
+
+@app.get("/api/v1/admin/repository-authorizations", response_model=list[RepositoryAuthorizationResponse])
+def list_repository_authorizations(
+    user_id: UUID | None = None,
+    session: Session = Depends(get_db_session),
+    _: User = Depends(require_admin),
+):
+    query = session.query(RepositoryAuthorization)
+    if user_id is not None:
+        query = query.filter(RepositoryAuthorization.user_id == user_id)
+    authorizations = query.order_by(RepositoryAuthorization.repository).all()
+    user_ids = {item.user_id for item in authorizations}
+    users = session.query(User).filter(User.id.in_(user_ids)).all() if user_ids else []
+    usernames = {user.id: user.username for user in users}
+    return [_repository_authorization_response(item, usernames.get(item.user_id)) for item in authorizations]
+
+
+@app.post("/api/v1/admin/repository-authorizations", response_model=RepositoryAuthorizationResponse, status_code=status.HTTP_201_CREATED)
+def create_repository_authorization(
+    request: RepositoryAuthorizationRequest,
+    session: Session = Depends(get_db_session),
+    current_admin: User = Depends(require_admin),
+):
+    target_user = session.query(User).filter(User.id == request.user_id).first()
+    if target_user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    repository = _normalise_repository(request.repository)
+    existing = session.query(RepositoryAuthorization).filter(
+        RepositoryAuthorization.user_id == request.user_id,
+        RepositoryAuthorization.repository == repository,
+    ).first()
+    if existing is not None:
+        if existing.active:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El repositorio ya está autorizado para esta cuenta")
+        existing.active = True
+        existing.updated_at = datetime.now(timezone.utc)
+        action = "repository_authorization_reactivated"
+        authorization = existing
+    else:
+        authorization = RepositoryAuthorization(
+            id=uuid4(), user_id=request.user_id, repository=repository, active=True,
+            created_at=datetime.now(timezone.utc), updated_at=datetime.now(timezone.utc),
+        )
+        session.add(authorization)
+        action = "repository_authorization_created"
+    _record_user_audit(session, current_admin.id, target_user.id, action, {"repository": repository})
+    session.commit()
+    session.refresh(authorization)
+    return _repository_authorization_response(authorization, target_user.username)
+
+
+@app.patch("/api/v1/admin/repository-authorizations/{authorization_id}", response_model=RepositoryAuthorizationResponse)
+def update_repository_authorization(
+    authorization_id: UUID,
+    request: RepositoryAuthorizationUpdateRequest,
+    session: Session = Depends(get_db_session),
+    current_admin: User = Depends(require_admin),
+):
+    authorization = session.query(RepositoryAuthorization).filter(RepositoryAuthorization.id == authorization_id).first()
+    if authorization is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository authorization not found")
+    if authorization.active == request.active:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se recibió ningún cambio para aplicar")
+    authorization.active = request.active
+    authorization.updated_at = datetime.now(timezone.utc)
+    _record_user_audit(session, current_admin.id, authorization.user_id, "repository_authorization_updated", {
+        "repository": authorization.repository, "active": request.active,
+    })
+    session.commit()
+    session.refresh(authorization)
+    user = session.query(User).filter(User.id == authorization.user_id).first()
+    return _repository_authorization_response(authorization, user.username if user else None)
+
+
 @app.get("/api/v1/evaluations/history")
 def evaluation_history(
     limit: int = Query(default=50, ge=1, le=100),
@@ -816,6 +940,7 @@ def evaluate_gh001_endpoint(
     """
     Executes the GH-001 control evaluation on a GitHub repository.
     """
+    _require_repository_authorization(session, current_user, request.owner, request.repository)
     repo = PostgresEvaluationRepository_Dependency_Wrapper(session)
     
     try:
@@ -886,6 +1011,7 @@ def evaluate_gh002_endpoint(
     """
     Executes the GH-002 control evaluation on a GitHub repository.
     """
+    _require_repository_authorization(session, current_user, request.owner, request.repository)
     repo = PostgresEvaluationRepository_Dependency_Wrapper(session)
     
     try:
@@ -937,6 +1063,7 @@ def evaluate_gh003_endpoint(
     current_user: User = Depends(get_current_user),
 ):
     """Verify that the selected GitHub branch requires signed commits."""
+    _require_repository_authorization(session, current_user, request.owner, request.repository)
     repository = PostgresEvaluationRepository_Dependency_Wrapper(session)
     try:
         persisted = evaluate_and_store_gh003(
