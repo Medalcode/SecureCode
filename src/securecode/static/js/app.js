@@ -203,30 +203,13 @@
   // --- Navegación entre Vistas ---
   function initNavigation() {
     const navItems = document.querySelectorAll('.nav-item[data-view]');
-    const viewPanels = document.querySelectorAll('.view-panel');
-    const pageTitle = document.getElementById('pageTitleText');
     const btnNewEval = document.getElementById('btnNewEval');
     const btnToggleSidebar = document.getElementById('btnToggleSidebar');
     const sidebar = document.getElementById('sidebar');
 
-    function switchView(viewId, title) {
-      state.activeTab = viewId;
-      navItems.forEach(item => {
-        item.classList.toggle('active', item.dataset.view === viewId);
-      });
-      viewPanels.forEach(panel => {
-        panel.classList.toggle('active', panel.id === `view-${viewId}`);
-      });
-      if (title && pageTitle) {
-        pageTitle.textContent = title;
-      }
-      if (window.innerWidth <= 768 && sidebar) {
-        sidebar.classList.remove('mobile-open');
-      }
-    }
-
     navItems.forEach(item => {
       item.addEventListener('click', () => {
+        if (item.dataset.view === 'admin' && !isAdministrator()) return;
         switchView(item.dataset.view, item.dataset.title);
       });
     });
@@ -243,6 +226,43 @@
         sidebar.classList.toggle('mobile-open');
       });
     }
+
+    updateAdminAccess();
+  }
+
+  function isAdministrator() {
+    return Boolean(state.token && state.accessRole === 'admin');
+  }
+
+  function switchView(viewId, title) {
+    if (viewId === 'admin' && !isAdministrator()) {
+      viewId = 'evaluator';
+      title = 'Evaluador de Controles';
+    }
+
+    state.activeTab = viewId;
+    document.querySelectorAll('.nav-item[data-view]').forEach(item => {
+      item.classList.toggle('active', item.dataset.view === viewId);
+    });
+    document.querySelectorAll('.view-panel').forEach(panel => {
+      panel.classList.toggle('active', panel.id === `view-${viewId}`);
+    });
+
+    const pageTitle = document.getElementById('pageTitleText');
+    if (title && pageTitle) pageTitle.textContent = title;
+    if (window.innerWidth <= 768) document.getElementById('sidebar')?.classList.remove('mobile-open');
+  }
+
+  // La visibilidad es una mejora de UX; los endpoints administrativos mantienen
+  // su propia autorización server-side mediante require_admin.
+  function updateAdminAccess() {
+    const adminNav = document.querySelector('.nav-item[data-view="admin"]');
+    const allowed = isAdministrator();
+    if (adminNav) {
+      adminNav.hidden = !allowed;
+      adminNav.setAttribute('aria-hidden', String(!allowed));
+    }
+    if (!allowed && state.activeTab === 'admin') switchView('evaluator', 'Evaluador de Controles');
   }
 
   // --- Comprobación de Salud de la API (/health) ---
@@ -1410,6 +1430,7 @@
         updateSettingsAccess();
         updateSubscriptionAccess();
         updateFinOpsAccess();
+        updateAdminAccess();
         refreshAdminUsers();
       });
     }
@@ -1470,6 +1491,7 @@
       state.accessRole = profile.role;
       localStorage.setItem('securecode_user', JSON.stringify(state.user));
       updateUserBadge();
+      updateAdminAccess();
       loadPersistentHistory();
       refreshAdminUsers();
       loadClientSettings();
@@ -1482,6 +1504,7 @@
       state.user.username = 'Sesión requerida';
       state.accessRole = null;
       updateUserBadge();
+      updateAdminAccess();
       refreshAdminUsers();
       updateSettingsAccess();
       updateSubscriptionAccess();

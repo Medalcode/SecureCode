@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 from securecode.api.app import app
 
@@ -19,7 +21,15 @@ def test_root_serves_html():
     assert 'id="newAdminAcknowledgement"' in response.text
     assert 'id="repositoryAuthorizationManagement"' in response.text
     assert 'id="repositoryAuthorizationForm"' in response.text
+    assert 'data-view="admin" data-title="Consola de Administración" hidden' in response.text
     assert "Validación local verificada" in response.text
+
+
+def test_admin_navigation_is_gated_by_the_server_validated_role():
+    script = Path("src/securecode/static/js/app.js").read_text(encoding="utf-8")
+    assert "function updateAdminAccess()" in script
+    assert "return Boolean(state.token && state.accessRole === 'admin');" in script
+    assert "if (item.dataset.view === 'admin' && !isAdministrator()) return;" in script
 
 def test_rules_catalog_endpoint():
     response = client.get("/api/v1/rules")
