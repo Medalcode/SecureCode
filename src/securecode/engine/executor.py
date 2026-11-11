@@ -52,14 +52,15 @@ def evaluate_rule(rule_definition: RuleDefinition, evidence: Any) -> EvaluationS
     elif isinstance(cond, AndCondition):
         results = [evaluate_condition(c, evidence) for c in cond.conditions]
         
-        # Three-valued logic for AND:
-        # If any condition is UNKNOWN, the result is UNKNOWN (missing evidence propagates).
-        # This matches the strictly defined semantics of GH-001 (returns UNKNOWN if any required field is None).
-        if EvaluationStatus.UNKNOWN in results:
-            return EvaluationStatus.UNKNOWN
-            
+        # Three-valued logic for AND. A known violation is conclusive even
+        # when another field is unavailable. UNKNOWN is reserved for cases
+        # where no condition has failed but the available evidence is not
+        # enough to prove compliance.
         if EvaluationStatus.FAIL in results:
             return EvaluationStatus.FAIL
+
+        if EvaluationStatus.UNKNOWN in results:
+            return EvaluationStatus.UNKNOWN
             
         return EvaluationStatus.PASS
         

@@ -13,7 +13,7 @@ Desarrollada mediante metodología **SDD (Specification-Driven Development)**, a
 - **Adaptadores GitHub REST API**: Adquisición y normalización de evidencia en tiempo real con degradación elegante ante estados no observables (*tri-state*: `PASS`, `FAIL`, `UNKNOWN`).
 - **Persistencia Inmutable en PostgreSQL**: Almacenamiento auditable con trazabilidad criptográfica (hashing canónico SHA-256 de evidencia cruda), integridad referencial estricta y migraciones versionadas con Alembic.
 - **Autenticación y Seguridad**: Hashing de contraseñas con Argon2id, tokens de acceso JWT (HS256) con expiración configurable, validación de usuarios activos, vinculación de auditoría `requested_by_user_id`, CORS de lista permitida y cabeceras de seguridad para navegador.
-- **Autorización y Auditoría**: Roles persistidos `admin` y `auditor`; sólo administradores pueden gestionar cuentas y los auditores sólo acceden a su propio historial de evaluaciones.
+- **Autorización y Auditoría**: Roles persistidos `admin` y `auditor`; los auditores requieren una autorización activa por repositorio (normalizada como `owner/repo`) y sólo acceden a su propio historial. Los administradores conservan el acceso operativo de plataforma y registran cada cambio de alcance.
 - **Frontend SPA Minimalista (Estilo Gemini/ChatGPT)**: Interfaz web oscura/clara sin dependencias pesadas, con selector de controles, visor de evidencia en tiempo real, copia de hash SHA-256, telemetría del sistema, simulación en Sandbox y panel FinOps.
 - **Contenedorización para Producción**: `Dockerfile` multi-stage basado en `python:3.11-slim`, sin compilador en runtime, con usuario no privilegiado (`appuser`, UID 10001); Compose ejecuta la API con filesystem de sólo lectura, sin capacidades Linux y sin escalamiento de privilegios.
 
@@ -21,9 +21,9 @@ Desarrollada mediante metodología **SDD (Specification-Driven Development)**, a
 
 ## Métricas de Calidad y Verificación
 
-- **Suite de Pruebas**: 103/103 pruebas aprobadas (Unitarias, API REST, Seguridad JWT, Configuración DEPLOY-002, Matriz de Estados GH-002 e Integración con PostgreSQL 15).
-- **Cobertura de Código**: **89.5%** en CI (`pytest-cov`).
-- **Rendimiento de Carga (Locust)**: Latencia nominal P95 de **180 ms** (P95 bajo estrés de **200 ms**, P98 de **300 ms**), **20.45 RPS**, **0.0%** errores.
+- **Suite de Pruebas**: la cifra vigente se obtiene exclusivamente ejecutando `pytest -q`; no se publica un total fijo en el README porque evoluciona con cada control y migración.
+- **Cobertura de Código**: se mide en CI con `pytest-cov`; consulte el artefacto de la ejecución vigente, no una cifra histórica.
+- **Rendimiento de Carga (Locust)**: la evidencia ES2 es una medición controlada histórica con mock local. Debe repetirse con el flujo actual de GitHub antes de usarse como capacidad de producción.
 
 ---
 

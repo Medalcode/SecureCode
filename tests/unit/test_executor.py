@@ -58,7 +58,7 @@ def test_executor_unknown_due_to_none():
     evidence = GH001Evidence(required_review_approvals=None, dismiss_stale_reviews=True)
     assert evaluate_rule(rule, evidence) == EvaluationStatus.UNKNOWN
 
-def test_executor_and_condition_with_one_unknown():
+def test_executor_and_condition_prioritizes_known_failure_over_unknown():
     rule = RuleDefinition(
         rule_id="test",
         control_id="c1",
@@ -72,8 +72,26 @@ def test_executor_and_condition_with_one_unknown():
             ]
         )
     )
-    # One field is missing -> should resolve to UNKNOWN (not FAIL), preserving strict semantics
+    # A known violation is conclusive even though another field is unavailable.
     evidence = GH001Evidence(required_review_approvals=0, dismiss_stale_reviews=None)
+    assert evaluate_rule(rule, evidence) == EvaluationStatus.FAIL
+
+
+def test_executor_and_condition_is_unknown_when_no_condition_fails():
+    rule = RuleDefinition(
+        rule_id="test",
+        control_id="c1",
+        version=1,
+        allowlisted_fields=["required_review_approvals", "dismiss_stale_reviews"],
+        condition=AndCondition(
+            operator="AND",
+            conditions=[
+                Condition(field="required_review_approvals", operator="GTE", value=2),
+                Condition(field="dismiss_stale_reviews", operator="EQ", value=True),
+            ],
+        ),
+    )
+    evidence = GH001Evidence(required_review_approvals=2, dismiss_stale_reviews=None)
     assert evaluate_rule(rule, evidence) == EvaluationStatus.UNKNOWN
 
 def test_rule_validation_rejects_unknown_operator():

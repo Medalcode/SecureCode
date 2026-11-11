@@ -48,6 +48,10 @@ def test_administrator_bypasses_per_account_scope_for_platform_operations():
     _require_repository_authorization(SessionStub(None), administrator, "Medalcode", "securecode-ground-truth")
 
 
+def test_repository_scope_is_case_insensitive_like_github_identity():
+    assert _normalise_repository("  Medalcode/SecureCode-Ground-Truth  ") == "medalcode/securecode-ground-truth"
+
+
 @pytest.mark.parametrize("value", ["owner", "owner/repo/path", "owner /repo", "owner/../repo"])
 def test_repository_scope_requires_canonical_owner_repo_format(value):
     with pytest.raises(HTTPException) as exc_info:

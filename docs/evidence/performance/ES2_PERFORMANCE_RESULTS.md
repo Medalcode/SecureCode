@@ -36,7 +36,7 @@ Los escenarios de carga probaron los límites del sistema aumentando gradualment
 * **Nivel 20 VUsers**: GH-001 p95 = 200ms | Throughput = 8.50 RPS | Errores = 0
 * **Nivel 30 VUsers**: GH-001 p95 = 180ms | Throughput = 11.36 RPS | Errores = 0
 
-*Nota: La latencia se mantuvo estable debido a la naturaleza asíncrona de FastAPI, que delegó eficientemente los tiempos de espera del Mock.*
+*Nota de validez histórica: esta ejecución se realizó contra una versión anterior y un mock local. No demuestra asincronía del endpoint ni representa el flujo actual, que consulta varias evidencias para GH-001. Antes de declarar un SLA vigente se debe repetir la prueba con el código actual, el mock que represente todas sus llamadas y la concurrencia objetivo.*
 
 ### 2.3. Escenario C: Estrés Controlado (50 VUsers, 2 minutos, Ramp-up 5/seg)
 **Objetivo:** Encontrar degradación de servicios o cuellos de botella.
@@ -57,7 +57,7 @@ Los escenarios de carga probaron los límites del sistema aumentando gradualment
 
 ## 3. Análisis de Resultados (Comparación y Degradación)
 
-1. **Rendimiento de Evaluación y Persistencia (GH-001)**: El sistema logró procesar **~20.4 evaluaciones por segundo** bajo estrés, completando 2.432 evaluaciones en este escenario (y 4.095 transacciones a lo largo de los cinco escenarios principales) con **0% de tasa de error**. La distribución de tiempos exhibió una mediana de 160ms y un p95 de **200ms** (alcanzando 300ms en el percentil 98). Frente al retardo base de 150ms inyectado por el mock en el endpoint de branch protection, el tiempo adicional aportado por FastAPI, la serialización de modelos Pydantic y la persistencia relacional en PostgreSQL se mantuvo estrecho y predecible bajo concurrencia.
+1. **Rendimiento de Evaluación y Persistencia (GH-001, línea base histórica)**: La versión medida procesó **~20.4 evaluaciones por segundo** bajo estrés, completando 2.432 evaluaciones en ese escenario con **0% de errores**. Esos resultados dependieron de un mock de una llamada con 150 ms inyectados; no son comparables directamente con la implementación actual de GH-001, que consulta varias evidencias. No se deben interpretar como una garantía de rendimiento en producción.
 2. **Impacto de la Autenticación (Argon2id)**: Durante el *ramp-up* del escenario de estrés, se solicitaron 5 hashes de contraseña por segundo. Esto incrementó la latencia p95 de autenticación a **200ms** (con p98 de 240ms), reflejando la demanda intensiva de CPU de la función criptográfica. No obstante, al haberse aislado la obtención del token al inicio de sesión (`on_start`), el procesamiento de las evaluaciones GH-001 no se vio degradado.
 3. **Estabilidad de PostgreSQL**: SQLAlchemy manejó eficientemente las transacciones. No se observaron excepciones de *Timeout* ni agotamiento de conexiones (Connection Pool Exhaustion) durante los picos de 20 RPS.
 
@@ -77,7 +77,7 @@ El experimento demuestra empíricamente que la arquitectura orquestada (FastAPI 
 
 **Resumen de Indicadores Clave:**
 * **Throughput Demostrado (GH-001)**: ~20.4 RPS.
-* **Tasa de Errores**: 0.0% bajo cargas de 50 usuarios concurrentes.
+* **Tasa de Errores**: 0.0% bajo cargas históricas de 50 usuarios concurrentes. Pendiente: repetir la batería con 100 usuarios concurrentes sobre el código y el escenario de GitHub vigentes.
 * **Evaluaciones Persistidas Confirmadas**: 
   * **4.095** evaluaciones GH-001 registradas en los 5 escenarios formales (262 nominal + 228 prog10 + 497 prog20 + 676 prog30 + 2.432 estrés).
   * **4.104** evaluaciones generadas por Locust al incluir el Smoke Test previo (+9 peticiones).

@@ -10,6 +10,7 @@ from fastapi import FastAPI, Depends, HTTPException, status, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 import logging
 
@@ -307,7 +308,9 @@ def _normalise_repository(value: str) -> str:
     repository = value.strip()
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,99}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}", repository):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="El repositorio debe usar el formato owner/repo")
-    return repository
+    # GitHub identifica owner y repository sin distinguir mayúsculas.  Canonicalizar
+    # evita que ``Acme/App`` y ``acme/app`` creen alcances distintos por accidente.
+    return repository.lower()
 
 
 def _require_repository_authorization(session: Session, current_user: User, owner: str, repository: str) -> None:
@@ -317,7 +320,7 @@ def _require_repository_authorization(session: Session, current_user: User, owne
     canonical = _normalise_repository(f"{owner}/{repository}")
     authorization = session.query(RepositoryAuthorization).filter(
         RepositoryAuthorization.user_id == current_user.id,
-        RepositoryAuthorization.repository == canonical,
+        func.lower(RepositoryAuthorization.repository) == canonical,
         RepositoryAuthorization.active.is_(True),
     ).first()
     if authorization is None:
@@ -771,7 +774,7 @@ def create_repository_authorization(
     repository = _normalise_repository(request.repository)
     existing = session.query(RepositoryAuthorization).filter(
         RepositoryAuthorization.user_id == request.user_id,
-        RepositoryAuthorization.repository == repository,
+        func.lower(RepositoryAuthorization.repository) == repository,
     ).first()
     if existing is not None:
         if existing.active:
