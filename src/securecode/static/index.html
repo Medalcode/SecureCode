@@ -81,7 +81,7 @@
         </button>
       </nav>
 
-      <div class="sidebar-section-title"><span>Historial de Auditoría</span><button type="button" class="history-export" id="btnExportHistory" title="Exportar historial CSV">Exportar</button></div>
+      <div class="sidebar-section-title"><span>Historial de Auditoría</span><button type="button" class="history-export" id="btnExportHistory" title="Exportar historial CSV" hidden>Exportar</button></div>
       <div class="history-list" id="historyList">
         <!-- Renderizado dinámicamente con JavaScript -->
       </div>
@@ -94,6 +94,7 @@
             <span class="user-role" id="userProfileRole">Acceso seguro requerido</span>
           </div>
         </div>
+        <button type="button" class="btn-logout" id="btnLogout" hidden aria-label="Cerrar sesión">Cerrar sesión</button>
       </div>
     </aside>
 
@@ -186,11 +187,11 @@
 
               <div class="card-actions">
                 <div>
-                  <span style="font-size: 11px; color: var(--text-faint);">Acceso de solo lectura a la API REST de GitHub</span>
+                  <span style="font-size: 11px; color: var(--text-faint);" id="evaluatorAccessNotice">Inicia sesión para ejecutar una evaluación y guardar evidencia.</span>
                   <p class="form-feedback" id="evaluatorFeedback" role="status" aria-live="polite"></p>
                 </div>
                 <button type="button" class="chip-btn" id="btnCancelEval" hidden>Cancelar</button>
-                <button type="submit" class="btn-primary" id="btnSubmitEval">
+                <button type="submit" class="btn-primary" id="btnSubmitEval" disabled>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polygon points="5 3 19 12 5 21 5 3"></polygon>
                   </svg>
@@ -643,6 +644,7 @@
         <div class="brand-icon" style="margin: 0 auto 12px; width: 40px; height: 40px; font-size: 20px;">S</div>
         <h2>Iniciar Sesión</h2>
         <p>Autenticación mediante JWT Bearer y hashing Argon2id.</p>
+        <p class="auth-account-note">Las cuentas son aprovisionadas por un administrador de plataforma. Si aún no tienes acceso, solicítalo a tu administrador.</p>
       </div>
 
       <form id="loginForm">

@@ -24,6 +24,9 @@ def test_root_serves_html():
     assert 'id="repositoryAuthorizationManagement"' in response.text
     assert 'id="repositoryAuthorizationForm"' in response.text
     assert 'data-view="admin" data-title="Consola de Administración" hidden' in response.text
+    assert 'id="btnLogout" hidden' in response.text
+    assert 'id="btnExportHistory" title="Exportar historial CSV" hidden' in response.text
+    assert 'id="btnSubmitEval" disabled' in response.text
     assert "Validación local verificada" in response.text
 
 
@@ -33,6 +36,10 @@ def test_admin_navigation_is_gated_by_the_server_validated_role():
     assert "function updateAdminAccess()" in script
     assert "return Boolean(state.token && state.accessRole === 'admin');" in script
     assert "if (item.dataset.view === 'admin' && !isAdministrator()) return;" in script
+    assert "function clearAuthenticatedSession()" in script
+    assert "function updateHistoryAccess()" in script
+    assert "function updateEvaluatorAccess()" in script
+    assert "localStorage.removeItem('securecode_history');" in script
     assert ".nav-item[hidden]" in stylesheet
     assert "display: none !important;" in stylesheet
 

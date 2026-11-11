@@ -314,6 +314,10 @@ body {
   cursor: pointer;
 }
 
+.btn-logout { border: 1px solid var(--border-subtle); background: transparent; color: var(--text-muted); border-radius: var(--radius-sm); padding: 6px 8px; font-size: 11px; font-weight: 650; cursor: pointer; }
+.btn-logout:hover { color: var(--color-fail); border-color: var(--color-fail); }
+.auth-account-note { margin-top: 10px; font-size: 12px; line-height: 1.45; color: var(--text-muted); }
+
 .user-avatar {
   width: 32px;
   height: 32px;

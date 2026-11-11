@@ -24,7 +24,8 @@
     evaluationAbortController: null,
     passwordResetTarget: null,
     adminUsers: [],
-    evalHistory: JSON.parse(localStorage.getItem('securecode_history') || '[]'),
+    // Nunca exponer evidencia cacheada antes de validar una sesión.
+    evalHistory: [],
     finops: null,
     systemHealth: { status: 'checking', latencyMs: null },
     rules: [
@@ -676,12 +677,13 @@
 
   // --- Historial Local de Evaluaciones (Estilo Chat sidebar) ---
   function initHistory() {
-    renderHistoryList();
-    loadPersistentHistory();
+    localStorage.removeItem('securecode_history');
+    updateHistoryAccess();
     document.getElementById('btnExportHistory')?.addEventListener('click', exportHistoryCSV);
   }
 
   function addHistoryEntry(data) {
+    if (!state.token || !state.accessRole) return;
     const entry = {
       id: data.evaluation_id,
       control: data.control_id,
@@ -692,13 +694,16 @@
     };
     state.evalHistory.unshift(entry);
     if (state.evalHistory.length > 20) state.evalHistory.pop();
-    localStorage.setItem('securecode_history', JSON.stringify(state.evalHistory));
     renderHistoryList();
     loadPersistentHistory();
   }
 
   async function loadPersistentHistory() {
-    if (!state.token) return;
+    if (!state.token || !state.accessRole) {
+      state.evalHistory = [];
+      updateHistoryAccess();
+      return;
+    }
     try {
       const res = await fetch('/api/v1/evaluations/history?limit=20', {
         headers: { 'Authorization': `Bearer ${state.token}` }
@@ -714,7 +719,7 @@
         data: null
       }));
       renderHistoryList();
-    } catch { /* La UI conserva el historial local si la red no está disponible. */ }
+    } catch { state.evalHistory = []; renderHistoryList(); }
   }
 
   async function loadHistoricalEvaluation(record) {
@@ -775,6 +780,7 @@
   }
 
   function exportHistoryCSV() {
+    if (!state.token || !state.accessRole) { openAuthModal(); return; }
     if (state.evalHistory.length === 0) {
       alert('No hay evaluaciones para exportar.');
       return;
@@ -793,6 +799,10 @@
   function renderHistoryList() {
     const list = document.getElementById('historyList');
     if (!list) return;
+    if (!state.token || !state.accessRole) {
+      list.innerHTML = `<div class="history-access-notice">Inicia sesión para consultar y exportar tus auditorías.</div>`;
+      return;
+    }
 
     if (state.evalHistory.length === 0) {
       list.innerHTML = `<div style="padding: 12px; font-size: 11px; color: var(--text-faint); text-align: center;">Sin evaluaciones previas</div>`;
@@ -826,6 +836,23 @@
         }
       });
     });
+  }
+
+  function updateHistoryAccess() {
+    const authenticated = Boolean(state.token && state.accessRole);
+    const exportButton = document.getElementById('btnExportHistory');
+    if (exportButton) exportButton.hidden = !authenticated;
+    renderHistoryList();
+  }
+
+  function updateEvaluatorAccess() {
+    const authenticated = Boolean(state.token && state.accessRole);
+    const button = document.getElementById('btnSubmitEval');
+    const notice = document.getElementById('evaluatorAccessNotice');
+    if (button) button.disabled = !authenticated;
+    if (notice) notice.textContent = authenticated
+      ? 'Acceso de solo lectura a la API REST de GitHub. La evidencia se asocia a tu cuenta.'
+      : 'Inicia sesión para ejecutar una evaluación y guardar evidencia.';
   }
 
   // --- FinOps y Cuota de Consumo ---
@@ -1408,6 +1435,7 @@
     const modal = document.getElementById('authModal');
     const form = document.getElementById('loginForm');
     const btnClearSession = document.getElementById('btnClearSession');
+    const btnLogout = document.getElementById('btnLogout');
     const btnCloseModal = document.getElementById('btnCloseAuthModal');
     const btnOpenLogin = document.getElementById('btnOpenLogin');
 
@@ -1419,21 +1447,8 @@
       btnCloseModal.addEventListener('click', () => closeAuthModal());
     }
 
-    if (btnClearSession) {
-      btnClearSession.addEventListener('click', () => {
-        state.token = null;
-        localStorage.removeItem('securecode_token');
-        localStorage.removeItem('securecode_user');
-        state.user.username = 'Sesión cerrada';
-        state.accessRole = null;
-        updateUserBadge();
-        updateSettingsAccess();
-        updateSubscriptionAccess();
-        updateFinOpsAccess();
-        updateAdminAccess();
-        refreshAdminUsers();
-      });
-    }
+    btnClearSession?.addEventListener('click', clearAuthenticatedSession);
+    btnLogout?.addEventListener('click', clearAuthenticatedSession);
 
     if (form) {
       form.addEventListener('submit', async (e) => {
@@ -1492,23 +1507,15 @@
       localStorage.setItem('securecode_user', JSON.stringify(state.user));
       updateUserBadge();
       updateAdminAccess();
+      updateHistoryAccess();
+      updateEvaluatorAccess();
       loadPersistentHistory();
       refreshAdminUsers();
       loadClientSettings();
       loadSubscription();
       loadFinOps();
     } catch {
-      state.token = null;
-      localStorage.removeItem('securecode_token');
-      localStorage.removeItem('securecode_user');
-      state.user.username = 'Sesión requerida';
-      state.accessRole = null;
-      updateUserBadge();
-      updateAdminAccess();
-      refreshAdminUsers();
-      updateSettingsAccess();
-      updateSubscriptionAccess();
-      updateFinOpsAccess();
+      clearAuthenticatedSession();
     }
   }
 
@@ -1549,6 +1556,27 @@
     if (nameEl) nameEl.textContent = signedIn ? state.user.username : 'Iniciar sesión';
     if (roleEl) roleEl.textContent = signedIn ? state.user.role : 'Acceso seguro requerido';
     if (avatarEl) avatarEl.textContent = signedIn ? state.user.username.charAt(0).toUpperCase() : '?';
+    const logoutButton = document.getElementById('btnLogout');
+    if (logoutButton) logoutButton.hidden = !signedIn;
+  }
+
+  function clearAuthenticatedSession() {
+    state.token = null;
+    state.accessRole = null;
+    state.evalHistory = [];
+    localStorage.removeItem('securecode_token');
+    localStorage.removeItem('securecode_user');
+    localStorage.removeItem('securecode_history');
+    state.user.username = 'Sesión requerida';
+    updateUserBadge();
+    updateAdminAccess();
+    updateHistoryAccess();
+    updateEvaluatorAccess();
+    updateSettingsAccess();
+    updateSubscriptionAccess();
+    updateFinOpsAccess();
+    document.getElementById('resultContainer')?.classList.remove('active');
+    refreshAdminUsers();
   }
 
 })();
