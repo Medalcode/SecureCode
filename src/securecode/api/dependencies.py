@@ -1,5 +1,6 @@
 import os
 from typing import Generator
+from uuid import UUID
 from fastapi import Request
 
 from sqlalchemy import Engine, create_engine
@@ -123,7 +124,11 @@ def get_current_user(
     if user_id is None:
         raise credentials_exception
 
-    user = session.query(User).filter(User.id == user_id).first()
+    try:
+        user_uuid = UUID(user_id)
+    except (TypeError, ValueError):
+        raise credentials_exception
+    user = session.query(User).filter(User.id == user_uuid).first()
     if user is None:
         raise credentials_exception
 

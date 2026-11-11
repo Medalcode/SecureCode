@@ -8,6 +8,8 @@ from sqlalchemy.orm import sessionmaker
 from securecode.adapters.postgres.models import Base, EvaluationRecord
 from securecode.adapters.postgres.repository import PostgresEvaluationRepository
 from securecode.models.gh001 import GH001Evidence
+from securecode.models.gh002 import GH002Evidence
+from securecode.models.gh003 import GH003Evidence
 from securecode.engine.evaluator import EvaluationStatus
 
 @pytest.fixture
@@ -19,6 +21,7 @@ def session():
     session = Session()
     yield session
     session.close()
+    engine.dispose()
 
 @pytest.fixture
 def repo(session):
@@ -85,6 +88,48 @@ def test_persist_and_retrieve_unknown(repo):
     persisted = repo.get_evaluation(eval_id)
     assert persisted is not None
     assert persisted.status == EvaluationStatus.UNKNOWN
+    assert persisted.reconstructed_evidence == evidence
+
+
+def test_persist_and_retrieve_gh002(repo):
+    evaluation_id = uuid4()
+    evidence = GH002Evidence(default_branch="main", protection_enabled=True)
+
+    repo.save_gh002_evaluation(
+        evaluation_id=evaluation_id,
+        evidence_id=uuid4(),
+        evidence=evidence,
+        status=EvaluationStatus.PASS,
+        source_repository="owner/repo",
+        source_branch="main",
+        collected_at=datetime.now(timezone.utc),
+        evaluated_at=datetime.now(timezone.utc),
+    )
+
+    persisted = repo.get_evaluation(evaluation_id)
+    assert persisted is not None
+    assert persisted.control_id == "GH-002"
+    assert persisted.reconstructed_evidence == evidence
+
+
+def test_persist_and_retrieve_gh003(repo):
+    evaluation_id = uuid4()
+    evidence = GH003Evidence(branch="release/2026", required_signatures_enabled=False)
+
+    repo.save_gh003_evaluation(
+        evaluation_id=evaluation_id,
+        evidence_id=uuid4(),
+        evidence=evidence,
+        status=EvaluationStatus.FAIL,
+        source_repository="owner/repo",
+        source_branch="release/2026",
+        collected_at=datetime.now(timezone.utc),
+        evaluated_at=datetime.now(timezone.utc),
+    )
+
+    persisted = repo.get_evaluation(evaluation_id)
+    assert persisted is not None
+    assert persisted.control_id == "GH-003"
     assert persisted.reconstructed_evidence == evidence
 
 def test_atomic_transaction_rollback(repo, session):

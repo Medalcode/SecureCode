@@ -49,8 +49,9 @@ jobs:
           echo "Verificando /api/v1/rules..."
           curl -f http://localhost:8000/api/v1/rules || exit 1
           
-          # Verificar telemetría del sistema
-          echo "Verificando /api/v1/system/overview..."
-          curl -f http://localhost:8000/api/v1/system/overview || exit 1
+          # La telemetría de plataforma es administrativa: comprobar que el
+          # contenedor no la expone sin Bearer token.
+          echo "Verificando protección de /api/v1/system/overview..."
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/api/v1/system/overview)" = "401"
 
           echo "Smoke test en contenedor Docker superado exitosamente!"

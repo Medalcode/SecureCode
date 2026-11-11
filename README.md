@@ -140,7 +140,7 @@ alembic downgrade <revision_id>
 - Ejecutar `alembic upgrade head` como Job antes de transferir tráfico.
 - Crear el usuario inicial con una contraseña única y conservar sólo el hash Argon2id; no existe acceso de demostración en producción.
 - Confirmar `/health`, el inicio de sesión y una evaluación autenticada en la revisión candidata antes de mover tráfico.
-- Configurar TLS, dominio y WAF/rate limiting en el balanceador o proveedor. El rate limiting distribuido debe vivir fuera de la memoria de una réplica de aplicación.
+- Configurar TLS, dominio y WAF/rate limiting en el balanceador o proveedor. La API aplica además un bloqueo persistente configurable tras intentos fallidos (`LOGIN_MAX_FAILURES=5`, `LOGIN_WINDOW_SECONDS=900`); el WAF sigue siendo necesario para limitar abuso por IP antes de consumir Argon2id.
 
 La interfaz no acepta ni guarda PATs de GitHub. La credencial de integración se configura sólo en el entorno del servidor y debe tener permisos mínimos de lectura.
 

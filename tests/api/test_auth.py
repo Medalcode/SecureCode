@@ -72,6 +72,15 @@ def mock_session():
         def query(self, model):
             return MockQuery(model)
 
+        def add(self, _):
+            pass
+
+        def delete(self, _):
+            pass
+
+        def commit(self):
+            pass
+
     return _MockSession()
 
 import pytest

@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import hashlib
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -33,7 +34,7 @@ from securecode.api.dependencies import (
 )
 from securecode.adapters.postgres.models import (
     User, EvaluationRecord, UserAuditEvent, UserSettings,
-    UserSubscription, SubscriptionEvent, UserFinOpsSettings, RepositoryAuthorization,
+    UserSubscription, SubscriptionEvent, UserFinOpsSettings, RepositoryAuthorization, LoginAttempt,
 )
 from securecode.models.gh001 import GH001Evidence
 from securecode.models.gh002 import GH002Evidence
@@ -298,6 +299,63 @@ _PLAN_CATALOG = {
 }
 
 
+def _bounded_int_from_environment(name: str, default: int, minimum: int, maximum: int) -> int:
+    try:
+        return min(max(int(os.environ.get(name, str(default))), minimum), maximum)
+    except ValueError:
+        return default
+
+
+def _login_rate_limit_settings() -> tuple[int, int]:
+    return (
+        _bounded_int_from_environment("LOGIN_MAX_FAILURES", 5, 1, 20),
+        _bounded_int_from_environment("LOGIN_WINDOW_SECONDS", 900, 60, 86_400),
+    )
+
+
+def _login_scope_hash(username: str, request: Request) -> str:
+    """Hash a username/client tuple without persisting personal identifiers."""
+    client = request.client.host if request.client else "unknown"
+    if os.environ.get("TRUST_PROXY_HEADERS", "false").lower() == "true":
+        client = request.headers.get("x-forwarded-for", client).split(",", 1)[0].strip()
+    return hashlib.sha256(f"{username}\x00{client}".encode("utf-8")).hexdigest()
+
+
+def _as_utc(value: datetime) -> datetime:
+    """Normalize drivers such as SQLite that return naive timezone columns."""
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+
+
+def _login_retry_after(session: Session, scope_hash: str, now: datetime) -> int | None:
+    attempt = session.query(LoginAttempt).filter(LoginAttempt.scope_hash == scope_hash).first()
+    if attempt and attempt.locked_until and _as_utc(attempt.locked_until) > now:
+        return max(1, int((_as_utc(attempt.locked_until) - now).total_seconds()))
+    return None
+
+
+def _record_failed_login(session: Session, scope_hash: str, now: datetime) -> None:
+    maximum_failures, window_seconds = _login_rate_limit_settings()
+    attempt = session.query(LoginAttempt).filter(LoginAttempt.scope_hash == scope_hash).first()
+    if attempt is None:
+        attempt = LoginAttempt(scope_hash=scope_hash, failure_count=1, window_started_at=now, locked_until=None, updated_at=now)
+        session.add(attempt)
+    elif (now - _as_utc(attempt.window_started_at)).total_seconds() >= window_seconds:
+        attempt.failure_count, attempt.window_started_at, attempt.locked_until = 1, now, None
+        attempt.updated_at = now
+    else:
+        attempt.failure_count += 1
+        attempt.updated_at = now
+    if attempt.failure_count >= maximum_failures:
+        attempt.locked_until = now + timedelta(seconds=window_seconds)
+    session.commit()
+
+
+def _clear_failed_logins(session: Session, scope_hash: str) -> None:
+    attempt = session.query(LoginAttempt).filter(LoginAttempt.scope_hash == scope_hash).first()
+    if attempt is not None:
+        session.delete(attempt)
+
+
 def _normalise_username(value: str) -> str:
     username = value.strip().lower()
     if not _EMAIL_PATTERN.fullmatch(username):
@@ -386,12 +444,15 @@ def _ensure_subscription(session: Session, user_id: UUID) -> UserSubscription:
 
 
 def _subscription_response(subscription: UserSubscription) -> dict:
-    next_change_at = subscription.last_changed_at + _SUBSCRIPTION_PERIOD
+    started_at = _as_utc(subscription.started_at)
+    expires_at = _as_utc(subscription.expires_at)
+    last_changed_at = _as_utc(subscription.last_changed_at)
+    next_change_at = last_changed_at + _SUBSCRIPTION_PERIOD
     return {
         "plan_id": subscription.plan_id,
-        "started_at": subscription.started_at,
-        "expires_at": subscription.expires_at,
-        "last_changed_at": subscription.last_changed_at,
+        "started_at": started_at,
+        "expires_at": expires_at,
+        "last_changed_at": last_changed_at,
         "can_change": datetime.now(timezone.utc) >= next_change_at,
         "next_change_at": next_change_at,
         "billing_mode": "demo_non_billable",
@@ -433,19 +494,31 @@ def _finops_response(session: Session, current_user: User, settings: UserFinOpsS
 
 @app.post("/api/v1/auth/token", response_model=Token)
 def login_for_access_token(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_db_session)
 ):
     normalized_username = form_data.username.strip().lower()
+    scope_hash = _login_scope_hash(normalized_username, request)
+    now = datetime.now(timezone.utc)
+    retry_after = _login_retry_after(session, scope_hash, now)
+    if retry_after is not None:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )
     user = session.query(User).filter(User.username == normalized_username).first()
     password_valid = verify_password(form_data.password, user.password_hash if user else _DUMMY_PASSWORD_HASH)
     if not user or not password_valid:
+        _record_failed_login(session, scope_hash, now)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     if not user.active:
+        _record_failed_login(session, scope_hash, now)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -453,6 +526,7 @@ def login_for_access_token(
         )
     # Last-login metadata is operational, never used as an authorization decision.
     user.last_login_at = datetime.now(timezone.utc)
+    _clear_failed_logins(session, scope_hash)
     if hasattr(session, "commit"):
         try:
             session.commit()
@@ -558,7 +632,7 @@ def change_subscription(
     if request.plan_id == subscription.plan_id:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="El plan seleccionado ya está activo")
     now = datetime.now(timezone.utc)
-    next_change_at = subscription.last_changed_at + _SUBSCRIPTION_PERIOD
+    next_change_at = _as_utc(subscription.last_changed_at) + _SUBSCRIPTION_PERIOD
     if now < next_change_at:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
