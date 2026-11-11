@@ -1,5 +1,6 @@
 """Deterministic rule evaluator facade."""
 import json
+import os
 from pathlib import Path
 from enum import Enum
 from typing import Optional
@@ -12,12 +13,18 @@ from securecode.models.rules import RuleDefinition
 from securecode.engine.types import EvaluationStatus
 from securecode.engine.executor import evaluate_rule
 
-_RULES_DIR = Path(__file__).parent.parent.parent.parent / "rules"
+_PACKAGED_RULES_DIR = Path(__file__).resolve().parent.parent / "rules"
+
+
+def get_rules_directory() -> Path:
+    """Resolve an explicit rules directory or the catalog shipped with the package."""
+    configured = os.environ.get("SECURECODE_RULES_DIR")
+    return Path(configured).expanduser().resolve() if configured else _PACKAGED_RULES_DIR
 
 @lru_cache(maxsize=16)
 def get_rule_definition(rule_file: str) -> RuleDefinition:
     """Load each canonical rule once per process, not once per request."""
-    with open(_RULES_DIR / rule_file, "r") as f:
+    with (get_rules_directory() / rule_file).open("r", encoding="utf-8") as f:
         return RuleDefinition(**json.load(f))
 
 def evaluate_gh001(evidence: Optional[GH001Evidence], rule_definition: RuleDefinition | None = None) -> EvaluationStatus:

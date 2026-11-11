@@ -10,6 +10,7 @@ Desarrollada mediante metodología **SDD (Specification-Driven Development)**, a
 
 - **GH-001 (Branch Protection Required Approvals & Stale Dismissal)**: Motor de evaluación determinista con umbrales estrictos de aprobación por pares y descarte de aprobaciones obsoletas.
 - **GH-002 (Default Branch Protection Enabled)**: Motor de evaluación determinista que valida si la rama principal del repositorio se encuentra protegida contra sobreescrituras directas.
+- **GH-003 (Signed Commits Required)**: Motor de evaluación determinista que verifica si la rama auditada exige commits firmados.
 - **Adaptadores GitHub REST API**: Adquisición y normalización de evidencia en tiempo real con degradación elegante ante estados no observables (*tri-state*: `PASS`, `FAIL`, `UNKNOWN`).
 - **Persistencia Inmutable en PostgreSQL**: Almacenamiento auditable con trazabilidad criptográfica (hashing canónico SHA-256 de evidencia cruda), integridad referencial estricta y migraciones versionadas con Alembic.
 - **Autenticación y Seguridad**: Hashing de contraseñas con Argon2id, tokens de acceso JWT (HS256) con expiración configurable, validación de usuarios activos, vinculación de auditoría `requested_by_user_id`, CORS de lista permitida y cabeceras de seguridad para navegador.

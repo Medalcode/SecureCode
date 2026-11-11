@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 from datetime import datetime
 from uuid import UUID
 
@@ -177,6 +177,7 @@ class PostgresEvaluationRepository(EvaluationRepository):
         raw = evidence_record.raw_evidence
         
         # Reconstruct domain model safely based on control_id
+        reconstructed_evidence: Union[GH001Evidence, GH002Evidence, GH003Evidence]
         if record.control_id == "GH-001":
             reconstructed_evidence = GH001Evidence(
                 required_review_approvals=raw.get("required_review_approvals"),

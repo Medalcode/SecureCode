@@ -2,7 +2,7 @@ import os
 from typing import Generator
 from fastapi import Request
 
-from sqlalchemy import create_engine
+from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
 from securecode.adapters.postgres.models import Base
@@ -39,11 +39,11 @@ def get_database_url() -> str:
 
 
 # We will lazily initialize the engine
-_engine = None
-_SessionLocal = None
+_engine: Engine | None = None
+_SessionLocal: sessionmaker[Session] | None = None
 
 
-def get_engine():
+def get_engine() -> Engine:
     global _engine, _SessionLocal
     if _engine is None:
         db_url = get_database_url()
@@ -76,14 +76,17 @@ def get_engine():
 
 def get_db_session() -> Generator[Session, None, None]:
     get_engine()  # Ensure initialization
-    session = _SessionLocal()
+    session_factory = _SessionLocal
+    if session_factory is None:  # Defensive guard for static analysis and startup failures.
+        raise RuntimeError("Database session factory is not initialized")
+    session = session_factory()
     try:
         yield session
     finally:
         session.close()
 
 
-def get_evaluation_repository(session: Session = None) -> EvaluationRepository:
+def get_evaluation_repository(session: Session | None = None) -> EvaluationRepository:
     # Allows overriding for testing, otherwise relies on get_db_session
     if session is None:
         raise ValueError("Session required")

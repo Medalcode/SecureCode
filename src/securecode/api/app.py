@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 import logging
 
 from securecode.application.evaluate_and_store import evaluate_and_store_gh001
+from securecode.engine.evaluator import get_rules_directory
 from securecode.ports.evaluation_repository import EvaluationRepository
 from securecode.api.schemas import (
     GH001EvaluationRequest,
@@ -40,7 +41,7 @@ from securecode.models.gh003 import GH003Evidence
 
 app = FastAPI(
     title="SecureCode API",
-    description="GH-001 Validation API",
+    description="API de evaluación de controles GitHub GH-001, GH-002 y GH-003, con administración, auditoría y FinOps.",
     version="1.0.0"
 )
 
@@ -99,7 +100,7 @@ def get_rules_catalog():
     The client consumes this endpoint to avoid claiming controls that are not
     actually present in the deployed rule set.
     """
-    rules_dir = Path(__file__).resolve().parent.parent.parent.parent / "rules"
+    rules_dir = get_rules_directory()
     rules_list = []
     if rules_dir.exists():
         for r_file in sorted(rules_dir.glob("*.json")):
@@ -732,8 +733,8 @@ def list_user_audit_events(
     usernames = {user.id: user.username for user in users}
     return [{
         "id": str(event.id), "action": event.action,
-        "actor_username": usernames.get(event.actor_user_id),
-        "target_username": usernames.get(event.target_user_id),
+        "actor_username": usernames.get(event.actor_user_id) if event.actor_user_id else None,
+        "target_username": usernames.get(event.target_user_id) if event.target_user_id else None,
         "details": event.details, "created_at": event.created_at,
     } for event in events]
 
@@ -867,6 +868,7 @@ def evaluation_detail(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluation not found")
 
     reconstructed = persisted.reconstructed_evidence
+    evidence: dict[str, object]
     if persisted.control_id == "GH-001" and isinstance(reconstructed, GH001Evidence):
         evidence = {
             "required_review_approvals": reconstructed.required_review_approvals,
@@ -967,6 +969,10 @@ def evaluate_gh001_endpoint(
     rule_obj = None
     if persisted.rule_id is not None and persisted.rule_version is not None:
         rule_obj = RuleResponse(id=persisted.rule_id, version=persisted.rule_version)
+
+    evidence = persisted.reconstructed_evidence
+    if not isinstance(evidence, GH001Evidence):
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stored GH-001 evidence is inconsistent")
         
     return EvaluationResponse(
         evaluation_id=str(persisted.id),
@@ -979,9 +985,9 @@ def evaluate_gh001_endpoint(
             branch=persisted.source_branch
         ),
         evidence=EvidenceResponse(
-            required_review_approvals=persisted.reconstructed_evidence.required_review_approvals,
-            dismiss_stale_reviews=persisted.reconstructed_evidence.dismiss_stale_reviews,
-            hash=persisted.reconstructed_evidence.canonical_hash()
+            required_review_approvals=evidence.required_review_approvals,
+            dismiss_stale_reviews=evidence.dismiss_stale_reviews,
+            hash=evidence.canonical_hash()
         ),
         collected_at=persisted.collected_at.isoformat(),
         evaluated_at=persisted.evaluated_at.isoformat()
@@ -1037,6 +1043,10 @@ def evaluate_gh002_endpoint(
     rule_obj = None
     if persisted.rule_id is not None and persisted.rule_version is not None:
         rule_obj = RuleResponse(id=persisted.rule_id, version=persisted.rule_version)
+
+    evidence = persisted.reconstructed_evidence
+    if not isinstance(evidence, GH002Evidence):
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stored GH-002 evidence is inconsistent")
         
     return GH002EvaluationResponse(
         evaluation_id=str(persisted.id),
@@ -1049,9 +1059,9 @@ def evaluate_gh002_endpoint(
             branch=persisted.source_branch
         ),
         evidence=GH002EvidenceResponse(
-            default_branch=persisted.reconstructed_evidence.default_branch,
-            protection_enabled=persisted.reconstructed_evidence.protection_enabled,
-            hash=persisted.reconstructed_evidence.canonical_hash()
+            default_branch=evidence.default_branch,
+            protection_enabled=evidence.protection_enabled,
+            hash=evidence.canonical_hash()
         ),
         collected_at=persisted.collected_at.isoformat(),
         evaluated_at=persisted.evaluated_at.isoformat()
@@ -1088,6 +1098,8 @@ def evaluate_gh003_endpoint(
 
     rule = RuleResponse(id=persisted.rule_id, version=persisted.rule_version) if persisted.rule_id and persisted.rule_version else None
     evidence = persisted.reconstructed_evidence
+    if not isinstance(evidence, GH003Evidence):
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stored GH-003 evidence is inconsistent")
     return GH003EvaluationResponse(
         evaluation_id=str(persisted.id),
         control_id=persisted.control_id,

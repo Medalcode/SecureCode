@@ -26,6 +26,9 @@ authors = [
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+securecode = ["rules/*.json", "static/index.html", "static/css/*.css", "static/js/*.js"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
