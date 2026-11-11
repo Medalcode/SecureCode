@@ -1,6 +1,8 @@
 from typing import Any
+
 from securecode.engine.types import EvaluationStatus
-from securecode.models.rules import RuleDefinition, Condition, AndCondition
+from securecode.models.rules import AndCondition, Condition, RuleDefinition
+
 
 def evaluate_condition(cond: Condition, evidence: Any) -> EvaluationStatus:
     # Safely extract field from evidence (Pydantic model)

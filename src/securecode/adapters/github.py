@@ -3,6 +3,7 @@ import os
 import urllib.request
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
+
 from securecode.models.gh001 import GH001Evidence
 
 
@@ -86,6 +87,7 @@ def get_gh001_evidence(owner: str, repo: str, branch: str, token: str | None = N
 
 from securecode.models.gh002 import GH002Evidence
 from securecode.models.gh003 import GH003Evidence
+
 
 def get_gh002_evidence(owner: str, repo: str, token: str | None = None) -> GH002Evidence:
     """

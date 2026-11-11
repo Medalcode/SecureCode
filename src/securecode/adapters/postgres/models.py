@@ -1,9 +1,18 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import String, DateTime, ForeignKey, JSON, Boolean, UniqueConstraint, Index
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
 
 class Base(DeclarativeBase):
     pass
@@ -18,8 +27,8 @@ class User(Base):
     # Roles are deliberately small and explicit. Authorization decisions never
     # depend on client-supplied labels.
     role: Mapped[str] = mapped_column(String(20), nullable=False, default="auditor", server_default="auditor")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
@@ -33,7 +42,7 @@ class UserAuditEvent(Base):
     target_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     action: Mapped[str] = mapped_column(String(64), nullable=False)
     details: Mapped[dict] = mapped_column(JSON().with_variant(JSONB, "postgresql"), nullable=False, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 
 
 class UserSettings(Base):
@@ -53,7 +62,7 @@ class UserSettings(Base):
     notify_evaluation_completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     notify_evaluation_failure: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     notify_weekly_digest: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 
 
 class UserSubscription(Base):
@@ -92,7 +101,7 @@ class UserFinOpsSettings(Base):
     budget_clp: Mapped[int] = mapped_column(nullable=False, default=1000, server_default="1000")
     alert_threshold_pct: Mapped[int] = mapped_column(nullable=False, default=80, server_default="80")
     alert_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 
 
 class RepositoryAuthorization(Base):
@@ -108,8 +117,8 @@ class RepositoryAuthorization(Base):
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     repository: Mapped[str] = mapped_column(String(201), nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 
 
 class LoginAttempt(Base):

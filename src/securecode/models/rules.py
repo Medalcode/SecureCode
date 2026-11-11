@@ -1,6 +1,7 @@
-import json
-from typing import Any, Dict, List, Optional, Union, Literal
-from pydantic import BaseModel, Field, field_validator, model_validator
+from typing import Any, Literal, Union
+
+from pydantic import BaseModel, field_validator, model_validator
+
 
 class ControlDefinition(BaseModel):
     control_id: str
@@ -16,7 +17,7 @@ class Condition(BaseModel):
 
 class AndCondition(BaseModel):
     operator: Literal["AND"]
-    conditions: List[Condition]
+    conditions: list[Condition]
 
     @field_validator("conditions")
     def validate_conditions_not_empty(cls, v):
@@ -32,11 +33,11 @@ class RuleDefinition(BaseModel):
     version: int
     active: bool = True
     condition: RuleConditionType
-    allowlisted_fields: List[str]
+    allowlisted_fields: list[str]
 
     @model_validator(mode='after')
     def validate_fields_against_allowlist(self):
-        def extract_fields(cond: RuleConditionType) -> List[str]:
+        def extract_fields(cond: RuleConditionType) -> list[str]:
             if isinstance(cond, AndCondition):
                 fields = []
                 for c in cond.conditions:

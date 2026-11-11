@@ -1,12 +1,10 @@
 import os
-from typing import Generator
+from collections.abc import Generator
 from uuid import UUID
-from fastapi import Request
 
 from sqlalchemy import Engine, create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
 
-from securecode.adapters.postgres.models import Base
 from securecode.adapters.postgres.repository import PostgresEvaluationRepository
 from securecode.ports.evaluation_repository import EvaluationRepository
 
@@ -104,8 +102,9 @@ def get_github_token() -> str | None:
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from securecode.api.security import verify_access_token
+
 from securecode.adapters.postgres.models import User
+from securecode.api.security import verify_access_token
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
 

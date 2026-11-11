@@ -1,44 +1,50 @@
-import os
-import json
-import re
 import hashlib
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+import json
+import logging
+import os
+import re
 from pathlib import Path
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi import FastAPI, Depends, HTTPException, status, Request, Query
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
-from fastapi.responses import JSONResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-import logging
+from starlette.middleware.base import BaseHTTPMiddleware
 
-from securecode.application.evaluate_and_store import evaluate_and_store_gh001
-from securecode.engine.evaluator import get_rules_directory
-from securecode.ports.evaluation_repository import EvaluationRepository
-from securecode.api.schemas import (
-    GH001EvaluationRequest,
-    EvaluationResponse,
-    SourceResponse,
-    EvidenceResponse,
-    RuleResponse
+from securecode.adapters.postgres.models import (
+    EvaluationRecord,
+    LoginAttempt,
+    RepositoryAuthorization,
+    SubscriptionEvent,
+    User,
+    UserAuditEvent,
+    UserFinOpsSettings,
+    UserSettings,
+    UserSubscription,
 )
 from securecode.api.dependencies import (
-    get_db_session,
-    get_evaluation_repository,
-    get_github_token,
     get_current_user,
+    get_db_session,
+    get_github_token,
     require_admin,
 )
-from securecode.adapters.postgres.models import (
-    User, EvaluationRecord, UserAuditEvent, UserSettings,
-    UserSubscription, SubscriptionEvent, UserFinOpsSettings, RepositoryAuthorization, LoginAttempt,
+from securecode.api.schemas import (
+    EvaluationResponse,
+    EvidenceResponse,
+    GH001EvaluationRequest,
+    RuleResponse,
+    SourceResponse,
 )
+from securecode.application.evaluate_and_store import evaluate_and_store_gh001
+from securecode.engine.evaluator import get_rules_directory
 from securecode.models.gh001 import GH001Evidence
 from securecode.models.gh002 import GH002Evidence
 from securecode.models.gh003 import GH003Evidence
+from securecode.ports.evaluation_repository import EvaluationRepository
 
 app = FastAPI(
     title="SecureCode API",
@@ -141,12 +147,13 @@ def get_system_overview(_: User = Depends(require_admin)):
     }
 
 
-from fastapi.security import OAuth2PasswordRequestForm
-from securecode.api.security import verify_password, create_access_token, hash_password
-from pydantic import BaseModel, Field
-from uuid import uuid4
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Literal
+
+from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel, Field
+
+from securecode.api.security import create_access_token, hash_password, verify_password
 
 # Equalize the expensive password-verification path for unknown usernames.
 # This reduces timing-based account enumeration without persisting a fake user.
@@ -318,12 +325,12 @@ def _login_scope_hash(username: str, request: Request) -> str:
     client = request.client.host if request.client else "unknown"
     if os.environ.get("TRUST_PROXY_HEADERS", "false").lower() == "true":
         client = request.headers.get("x-forwarded-for", client).split(",", 1)[0].strip()
-    return hashlib.sha256(f"{username}\x00{client}".encode("utf-8")).hexdigest()
+    return hashlib.sha256(f"{username}\x00{client}".encode()).hexdigest()
 
 
 def _as_utc(value: datetime) -> datetime:
     """Normalize drivers such as SQLite that return naive timezone columns."""
-    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
 def _login_retry_after(session: Session, scope_hash: str, now: datetime) -> int | None:
@@ -401,7 +408,7 @@ def _record_user_audit(session: Session, actor_id: UUID | None, target_id: UUID 
     """Record account lifecycle changes without persisting credentials or tokens."""
     session.add(UserAuditEvent(
         id=uuid4(), actor_user_id=actor_id, target_user_id=target_id,
-        action=action, details=details, created_at=datetime.now(timezone.utc),
+        action=action, details=details, created_at=datetime.now(UTC),
     ))
 
 
@@ -427,7 +434,7 @@ def _ensure_subscription(session: Session, user_id: UUID) -> UserSubscription:
     subscription = session.query(UserSubscription).filter(UserSubscription.user_id == user_id).first()
     if subscription:
         return subscription
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     subscription = UserSubscription(
         user_id=user_id, plan_id="pro", started_at=now,
         expires_at=now + _SUBSCRIPTION_PERIOD, last_changed_at=now,
@@ -453,7 +460,7 @@ def _subscription_response(subscription: UserSubscription) -> dict:
         "started_at": started_at,
         "expires_at": expires_at,
         "last_changed_at": last_changed_at,
-        "can_change": datetime.now(timezone.utc) >= next_change_at,
+        "can_change": datetime.now(UTC) >= next_change_at,
         "next_change_at": next_change_at,
         "billing_mode": "demo_non_billable",
         "catalog": list(_PLAN_CATALOG.values()),
@@ -472,7 +479,7 @@ def _ensure_finops_settings(session: Session, user_id: UUID) -> UserFinOpsSettin
 
 
 def _period_start_utc(now: datetime | None = None) -> datetime:
-    current = now or datetime.now(timezone.utc)
+    current = now or datetime.now(UTC)
     return current.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
@@ -500,7 +507,7 @@ def login_for_access_token(
 ):
     normalized_username = form_data.username.strip().lower()
     scope_hash = _login_scope_hash(normalized_username, request)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     retry_after = _login_retry_after(session, scope_hash, now)
     if retry_after is not None:
         raise HTTPException(
@@ -525,7 +532,7 @@ def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
     # Last-login metadata is operational, never used as an authorization decision.
-    user.last_login_at = datetime.now(timezone.utc)
+    user.last_login_at = datetime.now(UTC)
     _clear_failed_logins(session, scope_hash)
     if hasattr(session, "commit"):
         try:
@@ -603,7 +610,7 @@ def update_client_settings(
             setattr(settings, field, value)
     if not changes:
         return _settings_response(settings)
-    settings.updated_at = datetime.now(timezone.utc)
+    settings.updated_at = datetime.now(UTC)
     _record_user_audit(session, current_user.id, current_user.id, "client_settings_updated", changes)
     session.commit()
     session.refresh(settings)
@@ -631,7 +638,7 @@ def change_subscription(
     subscription = _ensure_subscription(session, current_user.id)
     if request.plan_id == subscription.plan_id:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="El plan seleccionado ya está activo")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     next_change_at = _as_utc(subscription.last_changed_at) + _SUBSCRIPTION_PERIOD
     if now < next_change_at:
         raise HTTPException(
@@ -703,7 +710,7 @@ def update_finops(
             changes[field] = {"from": previous, "to": value}
             setattr(settings, field, value)
     if changes:
-        settings.updated_at = datetime.now(timezone.utc)
+        settings.updated_at = datetime.now(UTC)
         _record_user_audit(session, current_user.id, current_user.id, "finops_preferences_updated", changes)
         session.commit()
         session.refresh(settings)
@@ -746,7 +753,7 @@ def create_user(
         password_hash=hash_password(request.password),
         active=True,
         role=request.role,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     session.add(user)
     _record_user_audit(session, _.id, user.id, "account_created", {"role": user.role, "active": True})
@@ -787,7 +794,7 @@ def update_user(
         changes["password_reset"] = True
     if not changes:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se recibió ningún cambio para aplicar")
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(UTC)
     _record_user_audit(session, current_admin.id, user.id, "account_updated", changes)
     session.commit()
     session.refresh(user)
@@ -855,13 +862,13 @@ def create_repository_authorization(
         if existing.active:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El repositorio ya está autorizado para esta cuenta")
         existing.active = True
-        existing.updated_at = datetime.now(timezone.utc)
+        existing.updated_at = datetime.now(UTC)
         action = "repository_authorization_reactivated"
         authorization = existing
     else:
         authorization = RepositoryAuthorization(
             id=uuid4(), user_id=request.user_id, repository=repository, active=True,
-            created_at=datetime.now(timezone.utc), updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC), updated_at=datetime.now(UTC),
         )
         session.add(authorization)
         action = "repository_authorization_created"
@@ -884,7 +891,7 @@ def update_repository_authorization(
     if authorization.active == request.active:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se recibió ningún cambio para aplicar")
     authorization.active = request.active
-    authorization.updated_at = datetime.now(timezone.utc)
+    authorization.updated_at = datetime.now(UTC)
     _record_user_audit(session, current_admin.id, authorization.user_id, "repository_authorization_updated", {
         "repository": authorization.repository, "active": request.active,
     })
@@ -1071,18 +1078,19 @@ def PostgresEvaluationRepository_Dependency_Wrapper(session: Session) -> Evaluat
     from securecode.adapters.postgres.repository import PostgresEvaluationRepository
     return PostgresEvaluationRepository(session)
 
-from securecode.application.evaluate_and_store import evaluate_and_store_gh002
 from securecode.api.schemas import (
     GH002EvaluationRequest,
     GH002EvaluationResponse,
-    GH002EvidenceResponse
-)
-from securecode.application.evaluate_and_store import evaluate_and_store_gh003
-from securecode.api.schemas import (
+    GH002EvidenceResponse,
     GH003EvaluationRequest,
     GH003EvaluationResponse,
     GH003EvidenceResponse,
 )
+from securecode.application.evaluate_and_store import (
+    evaluate_and_store_gh002,
+    evaluate_and_store_gh003,
+)
+
 
 @app.post("/api/v1/evaluations/gh-002", response_model=GH002EvaluationResponse)
 def evaluate_gh002_endpoint(

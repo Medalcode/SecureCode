@@ -1,5 +1,6 @@
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+
 import jwt
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
@@ -35,13 +36,13 @@ def get_jwt_expire_minutes() -> int:
     return int(os.environ.get("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
 def create_access_token(user_id: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=get_jwt_expire_minutes())
+    expire = datetime.now(UTC) + timedelta(minutes=get_jwt_expire_minutes())
     
     # We include sub, iat, exp, jti conceptually, but PyJWT handles exp explicitly.
     payload = {
         "sub": user_id,
         "exp": expire,
-        "iat": datetime.now(timezone.utc)
+        "iat": datetime.now(UTC)
     }
     
     return jwt.encode(payload, get_jwt_secret(), algorithm=get_jwt_algorithm())

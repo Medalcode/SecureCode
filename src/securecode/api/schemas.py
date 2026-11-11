@@ -1,8 +1,6 @@
 import re
-from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
-
 
 _GITHUB_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$")
 _INVALID_BRANCH_FRAGMENT = re.compile(r"[\s~^:?*\[\\\\]")
@@ -54,14 +52,14 @@ class RuleResponse(BaseModel):
     version: int
 
 class EvidenceResponse(BaseModel):
-    required_review_approvals: Optional[int]
-    dismiss_stale_reviews: Optional[bool]
+    required_review_approvals: int | None
+    dismiss_stale_reviews: bool | None
     hash: str
 
 class EvaluationResponse(BaseModel):
     evaluation_id: str
     control_id: str
-    rule: Optional[RuleResponse]
+    rule: RuleResponse | None
     status: str
     source: SourceResponse
     evidence: EvidenceResponse
@@ -73,13 +71,13 @@ class GH002EvaluationRequest(GitHubRepositoryRequest):
 
 class GH002EvidenceResponse(BaseModel):
     default_branch: str
-    protection_enabled: Optional[bool]
+    protection_enabled: bool | None
     hash: str
 
 class GH002EvaluationResponse(BaseModel):
     evaluation_id: str
     control_id: str
-    rule: Optional[RuleResponse]
+    rule: RuleResponse | None
     status: str
     source: SourceResponse
     evidence: GH002EvidenceResponse
@@ -93,14 +91,14 @@ class GH003EvaluationRequest(GitHubBranchRequest):
 
 class GH003EvidenceResponse(BaseModel):
     branch: str
-    required_signatures_enabled: Optional[bool]
+    required_signatures_enabled: bool | None
     hash: str
 
 
 class GH003EvaluationResponse(BaseModel):
     evaluation_id: str
     control_id: str
-    rule: Optional[RuleResponse]
+    rule: RuleResponse | None
     status: str
     source: SourceResponse
     evidence: GH003EvidenceResponse

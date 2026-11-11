@@ -1,16 +1,19 @@
-from typing import Optional, Union
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
-from securecode.ports.evaluation_repository import EvaluationRepository, PersistedEvaluation
+from securecode.adapters.postgres.models import EvaluationRecord, EvidenceRecord
+from securecode.engine.evaluator import EvaluationStatus
 from securecode.models.gh001 import GH001Evidence
 from securecode.models.gh002 import GH002Evidence
 from securecode.models.gh003 import GH003Evidence
-from securecode.engine.evaluator import EvaluationStatus
-from securecode.adapters.postgres.models import EvaluationRecord, EvidenceRecord
+from securecode.ports.evaluation_repository import (
+    EvaluationRepository,
+    PersistedEvaluation,
+)
+
 
 class PostgresEvaluationRepository(EvaluationRepository):
     """PostgreSQL implementation of the EvaluationRepository using SQLAlchemy."""
@@ -28,9 +31,9 @@ class PostgresEvaluationRepository(EvaluationRepository):
         source_branch: str,
         collected_at: datetime,
         evaluated_at: datetime,
-        rule_id: Optional[str] = None,
-        rule_version: Optional[int] = None,
-        requested_by_user_id: Optional[UUID] = None,
+        rule_id: str | None = None,
+        rule_version: int | None = None,
+        requested_by_user_id: UUID | None = None,
     ) -> None:
         """Save evidence and evaluation atomically."""
         try:
@@ -80,9 +83,9 @@ class PostgresEvaluationRepository(EvaluationRepository):
         source_branch: str,
         collected_at: datetime,
         evaluated_at: datetime,
-        rule_id: Optional[str] = None,
-        rule_version: Optional[int] = None,
-        requested_by_user_id: Optional[UUID] = None,
+        rule_id: str | None = None,
+        rule_version: int | None = None,
+        requested_by_user_id: UUID | None = None,
     ) -> None:
         """Save GH-002 evidence and evaluation atomically."""
         try:
@@ -131,9 +134,9 @@ class PostgresEvaluationRepository(EvaluationRepository):
         source_branch: str,
         collected_at: datetime,
         evaluated_at: datetime,
-        rule_id: Optional[str] = None,
-        rule_version: Optional[int] = None,
-        requested_by_user_id: Optional[UUID] = None,
+        rule_id: str | None = None,
+        rule_version: int | None = None,
+        requested_by_user_id: UUID | None = None,
     ) -> None:
         """Save signed-commit enforcement evidence atomically."""
         try:
@@ -167,7 +170,7 @@ class PostgresEvaluationRepository(EvaluationRepository):
             self._session.rollback()
             raise RuntimeError(f"Failed to persist evaluation: {e}") from e
 
-    def get_evaluation(self, evaluation_id: UUID) -> Optional[PersistedEvaluation]:
+    def get_evaluation(self, evaluation_id: UUID) -> PersistedEvaluation | None:
         """Retrieve an evaluation and reconstruct the immutable domain evidence."""
         record = self._session.query(EvaluationRecord).filter_by(id=evaluation_id).first()
         if not record:
@@ -177,7 +180,7 @@ class PostgresEvaluationRepository(EvaluationRepository):
         raw = evidence_record.raw_evidence
         
         # Reconstruct domain model safely based on control_id
-        reconstructed_evidence: Union[GH001Evidence, GH002Evidence, GH003Evidence]
+        reconstructed_evidence: GH001Evidence | GH002Evidence | GH003Evidence
         if record.control_id == "GH-001":
             reconstructed_evidence = GH001Evidence(
                 required_review_approvals=raw.get("required_review_approvals"),

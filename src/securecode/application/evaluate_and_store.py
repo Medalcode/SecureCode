@@ -1,10 +1,22 @@
-from typing import Optional
-from uuid import uuid4, UUID
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from uuid import UUID, uuid4
 
-from securecode.ports.evaluation_repository import EvaluationRepository, PersistedEvaluation
-from securecode.engine.evaluator import evaluate_gh001, evaluate_gh002, evaluate_gh003, get_rule_definition
-from securecode.adapters.github import get_gh001_evidence, get_gh002_evidence, get_gh003_evidence
+from securecode.adapters.github import (
+    get_gh001_evidence,
+    get_gh002_evidence,
+    get_gh003_evidence,
+)
+from securecode.engine.evaluator import (
+    evaluate_gh001,
+    evaluate_gh002,
+    evaluate_gh003,
+    get_rule_definition,
+)
+from securecode.ports.evaluation_repository import (
+    EvaluationRepository,
+    PersistedEvaluation,
+)
+
 
 def evaluate_and_store_gh001(
     owner: str,
@@ -12,14 +24,14 @@ def evaluate_and_store_gh001(
     branch: str,
     token: str,
     repository: EvaluationRepository,
-    requested_by_user_id: Optional[UUID] = None
+    requested_by_user_id: UUID | None = None
 ) -> PersistedEvaluation:
     """
     Orchestrates evidence acquisition, evaluation, and persistence.
     """
-    collected_at = datetime.now(timezone.utc)
+    collected_at = datetime.now(UTC)
     evidence = get_gh001_evidence(owner, repo, branch, token)
-    evaluated_at = datetime.now(timezone.utc)
+    evaluated_at = datetime.now(UTC)
     
     rule_def = get_rule_definition("GH-001.json")
     status = evaluate_gh001(evidence, rule_def)
@@ -52,14 +64,14 @@ def evaluate_and_store_gh002(
     repo: str,
     token: str,
     repository: EvaluationRepository,
-    requested_by_user_id: Optional[UUID] = None
+    requested_by_user_id: UUID | None = None
 ) -> PersistedEvaluation:
     """
     Orchestrates evidence acquisition, evaluation, and persistence for GH-002.
     """
-    collected_at = datetime.now(timezone.utc)
+    collected_at = datetime.now(UTC)
     evidence = get_gh002_evidence(owner, repo, token)
-    evaluated_at = datetime.now(timezone.utc)
+    evaluated_at = datetime.now(UTC)
     
     rule_def = get_rule_definition("GH-002.json")
     status = evaluate_gh002(evidence, rule_def)
@@ -94,12 +106,12 @@ def evaluate_and_store_gh003(
     branch: str,
     token: str,
     repository: EvaluationRepository,
-    requested_by_user_id: Optional[UUID] = None,
+    requested_by_user_id: UUID | None = None,
 ) -> PersistedEvaluation:
     """Acquire, evaluate and persist signed-commit policy evidence."""
-    collected_at = datetime.now(timezone.utc)
+    collected_at = datetime.now(UTC)
     evidence = get_gh003_evidence(owner, repo, branch, token)
-    evaluated_at = datetime.now(timezone.utc)
+    evaluated_at = datetime.now(UTC)
     rule_def = get_rule_definition("GH-003.json")
     status = evaluate_gh003(evidence, rule_def)
     evaluation_id, evidence_id = uuid4(), uuid4()

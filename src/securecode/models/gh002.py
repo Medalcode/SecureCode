@@ -1,12 +1,12 @@
 import hashlib
 import json
-from typing import Optional
 from dataclasses import dataclass
+
 
 @dataclass(frozen=True)
 class GH002Evidence:
     default_branch: str
-    protection_enabled: Optional[bool]
+    protection_enabled: bool | None
     
     def canonical_hash(self) -> str:
         """

@@ -3,7 +3,6 @@
 import hashlib
 import json
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -11,7 +10,7 @@ class GH003Evidence:
     """Evidence that GitHub requires signed commits on the selected branch."""
 
     branch: str
-    required_signatures_enabled: Optional[bool]
+    required_signatures_enabled: bool | None
 
     def canonical_hash(self) -> str:
         payload = {

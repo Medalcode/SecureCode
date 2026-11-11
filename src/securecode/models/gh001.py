@@ -1,9 +1,8 @@
 """GH-001 evidence model for branch protection evaluation."""
 
-import json
 import hashlib
-from dataclasses import dataclass, asdict
-from typing import Optional
+import json
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -14,8 +13,8 @@ class GH001Evidence:
         required_review_approvals: Minimum number of required reviews (None if unavailable)
         dismiss_stale_reviews: Whether stale reviews are automatically dismissed (None if unavailable)
     """
-    required_review_approvals: Optional[int] = None
-    dismiss_stale_reviews: Optional[bool] = None
+    required_review_approvals: int | None = None
+    dismiss_stale_reviews: bool | None = None
 
     def canonical_hash(self) -> str:
         """Calculate a deterministic SHA-256 hash of the evidence."""
