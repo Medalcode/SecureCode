@@ -202,6 +202,12 @@ body {
   transition: var(--transition);
 }
 
+/* Los controles restringidos empiezan ocultos. Esta regla prevalece sobre el
+   display:flex de .nav-item hasta que la sesión valida el rol administrador. */
+.nav-item[hidden] {
+  display: none !important;
+}
+
 .nav-item:hover {
   background-color: var(--bg-surface-elevated);
   color: var(--text-main);

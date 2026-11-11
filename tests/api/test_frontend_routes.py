@@ -28,9 +28,12 @@ def test_root_serves_html():
 
 def test_admin_navigation_is_gated_by_the_server_validated_role():
     script = Path("src/securecode/static/js/app.js").read_text(encoding="utf-8")
+    stylesheet = Path("src/securecode/static/css/app.css").read_text(encoding="utf-8")
     assert "function updateAdminAccess()" in script
     assert "return Boolean(state.token && state.accessRole === 'admin');" in script
     assert "if (item.dataset.view === 'admin' && !isAdministrator()) return;" in script
+    assert ".nav-item[hidden]" in stylesheet
+    assert "display: none !important;" in stylesheet
 
 def test_rules_catalog_endpoint():
     response = client.get("/api/v1/rules")
