@@ -9,6 +9,7 @@ def test_root_serves_html():
     response = client.get("/")
     assert response.status_code == 200
     assert "text/html" in response.headers.get("content-type", "")
+    assert response.headers.get("cache-control") == "no-store, max-age=0"
     assert "SecureCode" in response.text
     assert "Evaluador de Controles" in response.text
     assert 'id="clientSettingsForm"' in response.text

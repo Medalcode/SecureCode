@@ -95,10 +95,14 @@ if STATIC_DIR.exists():
 
 @app.get("/", response_class=HTMLResponse)
 def serve_index():
+    """Serve the application shell without caching role-sensitive navigation."""
+    no_store_headers = {"Cache-Control": "no-store, max-age=0"}
     index_file = STATIC_DIR / "index.html"
     if index_file.exists():
-        return HTMLResponse(content=index_file.read_text(encoding="utf-8"))
-    return HTMLResponse(content="<h1>SecureCode API</h1><p>Consulte /docs para OpenAPI.</p>")
+        return HTMLResponse(content=index_file.read_text(encoding="utf-8"), headers=no_store_headers)
+    return HTMLResponse(
+        content="<h1>SecureCode API</h1><p>Consulte /docs para OpenAPI.</p>", headers=no_store_headers
+    )
 
 @app.get("/api/v1/rules")
 def get_rules_catalog():
