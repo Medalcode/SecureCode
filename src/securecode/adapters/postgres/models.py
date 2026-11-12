@@ -32,6 +32,70 @@ class User(Base):
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class Organization(Base):
+    """A tenant that owns Enterprise Trial quotas and memberships."""
+
+    __tablename__ = "organizations"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+
+
+class OrganizationMembership(Base):
+    """Explicit user-to-tenant relation; a user may belong to many tenants."""
+
+    __tablename__ = "organization_memberships"
+    __table_args__ = (UniqueConstraint("organization_id", "user_id", name="uq_organization_membership"),)
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    organization_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    role: Mapped[str] = mapped_column(String(20), nullable=False, default="member", server_default="member")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+
+
+class EnterpriseTrial(Base):
+    """Time-limited tenant entitlement; it is not a billing record."""
+
+    __tablename__ = "enterprise_trials"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    organization_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id"), unique=True, nullable=False)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    repository_limit: Mapped[int] = mapped_column(nullable=False, default=3, server_default="3")
+    evaluation_limit: Mapped[int] = mapped_column(nullable=False, default=100, server_default="100")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+
+
+class EnterpriseTrialRepository(Base):
+    """Repository scope explicitly authorized for a tenant trial."""
+
+    __tablename__ = "enterprise_trial_repositories"
+    __table_args__ = (UniqueConstraint("trial_id", "repository", name="uq_enterprise_trial_repository"),)
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    trial_id: Mapped[UUID] = mapped_column(ForeignKey("enterprise_trials.id"), nullable=False)
+    repository: Mapped[str] = mapped_column(String(201), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+
+
+class EnterpriseTrialUsage(Base):
+    """Transactional reservation so concurrent requests cannot overrun a trial quota."""
+
+    __tablename__ = "enterprise_trial_usages"
+    __table_args__ = (UniqueConstraint("trial_id", "idempotency_key", name="uq_enterprise_trial_usage_key"),)
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    trial_id: Mapped[UUID] = mapped_column(ForeignKey("enterprise_trials.id"), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    state: Mapped[str] = mapped_column(String(16), nullable=False, default="reserved", server_default="reserved")
+    evaluation_id: Mapped[UUID | None] = mapped_column(ForeignKey("evaluation_records.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class UserAuditEvent(Base):
     """Immutable security-relevant lifecycle event for an account."""
 
