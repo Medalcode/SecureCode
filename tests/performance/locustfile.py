@@ -1,12 +1,13 @@
 import os
 import uuid
-from datetime import datetime, timezone
-from locust import HttpUser, task, between, events
+from datetime import UTC, datetime
+
+from locust import HttpUser, between, events, task
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from securecode.adapters.postgres.models import RepositoryAuthorization, User
 from securecode.api.security import hash_password
-from securecode.adapters.postgres.models import User, Base
 
 DB_URL = os.environ.get("DATABASE_URL")
 TEST_USER = "perf_user"
@@ -32,9 +33,26 @@ def on_test_start(environment, **kwargs):
                 username=TEST_USER,
                 password_hash=hash_password(TEST_PASS),
                 active=True,
-                created_at=datetime.now(timezone.utc)
+                created_at=datetime.now(UTC)
             )
             session.add(user)
+            session.commit()
+        authorization = (
+            session.query(RepositoryAuthorization)
+            .filter_by(user_id=user.id, repository="medalcode/securecode")
+            .first()
+        )
+        if not authorization:
+            session.add(
+                RepositoryAuthorization(
+                    id=uuid.uuid4(),
+                    user_id=user.id,
+                    repository="medalcode/securecode",
+                    active=True,
+                    created_at=datetime.now(UTC),
+                    updated_at=datetime.now(UTC),
+                )
+            )
             session.commit()
 
 class SecureCodeUser(HttpUser):
@@ -65,12 +83,12 @@ class SecureCodeUser(HttpUser):
                 exception=Exception(f"Login failed: {response.text}")
             )
 
-    @task(3)
+    @task(1)
     def health_check(self):
         """Mide la latencia base del framework sin operaciones de I/O pesadas"""
         self.client.get("/health", name="/health (Baseline)")
 
-    @task(7)
+    @task(3)
     def evaluate_gh001(self):
         """Mide la orquestación, conexión a BD y latencia controlada del Mock de GitHub"""
         if not self.token:
@@ -82,3 +100,22 @@ class SecureCodeUser(HttpUser):
             "repository": "securecode",
             "branch": "main"
         }, headers=headers, name="/api/v1/evaluations/gh-001")
+
+    @task(3)
+    def evaluate_gh002(self):
+        if not self.token:
+            return
+        self.client.post("/api/v1/evaluations/gh-002", json={
+            "owner": "Medalcode",
+            "repository": "securecode",
+        }, headers={"Authorization": f"Bearer {self.token}"}, name="/api/v1/evaluations/gh-002")
+
+    @task(3)
+    def evaluate_gh003(self):
+        if not self.token:
+            return
+        self.client.post("/api/v1/evaluations/gh-003", json={
+            "owner": "Medalcode",
+            "repository": "securecode",
+            "branch": "main",
+        }, headers={"Authorization": f"Bearer {self.token}"}, name="/api/v1/evaluations/gh-003")
