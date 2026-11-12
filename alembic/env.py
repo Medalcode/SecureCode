@@ -39,7 +39,9 @@ if db_url.startswith("postgres://"):
 if db_url.startswith("postgresql://"):
     db_url = "postgresql+psycopg2://" + db_url[len("postgresql://"):]
     
-config.set_main_option("sqlalchemy.url", db_url)
+# Alembic stores this value in ConfigParser, where '%' is interpolation syntax.
+# Preserve percent-encoded credentials (for example %23 for '#') in DATABASE_URL.
+config.set_main_option("sqlalchemy.url", db_url.replace("%", "%%"))
 
 
 def run_migrations_offline() -> None:

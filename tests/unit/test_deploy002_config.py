@@ -12,6 +12,7 @@ Cubre:
 
 import os
 import sys
+from configparser import ConfigParser
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -59,6 +60,15 @@ def test_normalize_postgres_preserves_query_params():
     result = _normalize_database_url(url)
     assert result.startswith("postgresql+psycopg2://")
     assert "sslmode=require" in result
+
+
+def test_alembic_config_preserves_percent_encoded_database_passwords():
+    """Alembic ConfigParser must not treat URL-encoded credentials as interpolation."""
+    url = "postgresql+psycopg2://user:secret%23%23@host:6543/db?sslmode=require"
+    parser = ConfigParser()
+    parser.add_section("alembic")
+    parser.set("alembic", "sqlalchemy.url", url.replace("%", "%%"))
+    assert parser.get("alembic", "sqlalchemy.url") == url
 
 
 def test_is_postgres_url_true_for_postgresql():
