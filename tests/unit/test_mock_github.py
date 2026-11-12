@@ -14,6 +14,7 @@ def client(monkeypatch):
 
 
 def test_pass_contract_covers_all_three_controls(client):
+    before = client.get("/__metrics").json()["repository_requests"]
     repository = client.get("/repos/owner/repo")
     branch = client.get("/repos/owner/repo/branches/main")
     protection = client.get("/repos/owner/repo/branches/main/protection")
@@ -24,6 +25,7 @@ def test_pass_contract_covers_all_three_controls(client):
     assert branch.status_code == 200
     assert protection.json()["required_pull_request_reviews"]["required_approving_review_count"] == 2
     assert signatures.status_code == 200
+    assert client.get("/__metrics").json()["repository_requests"] == before + 4
 
 
 @pytest.mark.parametrize(

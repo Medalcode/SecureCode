@@ -7,6 +7,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 
 app = FastAPI(title="Mock GitHub API (Performance Test)")
+app.state.repository_requests = 0
 
 
 def _scenario() -> str:
@@ -28,6 +29,19 @@ async def _apply_upstream_scenario() -> None:
     if scenario not in {"PASS", "UNPROTECTED", "SIGNATURES_DISABLED"}:
         raise HTTPException(status_code=500, detail="Invalid mock scenario")
     await asyncio.sleep(float(os.environ.get("MOCK_GITHUB_LATENCY_SECONDS", "0.05")))
+
+
+@app.middleware("http")
+async def count_repository_requests(request, call_next):
+    if request.url.path.startswith("/repos/"):
+        app.state.repository_requests += 1
+    return await call_next(request)
+
+
+@app.get("/__metrics")
+async def get_metrics():
+    """Expose only the local simulator request count for measurement scripts."""
+    return {"repository_requests": app.state.repository_requests}
 
 
 @app.get("/repos/{owner}/{repo}")
