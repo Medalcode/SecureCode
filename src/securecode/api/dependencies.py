@@ -34,7 +34,9 @@ def get_database_url() -> str:
     db_url = os.environ.get("DATABASE_URL")
     if not db_url:
         raise ValueError("DATABASE_URL environment variable is not set")
-    return _normalize_database_url(db_url)
+    # Secret-manager CLI input can retain a terminal newline. Never pass it to
+    # SQLAlchemy because query values such as sslmode become invalid.
+    return _normalize_database_url(db_url.strip())
 
 
 # We will lazily initialize the engine

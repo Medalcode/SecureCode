@@ -30,6 +30,9 @@ if not db_url:
     # Use a dummy SQLite URL for generating offline migrations if DATABASE_URL is missing
     # This prevents alembic revision --autogenerate from crashing if no env var is set
     db_url = "sqlite:///./securecode.db"
+else:
+    # ``gcloud secrets versions add --data-file=-`` may preserve a final newline.
+    db_url = db_url.strip()
 
 # The container includes psycopg2-binary.  Neon exposes a bare postgresql://
 # connection string, which otherwise makes SQLAlchemy try the unavailable

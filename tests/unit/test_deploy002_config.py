@@ -45,6 +45,13 @@ def test_normalize_postgresql_psycopg2_unchanged():
     assert result == url
 
 
+def test_get_database_url_strips_secret_manager_terminal_newline(monkeypatch):
+    from securecode.api.dependencies import get_database_url
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:6543/db?sslmode=require\r\n")
+    assert get_database_url() == "postgresql+psycopg2://user:pass@host:6543/db?sslmode=require"
+
+
 def test_normalize_sqlite_unchanged():
     """URLs SQLite no deben modificarse."""
     from securecode.api.dependencies import _normalize_database_url
