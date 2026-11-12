@@ -52,6 +52,11 @@ def test_get_database_url_strips_secret_manager_terminal_newline(monkeypatch):
     assert get_database_url() == "postgresql+psycopg2://user:pass@host:6543/db?sslmode=require"
 
 
+def test_seed_script_strips_database_url_before_creating_engine():
+    script = open("scripts/seed_user.py", encoding="utf-8").read()
+    assert "db_url = db_url.strip()" in script
+
+
 def test_normalize_sqlite_unchanged():
     """URLs SQLite no deben modificarse."""
     from securecode.api.dependencies import _normalize_database_url

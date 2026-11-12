@@ -111,6 +111,10 @@ def seed_user(username: str, password: str) -> None:
         print("[ERROR] La variable DATABASE_URL no está configurada.", file=sys.stderr)
         sys.exit(1)
 
+    # Secret Manager may preserve a terminal newline when the value is piped
+    # from PowerShell.  libpq treats it as part of sslmode/password values.
+    db_url = db_url.strip()
+
     engine = create_engine(_normalize_database_url(db_url))
     Session = sessionmaker(bind=engine)
     session = Session()
