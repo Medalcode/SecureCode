@@ -1,7 +1,7 @@
 """add enterprise trial tenant quotas
 
 Revision ID: aa7c1e9d4f30
-Revises: f9b2e4a7c308
+Revises: d5f4a1b9c302
 """
 
 from collections.abc import Sequence
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "aa7c1e9d4f30"
-down_revision: str | Sequence[str] | None = "f9b2e4a7c308"
+down_revision: str | Sequence[str] | None = "d5f4a1b9c302"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
