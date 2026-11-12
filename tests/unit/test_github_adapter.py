@@ -1,10 +1,12 @@
 import json
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 from urllib.error import HTTPError, URLError
 
+import pytest
+
 from securecode.adapters.github import get_gh001_evidence, get_gh002_evidence
-from securecode.engine.evaluator import evaluate_gh001, EvaluationStatus
+from securecode.engine.evaluator import EvaluationStatus, evaluate_gh001
+
 
 @pytest.fixture
 def mock_urlopen():
@@ -122,7 +124,7 @@ def test_github_adapter_malformed_response(mock_urlopen):
         
     # JSON array instead of object
     mock_urlopen.return_value = _create_mock_response([1, 2, 3])
-    with pytest.raises(ValueError, match="Expected JSON object"):
+    with pytest.raises(TypeError, match="Expected JSON object"):
         get_gh001_evidence("owner", "repo", "main")
 
 def test_github_adapter_network_failure(mock_urlopen):

@@ -21,11 +21,12 @@ python scripts\mock_github.py
 ```cmd
 REM Configurar la URL de conexión usando variables de entorno seguras (no incluir contraseñas en código)
 set DATABASE_URL=postgresql+psycopg2://<POSTGRES_USER>:<POSTGRES_PASSWORD>@localhost:5432/securecode_test
-set GITHUB_API_BASE_URL=http://localhost:8001
+set SECURECODE_GITHUB_TEST_MODE=1
+set SECURECODE_GITHUB_TEST_BASE_URL=http://127.0.0.1:8001
 set PYTHONPATH=src
 set JWT_SECRET_KEY=test-secret-key-that-is-at-least-32-bytes-long
 
-python -m uvicorn securecode.api.app:app --host 127.0.0.1 --port 8000
+python scripts\run_perf_api.py
 ```
 
 ---

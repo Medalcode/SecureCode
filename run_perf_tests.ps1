@@ -9,7 +9,8 @@ if ($env:DATABASE_URL -notmatch '/securecode_test(?:\?|$)') {
 if ($env:DATABASE_URL -notmatch '@(?:localhost|127\.0\.0\.1):5432/') {
     throw "Solo se permite PostgreSQL local en el puerto 5432."
 }
-$env:GITHUB_API_BASE_URL="http://localhost:8001"
+$env:SECURECODE_GITHUB_TEST_MODE="1"
+$env:SECURECODE_GITHUB_TEST_BASE_URL="http://127.0.0.1:8001"
 $env:PYTHONPATH="src"
 $env:JWT_SECRET_KEY="test-secret-key-that-is-at-least-32-bytes-long"
 

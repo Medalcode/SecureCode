@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import MagicMock, patch
 from urllib.error import HTTPError
 
@@ -10,6 +9,7 @@ from securecode.models.gh003 import GH003Evidence
 def _response(status=200):
     response = MagicMock()
     response.status = status
+    response.read.return_value = b"{}"
     response.__enter__.return_value = response
     return response
 
