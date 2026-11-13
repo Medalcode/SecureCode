@@ -1,7 +1,7 @@
 # P2 — Protocolo de medición local de consumo
 
 - Fecha de implementación: 2026-11-12, America/Santiago.
-- Commit de implementación: `6f1fb1b`.
+- Commits de implementación: `6f1fb1b` y `e0236c7` (perfiles de simulador).
 - Entorno de prueba de automatización: Windows 10, Python 3.14.6.
 
 ## Alcance implementado
@@ -16,6 +16,9 @@ PostgreSQL antes/después y diferencia de llamadas al simulador.
 Por defecto recorre los tres controles, tres perfiles de simulador y 100
 evaluaciones por combinación: 900 observaciones. Esta es una capacidad del
 protocolo, no una ejecución de 900 evaluaciones realizada en esta evidencia.
+Los perfiles `small`, `medium` y `large` usan repositorios locales distintos y
+latencias simuladas de 10, 50 y 100 ms; no se presentan como repositorios
+GitHub reales.
 
 ## Evidencia ejecutada
 
@@ -40,3 +43,8 @@ python -m pytest -q -p no:cacheprovider
 No existe todavía un CSV de medición de 900 evaluaciones ni datos de factura
 cloud. Por tanto no hay costo observado ni facturado que integrar al modelo
 financiero; el script no calcula CLP ni altera supuestos comerciales.
+
+El 13 de noviembre de 2026 se verificó que PostgreSQL escucha localmente en el
+puerto 5432, pero esta sesión no recibió una `DATABASE_URL` para
+`securecode_test`; una conexión local sin contraseña fue rechazada. No se usó
+ni modificó una base externa.
