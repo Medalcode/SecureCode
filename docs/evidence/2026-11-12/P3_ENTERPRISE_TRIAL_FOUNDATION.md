@@ -1,7 +1,7 @@
 # P3 — Fundación técnica Enterprise Trial
 
 - Fecha de ejecución: 2026-11-12, America/Santiago.
-- Commit de implementación: `545a9c2`.
+- Commits de implementación: `545a9c2` y `c944452` (cadena Alembic corregida).
 - Entorno: Windows 10, Python 3.14.6, SQLite en memoria para las pruebas de
   política. No se utilizó PostgreSQL comercial, Supabase, GitHub ni credenciales.
 
@@ -41,3 +41,10 @@ Las pruebas demuestran 100 reservas permitidas y la 101 bloqueada, tres
 repositorios permitidos y el cuarto bloqueado, expiración, aislamiento por
 membresía y reintentos idempotentes. La concurrencia real en PostgreSQL y la
 migración sobre Supabase siguen pendientes de ejecución controlada.
+
+Verificación de migraciones posterior a la corrección:
+
+```text
+alembic heads
+aa7c1e9d4f30 (head)
+```
