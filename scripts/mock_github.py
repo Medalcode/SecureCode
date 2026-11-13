@@ -14,7 +14,7 @@ def _scenario() -> str:
     return os.environ.get("MOCK_GITHUB_SCENARIO", "PASS").strip().upper()
 
 
-async def _apply_upstream_scenario() -> None:
+async def _apply_upstream_scenario(repository: str) -> None:
     """Produce reproducible upstream failures before an endpoint returns data."""
     scenario = _scenario()
     status_by_scenario = {
@@ -28,7 +28,16 @@ async def _apply_upstream_scenario() -> None:
         raise HTTPException(status_code=status_by_scenario[scenario], detail=scenario)
     if scenario not in {"PASS", "UNPROTECTED", "SIGNATURES_DISABLED"}:
         raise HTTPException(status_code=500, detail="Invalid mock scenario")
-    await asyncio.sleep(float(os.environ.get("MOCK_GITHUB_LATENCY_SECONDS", "0.05")))
+    configured_latency = os.environ.get("MOCK_GITHUB_LATENCY_SECONDS")
+    if configured_latency is not None:
+        latency = float(configured_latency)
+    else:
+        latency = {
+            "small": 0.01,
+            "medium": 0.05,
+            "large": 0.1,
+        }.get(repository.rsplit("-", maxsplit=1)[-1], 0.05)
+    await asyncio.sleep(latency)
 
 
 @app.middleware("http")
@@ -46,19 +55,19 @@ async def get_metrics():
 
 @app.get("/repos/{owner}/{repo}")
 async def get_repo(owner: str, repo: str):
-    await _apply_upstream_scenario()
+    await _apply_upstream_scenario(repo)
     return {"name": repo, "owner": {"login": owner}, "default_branch": "main"}
 
 
 @app.get("/repos/{owner}/{repo}/branches/{branch}")
 async def get_branch(owner: str, repo: str, branch: str):
-    await _apply_upstream_scenario()
+    await _apply_upstream_scenario(repo)
     return {"name": branch, "protected": True, "commit": {"sha": "a" * 40}}
 
 
 @app.get("/repos/{owner}/{repo}/branches/{branch}/protection")
 async def get_branch_protection(owner: str, repo: str, branch: str):
-    await _apply_upstream_scenario()
+    await _apply_upstream_scenario(repo)
     if _scenario() == "UNPROTECTED":
         raise HTTPException(status_code=404, detail="Branch not protected")
     return {
@@ -71,7 +80,7 @@ async def get_branch_protection(owner: str, repo: str, branch: str):
 
 @app.get("/repos/{owner}/{repo}/branches/{branch}/protection/required_signatures")
 async def get_required_signatures(owner: str, repo: str, branch: str):
-    await _apply_upstream_scenario()
+    await _apply_upstream_scenario(repo)
     if _scenario() in {"UNPROTECTED", "SIGNATURES_DISABLED"}:
         raise HTTPException(status_code=404, detail="Required signatures are not enabled")
     return {"url": f"/repos/{owner}/{repo}/branches/{branch}/protection/required_signatures"}

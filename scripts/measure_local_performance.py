@@ -172,9 +172,10 @@ def main() -> int:
     }
     observations: list[Observation] = []
     for profile in PROFILES:
+        repository = f"securecode-{profile}"
         for control in CONTROLS:
             endpoint = f"{api_base_url}/api/v1/evaluations/{control}"
-            payload = {"owner": "Medalcode", "repository": "securecode", "branch": "main"}
+            payload = {"owner": "Medalcode", "repository": repository, "branch": "main"}
             for sequence in range(1, args.evaluations_per_control + 1):
                 started = time.perf_counter()
                 try:

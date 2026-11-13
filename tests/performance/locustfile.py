@@ -37,23 +37,31 @@ def on_test_start(environment, **kwargs):
             )
             session.add(user)
             session.commit()
-        authorization = (
-            session.query(RepositoryAuthorization)
-            .filter_by(user_id=user.id, repository="medalcode/securecode")
-            .first()
-        )
-        if not authorization:
-            session.add(
-                RepositoryAuthorization(
-                    id=uuid.uuid4(),
-                    user_id=user.id,
-                    repository="medalcode/securecode",
-                    active=True,
-                    created_at=datetime.now(UTC),
-                    updated_at=datetime.now(UTC),
+        authorized_repositories = [
+            "medalcode/securecode",
+            "medalcode/securecode-small",
+            "medalcode/securecode-medium",
+            "medalcode/securecode-large",
+        ]
+        existing_repositories = {
+            authorization.repository
+            for authorization in session.query(RepositoryAuthorization)
+            .filter(RepositoryAuthorization.user_id == user.id)
+            .all()
+        }
+        for repository in authorized_repositories:
+            if repository not in existing_repositories:
+                session.add(
+                    RepositoryAuthorization(
+                        id=uuid.uuid4(),
+                        user_id=user.id,
+                        repository=repository,
+                        active=True,
+                        created_at=datetime.now(UTC),
+                        updated_at=datetime.now(UTC),
+                    )
                 )
-            )
-            session.commit()
+        session.commit()
 
 class SecureCodeUser(HttpUser):
     # Tiempo de espera simulado entre tareas de un usuario (1 a 2 segundos)

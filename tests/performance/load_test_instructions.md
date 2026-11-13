@@ -5,7 +5,10 @@ Esta guía detalla los pasos para ejecutar las pruebas de carga reproducibles en
 ## Requisitos y Entorno
 * **Locust** instalado (`pip install locust`).
 * Base de datos local configurada (`securecode_test`).
-* Servidor simulado (Mock) para aislar la API de GitHub de solicitudes externas e imitar una latencia predecible de ~150ms.
+* Servidor simulado (Mock) para aislar la API de GitHub de solicitudes externas.
+
+No ejecutes esta guía contra Supabase, Neon, Cloud Run, una base comercial ni
+una credencial GitHub real.
 
 ---
 
@@ -38,9 +41,11 @@ Antes de correr Locust, asegúrate de setear la misma configuración de la BD pa
 set DATABASE_URL=postgresql+psycopg2://<POSTGRES_USER>:<POSTGRES_PASSWORD>@localhost:5432/securecode_test
 ```
 
-### Escenarios Empíricos Ejecutados para ES2 (Automatizados en `run_perf_tests.ps1`)
+### Escenarios de carga configurados
 
-Los siguientes escenarios constituyen la batería formal ejecutada y documentada en los reportes de rendimiento de ES2:
+`tests/performance/locustfile.py` distribuye solicitudes entre GH-001, GH-002,
+GH-003 y `/health`. Conserva los CSV junto con fecha, SHA y entorno; estos
+comandos no prueban por sí solos un SLA actual.
 
 1. **Smoke Test previo**: Comprobación rápida del entorno (2 VUsers, 10 segundos).
    ```cmd
@@ -61,10 +66,42 @@ Los siguientes escenarios constituyen la batería formal ejecutada y documentada
 
 *(Nota: Para ejecutar la suite completa de forma desatendida, se utiliza el script `powershell -File run_perf_tests.ps1`).*
 
-### Escenarios Teóricos Propuestos (Para Escalabilidad Cloud Futura)
-Como parte del roadmap de capacidad en entornos distribuidos (Cloud Run + Cloud SQL), se contemplan escenarios de mayor envergadura no reproducibles en un único host local:
-* **Escalabilidad Media:** 200 usuarios concurrentes (ramp-up 10/s, 5 min).
-* **Estrés Límite de Infraestructura:** 500 usuarios concurrentes (ramp-up 20/s, 5 min).
+## 3. Medición de consumo por control y perfil
+
+El recolector local genera evidencia por control y perfil sin calcular costos
+ni cambiar supuestos financieros. Con API, mock y `securecode_test` local ya
+iniciados, define credenciales de un usuario de carga local:
+
+```cmd
+set SECURECODE_PERF_USERNAME=perf_user
+set SECURECODE_PERF_PASSWORD=<solo-clave-local>
+python scripts\measure_local_performance.py --output-dir reports\YYYY-MM-DD-local
+```
+
+Por defecto se ejecutan 100 evaluaciones por combinación de los controles
+GH-001, GH-002 y GH-003 con perfiles de simulador `small`, `medium` y `large`:
+900 observaciones. El mock asocia esos perfiles a repositorios locales
+`securecode-small`, `securecode-medium` y `securecode-large`, con latencias
+simuladas de 10, 50 y 100 ms; no representan repositorios GitHub reales. El
+resultado incluye `observations.csv` y `summary.json` con
+latencia, bytes de respuesta, estado HTTP, P95, tamaño de tablas PostgreSQL,
+conteo del simulador y CPU/RSS opcional del proceso API:
+
+```cmd
+python scripts\measure_local_performance.py ^
+  --api-pid <PID_DEL_PROCESO_API> ^
+  --output-dir reports\YYYY-MM-DD-local
+```
+
+La herramienta rechaza URLs distintas de `127.0.0.1` y una `DATABASE_URL` que
+no apunte a `localhost:5432/securecode_test`. Si una solicitud falla, conserva
+el CSV para análisis y retorna código distinto de cero.
+
+## 4. Estado de evidencia
+
+Los benchmarks históricos en `docs/evidence/performance/` no son mediciones
+actuales del flujo de tres controles. Al actualizar ES2, diferencia resultados
+históricos, simulados y mediciones nuevas verificables.
 
 ---
 
