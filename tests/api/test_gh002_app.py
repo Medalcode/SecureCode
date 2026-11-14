@@ -1,22 +1,24 @@
 import os
-import pytest
-from unittest.mock import patch, MagicMock
-from fastapi.testclient import TestClient
-from uuid import uuid4
 from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
+from uuid import uuid4
 
-from securecode.api.app import app
-from securecode.engine.evaluator import EvaluationStatus
-from securecode.ports.evaluation_repository import PersistedEvaluation
-from securecode.models.gh002 import GH002Evidence
-from securecode.api.dependencies import get_db_session
+import pytest
+from fastapi.testclient import TestClient
+
 from securecode.adapters.postgres.models import User
+from securecode.api.app import app
+from securecode.api.dependencies import get_db_session
 from securecode.api.security import create_access_token
+from securecode.engine.evaluator import EvaluationStatus
+from securecode.models.gh002 import GH002Evidence
+from securecode.ports.evaluation_repository import PersistedEvaluation
 
 os.environ["JWT_SECRET_KEY"] = "test-secret-key-that-is-at-least-32-bytes-long"
 os.environ["JWT_ALGORITHM"] = "HS256"
 
 from securecode.api.security import hash_password
+
 
 class DummyUser:
     def __init__(self, id, username, password_hash, active):
@@ -42,8 +44,16 @@ def mock_session():
         def filter(self, *args):
             self.filters.extend(args)
             return self
+
+        def join(self, *args):
+            return self
+
+        def order_by(self, *args):
+            return self
             
         def first(self):
+            if self.model.__name__ == "EnterpriseTrial":
+                return None
             if not self.filters:
                 return None
             expr = self.filters[0]

@@ -86,6 +86,37 @@ def get_active_trial_for_user(session: Session, user_id: UUID, *, now: datetime 
     )
 
 
+def get_trial_for_user(session: Session, user_id: UUID) -> EnterpriseTrial | None:
+    """Return the user's existing trial, including an expired one.
+
+    A trial is intentionally a one-time entitlement.  Returning expired
+    records lets an API reject a second activation instead of silently
+    creating a new tenant and resetting a quota.
+    """
+    return (
+        session.query(EnterpriseTrial)
+        .join(OrganizationMembership, OrganizationMembership.organization_id == EnterpriseTrial.organization_id)
+        .filter(OrganizationMembership.user_id == user_id)
+        .order_by(EnterpriseTrial.created_at.asc())
+        .first()
+    )
+
+
+def is_trial_owner(session: Session, *, trial_id: UUID, user_id: UUID) -> bool:
+    """Only the tenant owner may expand the trial repository scope."""
+    return (
+        session.query(OrganizationMembership)
+        .join(EnterpriseTrial, EnterpriseTrial.organization_id == OrganizationMembership.organization_id)
+        .filter(
+            EnterpriseTrial.id == trial_id,
+            OrganizationMembership.user_id == user_id,
+            OrganizationMembership.role == "owner",
+        )
+        .first()
+        is not None
+    )
+
+
 def _locked_trial(session: Session, trial_id: UUID, now: datetime) -> EnterpriseTrial:
     trial = session.query(EnterpriseTrial).filter(EnterpriseTrial.id == trial_id).with_for_update().first()
     if trial is None:

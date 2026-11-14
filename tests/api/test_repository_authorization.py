@@ -4,7 +4,7 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
-from securecode.api.app import _require_repository_authorization, _normalise_repository
+from securecode.api.app import _normalise_repository, _require_repository_authorization
 
 
 class QueryStub:
@@ -12,6 +12,12 @@ class QueryStub:
         self.result = result
 
     def filter(self, *_):
+        return self
+
+    def join(self, *_):
+        return self
+
+    def order_by(self, *_):
         return self
 
     def first(self):

@@ -12,12 +12,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from securecode.adapters.postgres.models import (
+    EnterpriseTrialRepository,
+    EnterpriseTrialUsage,
     EvaluationRecord,
     LoginAttempt,
+    Organization,
     RepositoryAuthorization,
     SubscriptionEvent,
     User,
@@ -38,6 +42,19 @@ from securecode.api.schemas import (
     GH001EvaluationRequest,
     RuleResponse,
     SourceResponse,
+)
+from securecode.application.enterprise_trial import (
+    TrialPolicyError,
+    complete_evaluation_reservation,
+    create_trial,
+    get_active_trial_for_user,
+    get_trial_for_user,
+    is_trial_owner,
+    release_evaluation_reservation,
+    reserve_evaluation,
+)
+from securecode.application.enterprise_trial import (
+    authorize_repository as authorize_trial_repository,
 )
 from securecode.application.evaluate_and_store import evaluate_and_store_gh001
 from securecode.engine.evaluator import get_rules_directory
@@ -292,6 +309,31 @@ class FinOpsResponse(BaseModel):
     updated_at: datetime | None = None
 
 
+class EnterpriseTrialActivationRequest(BaseModel):
+    organization_name: str = Field(min_length=2, max_length=120)
+    confirmation: bool = False
+
+
+class EnterpriseTrialRepositoryRequest(BaseModel):
+    repository: str = Field(min_length=3, max_length=201)
+
+
+class EnterpriseTrialResponse(BaseModel):
+    available: bool
+    status: Literal["not_started", "active", "expired"]
+    organization_name: str | None = None
+    starts_at: datetime | None = None
+    expires_at: datetime | None = None
+    repository_limit: int | None = None
+    repositories_used: int = 0
+    repositories_remaining: int = 0
+    evaluation_limit: int | None = None
+    evaluations_used: int = 0
+    evaluations_remaining: int = 0
+    repositories: list[str] = []
+    billing_mode: Literal["trial_non_billable"] = "trial_non_billable"
+
+
 _EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 _SUBSCRIPTION_PERIOD = timedelta(days=30)
 _PLAN_CATALOG = {
@@ -384,7 +426,7 @@ def _normalise_repository(value: str) -> str:
 
 
 def _require_repository_authorization(session: Session, current_user: User, owner: str, repository: str) -> None:
-    """Auditors require explicit active scope; admins retain platform operations."""
+    """Auditors require account scope or an active trial's explicit scope."""
     if getattr(current_user, "role", "auditor") == "admin":
         return
     canonical = _normalise_repository(f"{owner}/{repository}")
@@ -394,6 +436,16 @@ def _require_repository_authorization(session: Session, current_user: User, owne
         RepositoryAuthorization.active.is_(True),
     ).first()
     if authorization is None:
+        trial = get_active_trial_for_user(session, current_user.id)
+        trial_scope = None
+        if trial is not None:
+            trial_scope = (
+                session.query(EnterpriseTrialRepository)
+                .filter_by(trial_id=trial.id, repository=canonical)
+                .first()
+            )
+        if trial_scope is not None:
+            return
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tu cuenta no está autorizada para evaluar este repositorio. Solicita acceso a un administrador.",
@@ -501,6 +553,47 @@ def _finops_response(session: Session, current_user: User, settings: UserFinOpsS
         "budget_clp": settings.budget_clp, "alert_threshold_pct": settings.alert_threshold_pct,
         "alert_enabled": settings.alert_enabled, "billing_data_state": "not_connected",
         "observed_spend_clp": None, "updated_at": settings.updated_at,
+    }
+
+
+def _trial_response(session: Session, current_user: User) -> dict:
+    """Return entitlement state without presenting a trial as a paid plan."""
+    trial = get_trial_for_user(session, current_user.id)
+    if trial is None:
+        return {
+            "available": True, "status": "not_started", "organization_name": None,
+            "starts_at": None, "expires_at": None, "repository_limit": None,
+            "repositories_used": 0, "repositories_remaining": 0,
+            "evaluation_limit": None, "evaluations_used": 0, "evaluations_remaining": 0,
+            "repositories": [], "billing_mode": "trial_non_billable",
+        }
+    repositories = (
+        session.query(EnterpriseTrialRepository)
+        .filter(EnterpriseTrialRepository.trial_id == trial.id)
+        .order_by(EnterpriseTrialRepository.repository.asc())
+        .all()
+    )
+    usage_count = (
+        session.query(EnterpriseTrialUsage)
+        .filter(
+            EnterpriseTrialUsage.trial_id == trial.id,
+            EnterpriseTrialUsage.state.in_(("reserved", "completed")),
+        )
+        .count()
+    )
+    organization = session.query(Organization).filter(Organization.id == trial.organization_id).first()
+    active = get_active_trial_for_user(session, current_user.id) is not None
+    return {
+        "available": False,
+        "status": "active" if active else "expired",
+        "organization_name": organization.name if organization else None,
+        "starts_at": _as_utc(trial.starts_at), "expires_at": _as_utc(trial.expires_at),
+        "repository_limit": trial.repository_limit, "repositories_used": len(repositories),
+        "repositories_remaining": max(0, trial.repository_limit - len(repositories)),
+        "evaluation_limit": trial.evaluation_limit, "evaluations_used": usage_count,
+        "evaluations_remaining": max(0, trial.evaluation_limit - usage_count),
+        "repositories": [item.repository for item in repositories],
+        "billing_mode": "trial_non_billable",
     }
 
 @app.post("/api/v1/auth/token", response_model=Token)
@@ -719,6 +812,132 @@ def update_finops(
         session.commit()
         session.refresh(settings)
     return _finops_response(session, current_user, settings)
+
+
+@app.get("/api/v1/enterprise-trial", response_model=EnterpriseTrialResponse)
+def get_enterprise_trial(
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Expose only the caller's non-billable, one-time Enterprise Trial state."""
+    return _trial_response(session, current_user)
+
+
+@app.post("/api/v1/enterprise-trial", response_model=EnterpriseTrialResponse, status_code=status.HTTP_201_CREATED)
+def activate_enterprise_trial(
+    request: EnterpriseTrialActivationRequest,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Activate one 14-day technical trial after explicit confirmation.
+
+    The entitlement contains no payment operation, price, invoice, or renewal.
+    A user who has started a trial cannot create another one after it expires.
+    """
+    if not request.confirmation:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Debes confirmar la activación del trial")
+    if get_trial_for_user(session, current_user.id) is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Esta cuenta ya utilizó su Enterprise Trial")
+    try:
+        trial = create_trial(
+            session,
+            organization_name=request.organization_name,
+            owner_user_id=current_user.id,
+        )
+        _record_user_audit(session, current_user.id, current_user.id, "enterprise_trial_activated", {
+            "trial_id": str(trial.id), "billing_mode": "trial_non_billable",
+        })
+        session.commit()
+    except ValueError as error:
+        session.rollback()
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from error
+    return _trial_response(session, current_user)
+
+
+@app.post("/api/v1/enterprise-trial/repositories", response_model=EnterpriseTrialResponse)
+def add_enterprise_trial_repository(
+    request: EnterpriseTrialRepositoryRequest,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Authorize a repository in the caller's active trial, up to its fixed quota."""
+    trial = get_active_trial_for_user(session, current_user.id)
+    if trial is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No hay un Enterprise Trial activo")
+    if not is_trial_owner(session, trial_id=trial.id, user_id=current_user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo el propietario del trial puede agregar repositorios")
+    try:
+        repository = _normalise_repository(request.repository)
+        authorize_trial_repository(session, trial_id=trial.id, repository=repository)
+        _record_user_audit(session, current_user.id, current_user.id, "enterprise_trial_repository_authorized", {
+            "trial_id": str(trial.id), "repository": repository,
+        })
+        session.commit()
+    except (TrialPolicyError, ValueError) as error:
+        session.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+    return _trial_response(session, current_user)
+
+
+def _reserve_trial_evaluation(
+    session: Session,
+    current_user: User,
+    repository: str,
+    idempotency_key: str | None,
+) -> UUID | None:
+    """Reserve quota only for an active trial, before contacting GitHub.
+
+    Normal subscriptions are unchanged. A trial request must provide an
+    idempotency key because a client retry must never consume another unit.
+    """
+    trial = get_active_trial_for_user(session, current_user.id)
+    if trial is None:
+        return None
+    if not idempotency_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Idempotency-Key es obligatorio durante un Enterprise Trial activo",
+        )
+    existing = (
+        session.query(EnterpriseTrialUsage)
+        .filter_by(trial_id=trial.id, idempotency_key=idempotency_key)
+        .first()
+    )
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Esta solicitud de trial ya fue procesada o está en curso",
+        )
+    try:
+        reservation = reserve_evaluation(
+            session,
+            trial_id=trial.id,
+            repository=repository,
+            idempotency_key=idempotency_key,
+        )
+        session.commit()
+        return reservation.id
+    except (TrialPolicyError, ValueError) as error:
+        session.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+
+
+def _complete_trial_evaluation(session: Session, reservation_id: UUID | None, evaluation_id: UUID) -> None:
+    if reservation_id is None:
+        return
+    complete_evaluation_reservation(session, usage_id=reservation_id, evaluation_id=evaluation_id)
+    session.commit()
+
+
+def _release_trial_evaluation(session: Session, reservation_id: UUID | None) -> None:
+    if reservation_id is None:
+        return
+    try:
+        release_evaluation_reservation(session, usage_id=reservation_id)
+        session.commit()
+    except SQLAlchemyError:  # Best-effort cleanup after an upstream evaluation failure.
+        session.rollback()
+        logger.exception("Could not release Enterprise Trial reservation")
 
 
 def _user_response(user: User) -> dict:
@@ -1023,6 +1242,7 @@ def health_check():
 @app.post("/api/v1/evaluations/gh-001", response_model=EvaluationResponse)
 def evaluate_gh001_endpoint(
     request: GH001EvaluationRequest,
+    http_request: Request,
     session: Session = Depends(get_db_session),
     github_token: str = Depends(get_github_token),
     current_user: User = Depends(get_current_user)
@@ -1032,7 +1252,9 @@ def evaluate_gh001_endpoint(
     """
     _require_repository_authorization(session, current_user, request.owner, request.repository)
     repo = PostgresEvaluationRepository_Dependency_Wrapper(session)
-    
+    reservation_id = _reserve_trial_evaluation(
+        session, current_user, f"{request.owner}/{request.repository}", http_request.headers.get("Idempotency-Key")
+    )
     try:
         persisted = evaluate_and_store_gh001(
             owner=request.owner,
@@ -1042,12 +1264,16 @@ def evaluate_gh001_endpoint(
             repository=repo,
             requested_by_user_id=current_user.id
         )
+        _complete_trial_evaluation(session, reservation_id, persisted.id)
     except ValueError as e:
+        _release_trial_evaluation(session, reservation_id)
         raise HTTPException(status_code=422, detail="Invalid evidence acquired") from e
     except RuntimeError as e:
+        _release_trial_evaluation(session, reservation_id)
         logger.error(f"Execution failed: {e}")
         raise HTTPException(status_code=502, detail="Infrastructure or upstream communication failure") from e
     except Exception as e:
+        _release_trial_evaluation(session, reservation_id)
         logger.error(f"Unexpected internal error: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
         
@@ -1099,6 +1325,7 @@ from securecode.application.evaluate_and_store import (
 @app.post("/api/v1/evaluations/gh-002", response_model=GH002EvaluationResponse)
 def evaluate_gh002_endpoint(
     request: GH002EvaluationRequest,
+    http_request: Request,
     session: Session = Depends(get_db_session),
     github_token: str = Depends(get_github_token),
     current_user: User = Depends(get_current_user)
@@ -1108,7 +1335,9 @@ def evaluate_gh002_endpoint(
     """
     _require_repository_authorization(session, current_user, request.owner, request.repository)
     repo = PostgresEvaluationRepository_Dependency_Wrapper(session)
-    
+    reservation_id = _reserve_trial_evaluation(
+        session, current_user, f"{request.owner}/{request.repository}", http_request.headers.get("Idempotency-Key")
+    )
     try:
         persisted = evaluate_and_store_gh002(
             owner=request.owner,
@@ -1117,12 +1346,16 @@ def evaluate_gh002_endpoint(
             repository=repo,
             requested_by_user_id=current_user.id
         )
+        _complete_trial_evaluation(session, reservation_id, persisted.id)
     except ValueError as e:
+        _release_trial_evaluation(session, reservation_id)
         raise HTTPException(status_code=422, detail="Invalid evidence acquired") from e
     except RuntimeError as e:
+        _release_trial_evaluation(session, reservation_id)
         logger.error(f"Execution failed: {e}")
         raise HTTPException(status_code=502, detail="Infrastructure or upstream communication failure") from e
     except Exception as e:
+        _release_trial_evaluation(session, reservation_id)
         logger.error(f"Unexpected internal error: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
         
@@ -1157,6 +1390,7 @@ def evaluate_gh002_endpoint(
 @app.post("/api/v1/evaluations/gh-003", response_model=GH003EvaluationResponse)
 def evaluate_gh003_endpoint(
     request: GH003EvaluationRequest,
+    http_request: Request,
     session: Session = Depends(get_db_session),
     github_token: str = Depends(get_github_token),
     current_user: User = Depends(get_current_user),
@@ -1164,6 +1398,9 @@ def evaluate_gh003_endpoint(
     """Verify that the selected GitHub branch requires signed commits."""
     _require_repository_authorization(session, current_user, request.owner, request.repository)
     repository = PostgresEvaluationRepository_Dependency_Wrapper(session)
+    reservation_id = _reserve_trial_evaluation(
+        session, current_user, f"{request.owner}/{request.repository}", http_request.headers.get("Idempotency-Key")
+    )
     try:
         persisted = evaluate_and_store_gh003(
             owner=request.owner,
@@ -1173,12 +1410,16 @@ def evaluate_gh003_endpoint(
             repository=repository,
             requested_by_user_id=current_user.id,
         )
+        _complete_trial_evaluation(session, reservation_id, persisted.id)
     except ValueError as error:
+        _release_trial_evaluation(session, reservation_id)
         raise HTTPException(status_code=422, detail="Invalid evidence acquired") from error
     except RuntimeError as error:
+        _release_trial_evaluation(session, reservation_id)
         logger.error("GH-003 execution failed: %s", error)
         raise HTTPException(status_code=502, detail="Infrastructure or upstream communication failure") from error
     except Exception as error:
+        _release_trial_evaluation(session, reservation_id)
         logger.error("Unexpected GH-003 error: %s", error)
         raise HTTPException(status_code=500, detail="Internal Server Error") from error
 
