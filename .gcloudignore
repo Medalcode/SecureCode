@@ -1,0 +1,27 @@
+# Contexto mínimo para Cloud Build. El Dockerfile copia explícitamente sólo
+# las carpetas de aplicación, migraciones, reglas y scripts necesarias.
+.git
+.gitignore
+.gcloudignore
+.review-20261112/
+.test-*/
+reports/
+docs/
+tests/
+artifacts/
+.github/
+venv/
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+src/*.egg-info/
+*.py[cod]
+*.docx
+*.xlsx
+*.pdf
+*.csv
+*.db
+.env
+.coverage
