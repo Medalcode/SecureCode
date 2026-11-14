@@ -75,13 +75,15 @@ class UrllibGitHubHttpClient:
         request = urllib.request.Request(f"{self.base_url.rstrip('/')}{path}", headers=headers)
         # Corporate proxy settings can incorrectly intercept 127.0.0.1.  The
         # test seam is a fixed loopback endpoint, so bypass proxies explicitly.
-        open_request = urllib.request.urlopen
-        if self.base_url.rstrip("/") == LOCAL_TEST_GITHUB_API_BASE_URL:
-            open_request = urllib.request.build_opener(
-                urllib.request.ProxyHandler({})
-            ).open
+        timeout = _github_timeout_seconds()
         try:
-            with open_request(request, timeout=_github_timeout_seconds()) as response:
+            if self.base_url.rstrip("/") == LOCAL_TEST_GITHUB_API_BASE_URL:
+                response_context = urllib.request.build_opener(
+                    urllib.request.ProxyHandler({})
+                ).open(request, timeout=timeout)
+            else:
+                response_context = urllib.request.urlopen(request, timeout=timeout)
+            with response_context as response:
                 payload = json.loads(response.read().decode("utf-8"))
                 if not isinstance(payload, dict):
                     raise TypeError("Expected JSON object from GitHub API")
