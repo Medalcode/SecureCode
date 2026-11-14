@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+
 from securecode.api.app import app
 
 client = TestClient(app)
@@ -11,7 +12,7 @@ def test_root_serves_html():
     assert "text/html" in response.headers.get("content-type", "")
     assert response.headers.get("cache-control") == "no-store, max-age=0"
     assert "/static/css/app.css?v=20261111-admin-navigation-gate" in response.text
-    assert "/static/js/app.js?v=20261114-enterprise-trial" in response.text
+    assert "/static/js/app.js?v=20261114-auth-gate" in response.text
     assert "Enterprise Trial" in response.text
     assert "enterpriseTrialActivateForm" in response.text
     assert "SecureCode" in response.text
@@ -42,6 +43,11 @@ def test_admin_navigation_is_gated_by_the_server_validated_role():
     assert "function clearAuthenticatedSession()" in script
     assert "function updateHistoryAccess()" in script
     assert "function updateEvaluatorAccess()" in script
+    assert """if (!state.token) {
+        setEvaluatorFeedback('Inicia sesión para ejecutar una evaluación y guardar su evidencia.', 'neutral');
+        openAuthModal();
+        return;
+      }""" in script
     assert "localStorage.removeItem('securecode_history');" in script
     assert ".nav-item[hidden]" in stylesheet
     assert "display: none !important;" in stylesheet

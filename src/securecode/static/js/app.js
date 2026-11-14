@@ -322,6 +322,15 @@
     // Envío del formulario
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
+
+      // La interfaz debe detener al visitante antes de solicitar una
+      // evaluación. El servidor conserva su propio 401 como defensa final.
+      if (!state.token) {
+        setEvaluatorFeedback('Inicia sesión para ejecutar una evaluación y guardar su evidencia.', 'neutral');
+        openAuthModal();
+        return;
+      }
+
       const rawRepo = repoInput.value.trim();
       const branch = branchInput ? branchInput.value.trim() : 'main';
 
