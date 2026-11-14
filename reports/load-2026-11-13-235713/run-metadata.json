@@ -1,0 +1,11 @@
+﻿{
+    "captured_at_utc":  "2026-11-14T02:59:17.4831866Z",
+    "git_commit":  "5f070e86e434a5ea048a0599abfce48a84232dc9",
+    "users":  100,
+    "spawn_rate":  10,
+    "duration":  "2m",
+    "api_endpoint":  "http://127.0.0.1:8000",
+    "mock_endpoint":  "http://127.0.0.1:8001",
+    "database_scope":  "local securecode_test",
+    "locust_exit_code":  0
+}
