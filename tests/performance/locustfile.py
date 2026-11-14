@@ -36,7 +36,14 @@ def on_test_start(environment, **kwargs):
                 created_at=datetime.now(UTC)
             )
             session.add(user)
-            session.commit()
+        else:
+            # This account exists only in the isolated performance database.
+            # Reset it deterministically so a previous manual seed cannot make
+            # authentication fail when Locust starts.
+            user.password_hash = hash_password(TEST_PASS)
+            user.active = True
+            user.role = "auditor"
+        session.flush()
         authorized_repositories = [
             "medalcode/securecode",
             "medalcode/securecode-small",
