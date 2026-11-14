@@ -30,7 +30,8 @@ def test_root_serves_html():
     assert 'data-view="admin" data-title="Consola de Administración" hidden' in response.text
     assert 'id="btnLogout" hidden' in response.text
     assert 'id="btnExportHistory" title="Exportar historial CSV" hidden' in response.text
-    assert 'id="btnSubmitEval" disabled' in response.text
+    assert 'id="btnSubmitEval"' in response.text
+    assert 'id="btnSubmitEval" disabled' not in response.text
     assert "Validación local verificada" in response.text
 
 
@@ -48,6 +49,12 @@ def test_admin_navigation_is_gated_by_the_server_validated_role():
         openAuthModal();
         return;
       }""" in script
+    assert """btnSubmit?.addEventListener('click', (event) => {
+      if (state.token) return;
+      event.preventDefault();
+      setEvaluatorFeedback('Inicia sesión para ejecutar una evaluación y guardar su evidencia.', 'neutral');
+      openAuthModal();
+    });""" in script
     assert "localStorage.removeItem('securecode_history');" in script
     assert ".nav-item[hidden]" in stylesheet
     assert "display: none !important;" in stylesheet
