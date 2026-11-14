@@ -11,7 +11,9 @@ def test_root_serves_html():
     assert "text/html" in response.headers.get("content-type", "")
     assert response.headers.get("cache-control") == "no-store, max-age=0"
     assert "/static/css/app.css?v=20261111-admin-navigation-gate" in response.text
-    assert "/static/js/app.js?v=20261111-auth-session-controls" in response.text
+    assert "/static/js/app.js?v=20261114-enterprise-trial" in response.text
+    assert "Enterprise Trial" in response.text
+    assert "enterpriseTrialActivateForm" in response.text
     assert "SecureCode" in response.text
     assert "Evaluador de Controles" in response.text
     assert 'id="clientSettingsForm"' in response.text

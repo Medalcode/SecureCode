@@ -441,6 +441,29 @@
               </div>
             </section>
 
+            <section class="enterprise-trial-card" aria-labelledby="enterpriseTrialTitle">
+              <div class="plan-selector-heading">
+                <div><span class="section-kicker">Acceso de evaluación</span><h2 id="enterpriseTrialTitle">Enterprise Trial</h2><p>Trial técnico de una sola vez. No genera cobros, pagos ni renovación automática.</p></div>
+                <span class="verification-source" id="enterpriseTrialStatus">Cargando estado…</span>
+              </div>
+              <div id="enterpriseTrialNotStarted" hidden>
+                <form id="enterpriseTrialActivateForm" class="enterprise-trial-form" novalidate>
+                  <label for="enterpriseTrialOrganization">Nombre de organización<input class="input-control" id="enterpriseTrialOrganization" maxlength="120" required placeholder="Ej.: Empresa SpA"></label>
+                  <label class="finops-toggle"><input id="enterpriseTrialConfirmation" type="checkbox"> Confirmo que el trial dura 14 días, permite hasta 3 repositorios y 100 evaluaciones, y no es facturable.</label>
+                  <button class="btn-primary" id="btnActivateEnterpriseTrial" type="submit" disabled>Activar Enterprise Trial</button>
+                </form>
+              </div>
+              <div id="enterpriseTrialActive" hidden>
+                <div class="enterprise-trial-metrics"><div><b id="enterpriseTrialDays">—</b><span>vigencia restante</span></div><div><b id="enterpriseTrialRepositories">—</b><span>repositorios usados</span></div><div><b id="enterpriseTrialEvaluations">—</b><span>evaluaciones usadas</span></div></div>
+                <form id="enterpriseTrialRepositoryForm" class="enterprise-trial-form enterprise-trial-repository-form" novalidate>
+                  <label for="enterpriseTrialRepository">Repositorio autorizado<input class="input-control" id="enterpriseTrialRepository" maxlength="201" required placeholder="owner/repo"></label>
+                  <button class="btn-primary" type="submit">Agregar repositorio</button>
+                </form>
+                <div class="enterprise-trial-repositories" id="enterpriseTrialRepositoriesList"></div>
+              </div>
+              <div class="subscription-disclaimer" id="enterpriseTrialFeedback" aria-live="polite"></div>
+            </section>
+
             <div class="data-table-wrapper">
               <div class="data-table-header"><div><div class="data-table-title">Historial de suscripción</div><div class="admin-helper">Cambios confirmados asociados a tu cuenta.</div></div></div>
               <table class="modern-table"><thead><tr><th>Fecha</th><th>Evento</th><th>Plan anterior</th><th>Plan vigente</th><th>Período</th></tr></thead><tbody id="subscriptionHistoryBody"></tbody></table>
@@ -683,6 +706,6 @@
   </div>
 
   <!-- Script Principal de la Aplicación -->
-  <script src="/static/js/app.js?v=20261111-auth-session-controls"></script>
+  <script src="/static/js/app.js?v=20261114-enterprise-trial"></script>
 </body>
 </html>

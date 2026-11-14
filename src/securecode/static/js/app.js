@@ -27,6 +27,7 @@
     // Nunca exponer evidencia cacheada antes de validar una sesión.
     evalHistory: [],
     finops: null,
+    enterpriseTrial: null,
     systemHealth: { status: 'checking', latencyMs: null },
     rules: [
       {
@@ -67,6 +68,7 @@
     initHistory();
     initDashboard();
     initSubscription();
+    initEnterpriseTrial();
     initAdminConsole();
     initClientSettings();
     initAuthModal();
@@ -513,6 +515,11 @@
 
     if (state.token) {
       headers['Authorization'] = `Bearer ${state.token}`;
+      if (state.enterpriseTrial?.status === 'active') {
+        headers['Idempotency-Key'] = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : 'trial-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+      }
     }
 
     const res = await fetch(endpoint, {
@@ -534,6 +541,10 @@
 
     if (res.status === 422) {
       throw new Error(await getApiError(res, 'Los datos del repositorio o la rama no cumplen el formato válido de GitHub.'));
+    }
+
+    if (res.status === 400 || res.status === 403 || res.status === 409) {
+      throw new Error(await getApiError(res, 'La evaluación fue rechazada por un control de acceso o cuota.'));
     }
 
     if (!res.ok) {
@@ -1041,6 +1052,104 @@
     }
   }
 
+  // --- Enterprise Trial no facturable ---
+  function initEnterpriseTrial() {
+    const confirmation = document.getElementById('enterpriseTrialConfirmation');
+    const activateForm = document.getElementById('enterpriseTrialActivateForm');
+    const repositoryForm = document.getElementById('enterpriseTrialRepositoryForm');
+    confirmation?.addEventListener('change', event => {
+      const button = document.getElementById('btnActivateEnterpriseTrial');
+      if (button) button.disabled = !event.target.checked;
+    });
+    activateForm?.addEventListener('submit', activateEnterpriseTrial);
+    repositoryForm?.addEventListener('submit', addEnterpriseTrialRepository);
+  }
+
+  async function loadEnterpriseTrial() {
+    if (!state.token) return;
+    try {
+      const response = await fetch('/api/v1/enterprise-trial', { headers: { Authorization: 'Bearer ' + state.token } });
+      if (!response.ok) throw new Error(await getApiError(response, 'No se pudo cargar el Enterprise Trial.'));
+      state.enterpriseTrial = await response.json();
+      renderEnterpriseTrial(state.enterpriseTrial);
+    } catch (error) {
+      const feedback = document.getElementById('enterpriseTrialFeedback');
+      if (feedback) feedback.textContent = error.message;
+    }
+  }
+
+  function renderEnterpriseTrial(trial) {
+    const status = document.getElementById('enterpriseTrialStatus');
+    const inactive = document.getElementById('enterpriseTrialNotStarted');
+    const active = document.getElementById('enterpriseTrialActive');
+    const feedback = document.getElementById('enterpriseTrialFeedback');
+    if (!trial || !status || !inactive || !active) return;
+    inactive.hidden = trial.status !== 'not_started';
+    active.hidden = trial.status !== 'active';
+    if (trial.status === 'not_started') {
+      status.textContent = 'Disponible una vez';
+      if (feedback) feedback.textContent = 'Actívalo sólo si deseas probar los límites Enterprise. La suscripción actual no cambia.';
+      return;
+    }
+    if (trial.status === 'expired') {
+      status.textContent = 'Trial finalizado';
+      if (feedback) feedback.textContent = 'El trial fue utilizado y venció. No se realiza ningún cobro ni renovación.';
+      return;
+    }
+    const remainingDays = Math.max(0, Math.ceil((new Date(trial.expires_at).getTime() - Date.now()) / 86400000));
+    status.textContent = 'Activo · sin cobro';
+    document.getElementById('enterpriseTrialDays').textContent = remainingDays + ' días';
+    document.getElementById('enterpriseTrialRepositories').textContent = trial.repositories_used + ' / ' + trial.repository_limit;
+    document.getElementById('enterpriseTrialEvaluations').textContent = trial.evaluations_used + ' / ' + trial.evaluation_limit;
+    document.getElementById('enterpriseTrialRepositoriesList').innerHTML = trial.repositories.length
+      ? trial.repositories.map(item => '<code>' + escapeHTML(item) + '</code>').join('')
+      : '<span>Aún no hay repositorios autorizados.</span>';
+    const repositoryInput = document.getElementById('enterpriseTrialRepository');
+    if (repositoryInput) repositoryInput.disabled = trial.repositories_remaining === 0;
+    if (feedback) feedback.textContent = 'Vence el ' + formatSubscriptionDate(trial.expires_at) + '. Para evaluar, usa uno de estos repositorios y una clave de idempotencia.';
+  }
+
+  async function activateEnterpriseTrial(event) {
+    event.preventDefault();
+    const organization = document.getElementById('enterpriseTrialOrganization')?.value.trim();
+    const confirmed = Boolean(document.getElementById('enterpriseTrialConfirmation')?.checked);
+    const feedback = document.getElementById('enterpriseTrialFeedback');
+    if (!organization || !confirmed) return;
+    if (feedback) feedback.textContent = 'Activando trial…';
+    try {
+      const response = await fetch('/api/v1/enterprise-trial', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + state.token },
+        body: JSON.stringify({ organization_name: organization, confirmation: true })
+      });
+      if (!response.ok) throw new Error(await getApiError(response, 'No se pudo activar el trial.'));
+      state.enterpriseTrial = await response.json();
+      renderEnterpriseTrial(state.enterpriseTrial);
+    } catch (error) {
+      if (feedback) feedback.textContent = error.message;
+    }
+  }
+
+  async function addEnterpriseTrialRepository(event) {
+    event.preventDefault();
+    const input = document.getElementById('enterpriseTrialRepository');
+    const repository = input?.value.trim();
+    const feedback = document.getElementById('enterpriseTrialFeedback');
+    if (!repository) return;
+    if (feedback) feedback.textContent = 'Autorizando repositorio…';
+    try {
+      const response = await fetch('/api/v1/enterprise-trial/repositories', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + state.token },
+        body: JSON.stringify({ repository })
+      });
+      if (!response.ok) throw new Error(await getApiError(response, 'No se pudo autorizar el repositorio.'));
+      state.enterpriseTrial = await response.json();
+      if (input) input.value = '';
+      renderEnterpriseTrial(state.enterpriseTrial);
+    } catch (error) {
+      if (feedback) feedback.textContent = error.message;
+    }
+  }
+
   function renderSubscriptionHistory(events) {
     const body = document.getElementById('subscriptionHistoryBody');
     if (!body) return;
@@ -1513,6 +1622,7 @@
       refreshAdminUsers();
       loadClientSettings();
       loadSubscription();
+      loadEnterpriseTrial();
       loadFinOps();
     } catch {
       clearAuthenticatedSession();

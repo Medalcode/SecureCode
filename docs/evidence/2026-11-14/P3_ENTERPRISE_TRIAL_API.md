@@ -53,8 +53,25 @@ python -m pytest -q -p no:cacheprovider --basetemp=.test-tmp-enterprise-full
 203 passed, 13 skipped in 3.74s
 ```
 
-## Pendiente explícito
+## Interfaz implementada
 
-La interfaz web aún no muestra el formulario ni el estado del Enterprise
-Trial. La siguiente tarea de producto es consumir estos endpoints desde la
-página de Plan & SLA con las mismas confirmaciones y mensajes de cuota.
+La página autenticada **Plan & SLA** consume los endpoints anteriores y
+muestra el estado disponible, activo o vencido. Permite ingresar el nombre de
+organización, exige confirmación antes de activar, muestra días y cuotas
+restantes, y permite añadir repositorios hasta el límite. También comunica
+explícitamente que el trial es no facturable y que no modifica la suscripción
+comercial.
+
+La interfaz no intenta generar cobros ni inventa precios. Cuando el trial está
+activo, el evaluador genera y envía una `Idempotency-Key` nueva por cada
+ejecución, de modo que el límite se aplique sin exponer ese detalle operativo
+al usuario final.
+
+Verificación adicional de interfaz:
+
+```text
+node --check src/securecode/static/js/app.js
+python -m pytest tests/api/test_frontend_routes.py \
+  tests/api/test_enterprise_trial_http.py tests/api/test_admin_http.py -q
+11 passed in 1.46s
+```
