@@ -1,0 +1,24 @@
+{
+  "pull_request": 10,
+  "url": "https://github.com/Medalcode/SecureCode/pull/10",
+  "base": "main",
+  "head": "docs/gov-001-specification",
+  "observed_sequence": [
+    {
+      "merge_state_status": "BLOCKED",
+      "checks": [
+        {"name": "test", "status": "IN_PROGRESS"},
+        {"name": "docker-smoke-test", "status": "IN_PROGRESS"}
+      ]
+    },
+    {
+      "merge_state_status": "CLEAN",
+      "checks": [
+        {"name": "test", "status": "COMPLETED", "conclusion": "SUCCESS"},
+        {"name": "docker-smoke-test", "status": "COMPLETED", "conclusion": "SUCCESS"}
+      ]
+    }
+  ],
+  "merged": false,
+  "captured_at": "2026-11-14"
+}
