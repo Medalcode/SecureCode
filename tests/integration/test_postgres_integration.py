@@ -192,6 +192,7 @@ def test_api_postgres_integration(engine, session, monkeypatch):
         username=f"integration_user_{uuid4().hex[:12]}",
         password_hash=hash_password("securepassword"),
         active=True,
+        role="admin",
         created_at=datetime.now(timezone.utc)
     )
     session.add(test_user)
