@@ -39,8 +39,9 @@ python -m pytest -q -p no:cacheprovider
 
 Las pruebas demuestran 100 reservas permitidas y la 101 bloqueada, tres
 repositorios permitidos y el cuarto bloqueado, expiración, aislamiento por
-membresía y reintentos idempotentes. La concurrencia real en PostgreSQL y la
-migración sobre Supabase siguen pendientes de ejecución controlada.
+membresía y reintentos idempotentes. La concurrencia real en PostgreSQL sigue
+pendiente de ejecución controlada. La migración sobre Supabase fue ejecutada
+posteriormente el 2026-11-14; véase `P4_SUPABASE_SCHEMA_MIGRATION.md`.
 
 Verificación de migraciones posterior a la corrección:
 

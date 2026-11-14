@@ -57,6 +57,10 @@ def create_trial(
     if not normalized_name:
         raise ValueError("Organization name is required.")
     organization = Organization(id=uuid4(), name=normalized_name, created_at=current)
+    # Persist the parent before creating rows that reference its UUID.  SQLite
+    # may not enforce foreign keys by default, while PostgreSQL/Supabase does.
+    session.add(organization)
+    session.flush()
     trial = EnterpriseTrial(
         id=uuid4(),
         organization_id=organization.id,
@@ -69,7 +73,7 @@ def create_trial(
     membership = OrganizationMembership(
         id=uuid4(), organization_id=organization.id, user_id=owner_user_id, role="owner", created_at=current
     )
-    session.add_all((organization, membership, trial))
+    session.add_all((membership, trial))
     session.flush()
     return trial
 
