@@ -68,8 +68,9 @@ try {
         -RedirectStandardError (Join-Path $reportDirectory 'api.stderr.log')
     Wait-LocalEndpoint 'http://127.0.0.1:8000/health' 'La API local'
 
+    $csvPrefix = Join-Path $reportDirectory 'locust'
     & locust -f tests\performance\locustfile.py --headless -u $Users -r $SpawnRate -t $Duration `
-        --host=http://127.0.0.1:8000 --csv=(Join-Path $reportDirectory 'locust')
+        --host http://127.0.0.1:8000 --csv $csvPrefix
     $locustExitCode = $LASTEXITCODE
 
     [ordered]@{
