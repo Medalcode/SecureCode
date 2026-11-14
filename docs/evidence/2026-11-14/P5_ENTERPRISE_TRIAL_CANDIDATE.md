@@ -41,6 +41,18 @@ Se creó una cuenta auditor aislada, con una contraseña efímera no registrada 
 
 No se creó facturación, cobro, renovación ni transferencia de tráfico. Los registros de prueba permanecen deliberadamente en Supabase como evidencia auditable; no contienen contraseñas en texto plano.
 
-## Decisión pendiente
+## Promoción y verificación posterior
 
-La candidata está lista para una decisión de transferencia de tráfico. Antes de promoverla, debe revisarse el Pull Request del fix `f7f7424`; la promoción de tráfico requiere una autorización separada.
+El PR que contiene el fix fue fusionado como `552dd167aeac99a89f6e516a9ea0d6d56e29a6a4` tras aprobar `test` y `docker-smoke-test`. Con autorización separada, Cloud Run trasladó el 100 % del tráfico a `securecode-enterprise-trial-fix`.
+
+Smoke test posterior en la URL principal:
+
+```json
+{
+  "health_status": 200,
+  "health_body": {"status": "ok"},
+  "enterprise_trial_unauthenticated_status": 401
+}
+```
+
+El `401` confirma que el endpoint está presente y protegido; un `404` habría indicado una imagen antigua. La revisión anterior no recibió tráfico tras la promoción.
