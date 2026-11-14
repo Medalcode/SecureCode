@@ -1,0 +1,50 @@
+{
+  "captured_at_utc": "2026-11-14T01:55:35.835497+00:00",
+  "commit": "406f2d5e65f904e726fd198d9fcedf6ddfa7097f",
+  "environment": {
+    "python": "3.14.6",
+    "platform": "Windows-10-10.0.19045-SP0"
+  },
+  "scope": {
+    "controls": [
+      "gh-001",
+      "gh-002",
+      "gh-003"
+    ],
+    "profiles": [
+      "small",
+      "medium",
+      "large"
+    ],
+    "evaluations_per_control": 100
+  },
+  "before": {
+    "database_bytes": {
+      "evaluation_records": 32768,
+      "evidence_records": 32768
+    },
+    "process": {
+      "cpu_user_seconds": 1.40625,
+      "cpu_system_seconds": 0.421875,
+      "rss_bytes": 99254272
+    },
+    "mock_requests": 29
+  },
+  "after": {
+    "database_bytes": {
+      "evaluation_records": 237568,
+      "evidence_records": 270336
+    },
+    "process": {
+      "cpu_user_seconds": 17.328125,
+      "cpu_system_seconds": 6.4375,
+      "rss_bytes": 104681472
+    },
+    "mock_requests": 2429
+  },
+  "mock_request_delta": 2400,
+  "total_observations": 900,
+  "successful_observations": 900,
+  "error_observations": 0,
+  "latency_p95_ms": 419.0112
+}
