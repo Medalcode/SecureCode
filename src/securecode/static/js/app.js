@@ -70,6 +70,7 @@
     initSubscription();
     initEnterpriseTrial();
     initAdminConsole();
+    initOrganizationConsole();
     initClientSettings();
     initAuthModal();
     syncAuthenticatedUser();
@@ -212,7 +213,8 @@
 
     navItems.forEach(item => {
       item.addEventListener('click', () => {
-        if (item.dataset.view === 'admin' && !isAdministrator()) return;
+        if (item.dataset.view === 'admin' && !isPlatformAdmin()) return;
+        if (item.dataset.view === 'organization' && !isOrganizationOwner()) return;
         switchView(item.dataset.view, item.dataset.title);
       });
     });
@@ -233,12 +235,16 @@
     updateAdminAccess();
   }
 
-  function isAdministrator() {
-    return Boolean(state.token && state.accessRole === 'admin');
+  function isPlatformAdmin() {
+    return Boolean(state.token && state.accessRole === 'platform_admin');
+  }
+
+  function isOrganizationOwner() {
+    return Boolean(state.token && state.accessRole === 'organization_owner');
   }
 
   function switchView(viewId, title) {
-    if (viewId === 'admin' && !isAdministrator()) {
+    if ((viewId === 'admin' && !isPlatformAdmin()) || (viewId === 'organization' && !isOrganizationOwner())) {
       viewId = 'evaluator';
       title = 'Evaluador de Controles';
     }
@@ -256,16 +262,21 @@
     if (window.innerWidth <= 768) document.getElementById('sidebar')?.classList.remove('mobile-open');
   }
 
-  // La visibilidad es una mejora de UX; los endpoints administrativos mantienen
-  // su propia autorización server-side mediante require_admin.
   function updateAdminAccess() {
     const adminNav = document.querySelector('.nav-item[data-view="admin"]');
-    const allowed = isAdministrator();
+    const organizationNav = document.querySelector('.nav-item[data-view="organization"]');
+    const allowed = isPlatformAdmin();
     if (adminNav) {
       adminNav.hidden = !allowed;
       adminNav.setAttribute('aria-hidden', String(!allowed));
     }
+    const ownerAllowed = isOrganizationOwner();
+    if (organizationNav) {
+      organizationNav.hidden = !ownerAllowed;
+      organizationNav.setAttribute('aria-hidden', String(!ownerAllowed));
+    }
     if (!allowed && state.activeTab === 'admin') switchView('evaluator', 'Evaluador de Controles');
+    if (!ownerAllowed && state.activeTab === 'organization') switchView('evaluator', 'Evaluador de Controles');
   }
 
   // --- Comprobación de Salud de la API (/health) ---
@@ -909,14 +920,19 @@
   function updateFinOpsAccess() {
     const panel = document.getElementById('finopsPanel');
     const notice = document.getElementById('finopsAccessNotice');
-    const authenticated = Boolean(state.token && state.accessRole);
-    if (panel) panel.hidden = !authenticated;
-    if (notice) notice.hidden = authenticated;
+    const allowed = isOrganizationOwner();
+    if (panel) panel.hidden = !allowed;
+    if (notice) {
+      notice.hidden = allowed;
+      notice.textContent = state.token
+        ? 'Sólo el propietario de la organización puede administrar consumo y preferencias FinOps.'
+        : 'Inicia sesión con el propietario de la organización para administrar consumo y preferencias FinOps.';
+    }
   }
 
   async function loadFinOps() {
     updateFinOpsAccess();
-    if (!state.token) return;
+    if (!isOrganizationOwner()) return;
     try {
       const response = await fetch('/api/v1/finops', { headers: { 'Authorization': 'Bearer ' + state.token } });
       if (!response.ok) throw new Error('No se pudo cargar el consumo.');
@@ -950,7 +966,7 @@
   function renderFinOps(data) {
     document.getElementById('quotaUsedText').textContent = Number(data.evaluations_current_period).toLocaleString('es-CL');
     document.getElementById('quotaMaxText').textContent = Number(data.evaluations_all_time).toLocaleString('es-CL');
-    document.getElementById('usageScopeLabel').textContent = data.scope === 'platform' ? 'Plataforma' : 'Cuenta';
+    document.getElementById('usageScopeLabel').textContent = data.scope === 'platform' ? 'Plataforma' : data.scope === 'organization' ? 'Organización' : 'Cuenta';
     document.getElementById('usagePeriodStart').textContent = new Date(data.period_start).toLocaleDateString('es-CL');
     document.getElementById('quotaPctText').textContent = 'Evaluaciones del período actual';
     document.getElementById('quotaBarFill').style.width = data.evaluations_all_time ? Math.min(100, Math.round((data.evaluations_current_period / data.evaluations_all_time) * 100)) + '%' : '0%';
@@ -961,7 +977,7 @@
     document.getElementById('projectedChargeText').textContent = 'No disponible';
   }
 
-  // --- Ciclo de suscripción persistido por cuenta ---
+  // --- Ciclo de suscripción administrado por el propietario de la organización ---
   function initSubscription() {
     document.getElementById('subscriptionConfirmCheckbox')?.addEventListener('change', event => {
       const confirm = document.getElementById('btnConfirmSubscriptionChange');
@@ -975,14 +991,19 @@
   function updateSubscriptionAccess() {
     const panel = document.getElementById('subscriptionPanel');
     const notice = document.getElementById('subscriptionAccessNotice');
-    const authenticated = Boolean(state.token && state.accessRole);
-    if (panel) panel.hidden = !authenticated;
-    if (notice) notice.hidden = authenticated;
+    const allowed = isOrganizationOwner();
+    if (panel) panel.hidden = !allowed;
+    if (notice) {
+      notice.hidden = allowed;
+      notice.textContent = state.token
+        ? 'Sólo el propietario de la organización puede administrar el plan y el SLA.'
+        : 'Inicia sesión con el propietario de la organización para administrar el plan y el SLA.';
+    }
   }
 
   async function loadSubscription() {
     updateSubscriptionAccess();
-    if (!state.token) return;
+    if (!isOrganizationOwner()) return;
     try {
       const headers = { 'Authorization': 'Bearer ' + state.token };
       const results = await Promise.all([
@@ -1135,15 +1156,14 @@
 
   async function activateEnterpriseTrial(event) {
     event.preventDefault();
-    const organization = document.getElementById('enterpriseTrialOrganization')?.value.trim();
     const confirmed = Boolean(document.getElementById('enterpriseTrialConfirmation')?.checked);
     const feedback = document.getElementById('enterpriseTrialFeedback');
-    if (!organization || !confirmed) return;
+    if (!confirmed) return;
     if (feedback) feedback.textContent = 'Activando trial…';
     try {
       const response = await fetch('/api/v1/enterprise-trial', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + state.token },
-        body: JSON.stringify({ organization_name: organization, confirmation: true })
+        body: JSON.stringify({ confirmation: true })
       });
       if (!response.ok) throw new Error(await getApiError(response, 'No se pudo activar el trial.'));
       state.enterpriseTrial = await response.json();
@@ -1186,6 +1206,130 @@
 
   function updateQuotaUI() {
     if (state.finops) renderFinOps(state.finops);
+  }
+
+  // --- Administración del cliente: propietario y Analyst ---
+  function initOrganizationConsole() {
+    document.getElementById('btnRefreshOrganization')?.addEventListener('click', refreshOrganization);
+    document.getElementById('createOrganizationMemberForm')?.addEventListener('submit', createOrganizationAnalyst);
+    document.getElementById('organizationRepositoryAuthorizationForm')?.addEventListener('submit', saveOrganizationRepositoryAuthorization);
+  }
+
+  function setOrganizationFeedback(message = '', tone = '') {
+    const feedback = document.getElementById('organizationMemberFeedback');
+    if (feedback) { feedback.textContent = message; feedback.dataset.tone = tone; }
+  }
+
+  function setOrganizationRepositoryFeedback(message = '', tone = '') {
+    const feedback = document.getElementById('organizationRepositoryFeedback');
+    if (feedback) { feedback.textContent = message; feedback.dataset.tone = tone; }
+  }
+
+  async function refreshOrganization() {
+    const panel = document.getElementById('organizationPanel');
+    const notice = document.getElementById('organizationAccessNotice');
+    if (!panel || !notice) return;
+    if (!isOrganizationOwner()) {
+      panel.hidden = true;
+      notice.hidden = false;
+      notice.textContent = state.token ? 'Sólo el propietario de la organización puede administrar el equipo.' : 'Inicia sesión con el propietario de la organización para administrar el equipo.';
+      return;
+    }
+    try {
+      const headers = { Authorization: `Bearer ${state.token}` };
+      const [membersResult, authorizationsResult] = await Promise.all([
+        fetch('/api/v1/organization/members', { headers }),
+        fetch('/api/v1/organization/repository-authorizations', { headers })
+      ]);
+      if (!membersResult.ok) throw new Error(await getApiError(membersResult, 'No se pudo cargar el equipo.'));
+      state.organizationMembers = await membersResult.json();
+      if (!authorizationsResult.ok) throw new Error(await getApiError(authorizationsResult, 'No se pudieron cargar los repositorios.'));
+      state.organizationAuthorizations = await authorizationsResult.json();
+      renderOrganizationMembers();
+      renderOrganizationAuthorizations();
+      panel.hidden = false;
+      notice.hidden = true;
+    } catch (error) {
+      panel.hidden = true;
+      notice.hidden = false;
+      notice.textContent = error.message;
+    }
+  }
+
+  function renderOrganizationMembers() {
+    const body = document.getElementById('organizationMembersBody');
+    const select = document.getElementById('organizationAuthorizationUserId');
+    if (!body || !select) return;
+    const members = state.organizationMembers || [];
+    body.innerHTML = members.map(member => {
+      const owner = member.role === 'organization_owner';
+      const action = owner ? '<span class="admin-helper">Propietario</span>' : `<div class="admin-action-group"><button type="button" class="btn-inline-danger" data-organization-member="${escapeHTML(member.id)}" data-active="${member.active}">${member.active ? 'Desactivar' : 'Activar'}</button><button type="button" class="btn-copy" data-organization-reset="${escapeHTML(member.id)}" data-organization-username="${escapeHTML(member.username)}">Restablecer</button></div>`;
+      return `<tr><td>${escapeHTML(member.username)}</td><td>${owner ? 'Organization Owner' : 'Analyst'}</td><td>${member.active ? 'Activo' : 'Desactivado'}</td><td>${action}</td></tr>`;
+    }).join('') || '<tr><td colspan="4">No hay miembros.</td></tr>';
+    body.querySelectorAll('[data-organization-member]').forEach(button => button.addEventListener('click', () => updateOrganizationAnalyst(button)));
+    body.querySelectorAll('[data-organization-reset]').forEach(button => button.addEventListener('click', () => openOrganizationPasswordReset(button)));
+    const analysts = members.filter(member => member.role === 'analyst' && member.active);
+    select.innerHTML = analysts.map(member => `<option value="${escapeHTML(member.id)}">${escapeHTML(member.username)}</option>`).join('') || '<option value="">No hay Analyst activos</option>';
+  }
+
+  function renderOrganizationAuthorizations() {
+    const body = document.getElementById('organizationAuthorizationsBody');
+    if (!body) return;
+    body.innerHTML = (state.organizationAuthorizations || []).map(item => `<tr><td>${escapeHTML(item.username || item.user_id)}</td><td><code>${escapeHTML(item.repository)}</code></td><td>${item.active ? 'Activa' : 'Revocada'}</td><td><button type="button" class="btn-copy" data-organization-authorization="${escapeHTML(item.id)}" data-active="${item.active}">${item.active ? 'Revocar' : 'Reactivar'}</button></td></tr>`).join('') || '<tr><td colspan="4">Aún no hay repositorios autorizados.</td></tr>';
+    body.querySelectorAll('[data-organization-authorization]').forEach(button => button.addEventListener('click', () => updateOrganizationAuthorization(button)));
+  }
+
+  async function createOrganizationAnalyst(event) {
+    event.preventDefault();
+    const username = document.getElementById('organizationMemberUsername').value.trim();
+    const password = document.getElementById('organizationMemberPassword').value;
+    if (!Object.values(passwordRules(password)).every(Boolean)) { setOrganizationFeedback('La contraseña debe cumplir la política de seguridad.', 'error'); return; }
+    try {
+      const res = await fetch('/api/v1/organization/members', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.token}` }, body: JSON.stringify({ username, password }) });
+      if (!res.ok) throw new Error(await getApiError(res, 'No se pudo crear el Analyst.'));
+      event.target.reset(); setOrganizationFeedback('Analyst creado. Entrega la contraseña temporal por un canal seguro.', 'success');
+      await refreshOrganization();
+    } catch (error) { setOrganizationFeedback(error.message, 'error'); }
+  }
+
+  async function updateOrganizationAnalyst(button) {
+    try {
+      const active = button.dataset.active !== 'true';
+      const res = await fetch(`/api/v1/organization/members/${encodeURIComponent(button.dataset.organizationMember)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.token}` }, body: JSON.stringify({ active }) });
+      if (!res.ok) throw new Error(await getApiError(res, 'No se pudo actualizar el Analyst.'));
+      await refreshOrganization();
+    } catch (error) { setOrganizationFeedback(error.message, 'error'); }
+  }
+
+  function openOrganizationPasswordReset(button) {
+    openPasswordResetModal(
+      button.dataset.organizationReset,
+      button.dataset.organizationUsername,
+      `/api/v1/organization/members/${encodeURIComponent(button.dataset.organizationReset)}`,
+      'organization'
+    );
+  }
+
+  async function saveOrganizationRepositoryAuthorization(event) {
+    event.preventDefault();
+    const userId = document.getElementById('organizationAuthorizationUserId').value;
+    const repository = document.getElementById('organizationAuthorizationRepository').value.trim();
+    if (!userId || !normalizeGithubRepository(repository)) { setOrganizationRepositoryFeedback('Selecciona un Analyst e ingresa un repositorio owner/repo válido.', 'error'); return; }
+    try {
+      const res = await fetch('/api/v1/organization/repository-authorizations', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.token}` }, body: JSON.stringify({ user_id: userId, repository }) });
+      if (!res.ok) throw new Error(await getApiError(res, 'No se pudo autorizar el repositorio.'));
+      document.getElementById('organizationAuthorizationRepository').value = '';
+      setOrganizationRepositoryFeedback('Repositorio autorizado.', 'success'); await refreshOrganization();
+    } catch (error) { setOrganizationRepositoryFeedback(error.message, 'error'); }
+  }
+
+  async function updateOrganizationAuthorization(button) {
+    try {
+      const active = button.dataset.active !== 'true';
+      const res = await fetch(`/api/v1/organization/repository-authorizations/${encodeURIComponent(button.dataset.organizationAuthorization)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.token}` }, body: JSON.stringify({ active }) });
+      if (!res.ok) throw new Error(await getApiError(res, 'No se pudo actualizar la autorización.'));
+      await refreshOrganization();
+    } catch (error) { setOrganizationRepositoryFeedback(error.message, 'error'); }
   }
 
   // --- Consola de Administración ---
@@ -1236,7 +1380,7 @@
     const notice = document.getElementById('adminAccessNotice');
     const body = document.getElementById('adminUsersBody');
     if (!management || !notice || !body) return;
-    if (!state.token || state.accessRole !== 'admin') {
+    if (!isPlatformAdmin()) {
       management.hidden = true;
       document.getElementById('adminAuditTrail').hidden = true;
       notice.hidden = false;
@@ -1247,8 +1391,6 @@
       if (!res.ok) throw new Error('No autorizado');
       state.adminUsers = await res.json();
       renderAdminUsers();
-      renderAuthorizationUserOptions();
-      loadRepositoryAuthorizations();
       refreshUserAuditEvents();
       management.hidden = false;
       notice.hidden = true;
@@ -1274,16 +1416,16 @@
     const count = document.getElementById('adminUserCount');
     if (count) count.textContent = `${users.length} de ${state.adminUsers.length} cuentas`;
     const activeUsers = state.adminUsers.filter(user => user.active).length;
-    const administrators = state.adminUsers.filter(user => user.role === 'admin' && user.active).length;
+    const administrators = state.adminUsers.filter(user => user.role === 'platform_admin' && user.active).length;
     document.getElementById('adminTotalUsers').textContent = String(state.adminUsers.length);
     document.getElementById('adminActiveUsers').textContent = String(activeUsers);
     document.getElementById('adminAdminUsers').textContent = String(administrators);
     body.innerHTML = users.map(user => {
         const action = user.username === state.user.username
           ? '<span class="admin-helper">Cuenta actual</span>'
-          : `<div class="admin-action-group"><button class="btn-inline-danger" data-action="active" data-user-id="${escapeHTML(user.id)}" data-active="${user.active}">${user.active ? 'Desactivar' : 'Activar'}</button><button class="btn-copy" data-action="role" data-user-id="${escapeHTML(user.id)}" data-role="${user.role}">${user.role === 'admin' ? 'Hacer auditor' : 'Hacer admin'}</button><button class="btn-copy" data-action="password" data-user-id="${escapeHTML(user.id)}">Restablecer</button></div>`;
+          : `<div class="admin-action-group"><button class="btn-inline-danger" data-action="active" data-user-id="${escapeHTML(user.id)}" data-active="${user.active}">${user.active ? 'Desactivar' : 'Activar'}</button><button class="btn-copy" data-action="password" data-user-id="${escapeHTML(user.id)}">Restablecer</button></div>`;
         const activity = user.last_login_at || user.updated_at || user.created_at;
-        return `<tr><td>${escapeHTML(user.username)}</td><td>${user.role === 'admin' ? 'Administrador' : 'Auditor'}</td><td>${user.active ? 'Activo' : 'Desactivado'}</td><td>${activity ? new Date(activity).toLocaleString() : 'Sin registros'}</td><td>${action}</td></tr>`;
+        return `<tr><td>${escapeHTML(user.username)}</td><td>Platform Admin</td><td>${user.active ? 'Activo' : 'Desactivado'}</td><td>${activity ? new Date(activity).toLocaleString() : 'Sin registros'}</td><td>${action}</td></tr>`;
       }).join('') || '<tr><td colspan="5">No hay cuentas que coincidan con los filtros.</td></tr>';
     body.querySelectorAll('[data-user-id]').forEach(button => button.addEventListener('click', () => manageUserAction(button)));
   }
@@ -1354,7 +1496,7 @@
   async function refreshUserAuditEvents() {
     const trail = document.getElementById('adminAuditTrail');
     const body = document.getElementById('adminAuditBody');
-    if (!trail || !body || !state.token || state.accessRole !== 'admin') return;
+    if (!trail || !body || !isPlatformAdmin()) return;
     try {
       const res = await fetch('/api/v1/admin/user-audit-events?limit=25', { headers: { 'Authorization': `Bearer ${state.token}` } });
       if (!res.ok) throw new Error('No autorizado');
@@ -1386,7 +1528,7 @@
       setAdminFeedback('Revisa los requisitos y confirma la contraseña temporal.', 'error');
       return;
     }
-    if (payload.role === 'admin' && !document.getElementById('newAdminAcknowledgementCheck').checked) {
+    if (payload.role === 'platform_admin' && !document.getElementById('newAdminAcknowledgementCheck').checked) {
       setAdminFeedback('Confirma explícitamente la asignación de privilegios administrativos.', 'error');
       return;
     }
@@ -1421,9 +1563,7 @@
     if (action === 'role' && !window.confirm(`¿Cambiar el rol de ${username}? El nuevo permiso tendrá efecto en su próximo inicio de sesión.`)) return;
     const payload = action === 'active'
       ? { active: button.dataset.active !== 'true' }
-      : action === 'role'
-        ? { role: button.dataset.role === 'admin' ? 'auditor' : 'admin' }
-        : null;
+      : null;
     if (action === 'password') {
       openPasswordResetModal(button.dataset.userId, username);
       return;
@@ -1473,7 +1613,7 @@
   }
 
   function updateAdminRoleAcknowledgement() {
-    const isAdmin = document.getElementById('newUserRole')?.value === 'admin';
+    const isAdmin = document.getElementById('newUserRole')?.value === 'platform_admin';
     const acknowledgement = document.getElementById('newAdminAcknowledgement');
     const checkbox = document.getElementById('newAdminAcknowledgementCheck');
     if (acknowledgement) acknowledgement.hidden = !isAdmin;
@@ -1496,8 +1636,8 @@
     feedback.dataset.tone = tone;
   }
 
-  function openPasswordResetModal(userId, username) {
-    state.passwordResetTarget = { userId, username };
+  function openPasswordResetModal(userId, username, endpoint = null, scope = 'platform') {
+    state.passwordResetTarget = { userId, username, endpoint, scope };
     const modal = document.getElementById('passwordResetModal');
     document.getElementById('passwordResetDescription').textContent = `Define una nueva contraseña temporal para ${username}. No será mostrada nuevamente.`;
     document.getElementById('passwordResetForm').reset();
@@ -1527,15 +1667,21 @@
     if (button) button.disabled = true;
     if (feedback) feedback.textContent = 'Restableciendo contraseña…';
     try {
-      const res = await fetch(`/api/v1/admin/users/${encodeURIComponent(target.userId)}`, {
+      const endpoint = target.endpoint || `/api/v1/admin/users/${encodeURIComponent(target.userId)}`;
+      const res = await fetch(endpoint, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.token}` },
         body: JSON.stringify({ password: document.getElementById('resetUserPassword').value })
       });
       if (!res.ok) throw new Error(await getApiError(res, 'No se pudo restablecer la contraseña.'));
       closePasswordResetModal();
-      setAdminFeedback(`Contraseña restablecida para ${target.username}.`, 'success');
-      await refreshAdminUsers();
+      if (target.scope === 'organization') {
+        setOrganizationFeedback(`Contraseña restablecida para ${target.username}.`, 'success');
+        await refreshOrganization();
+      } else {
+        setAdminFeedback(`Contraseña restablecida para ${target.username}.`, 'success');
+        await refreshAdminUsers();
+      }
     } catch (error) {
       if (feedback) feedback.textContent = error.message;
     } finally {
@@ -1571,6 +1717,7 @@
     const btnLogout = document.getElementById('btnLogout');
     const btnCloseModal = document.getElementById('btnCloseAuthModal');
     const btnOpenLogin = document.getElementById('btnOpenLogin');
+    const registrationForm = document.getElementById('registrationForm');
 
     if (btnOpenLogin) {
       btnOpenLogin.addEventListener('click', () => openAuthModal());
@@ -1579,6 +1726,9 @@
     if (btnCloseModal) {
       btnCloseModal.addEventListener('click', () => closeAuthModal());
     }
+    document.getElementById('btnShowRegistration')?.addEventListener('click', showRegistrationForm);
+    document.getElementById('btnShowLogin')?.addEventListener('click', showLoginForm);
+    document.getElementById('btnCloseRegistrationModal')?.addEventListener('click', closeAuthModal);
 
     btnClearSession?.addEventListener('click', clearAuthenticatedSession);
     btnLogout?.addEventListener('click', clearAuthenticatedSession);
@@ -1622,6 +1772,26 @@
       });
     }
 
+    registrationForm?.addEventListener('submit', async event => {
+      event.preventDefault();
+      removeAuthAlert();
+      const payload = {
+        organization_name: document.getElementById('registrationOrganizationName').value.trim(),
+        username: document.getElementById('registrationUsername').value.trim(),
+        password: document.getElementById('registrationPassword').value,
+        password_confirmation: document.getElementById('registrationPasswordConfirmation').value
+      };
+      if (!Object.values(passwordRules(payload.password)).every(Boolean) || payload.password !== payload.password_confirmation) {
+        showAuthError('Revisa la contraseña y su confirmación.'); return;
+      }
+      try {
+        const res = await fetch('/api/v1/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        if (!res.ok) throw new Error(await getApiError(res, 'No se pudo crear la organización.'));
+        registrationForm.reset(); showLoginForm();
+        showAuthSuccess('Organización creada. Ahora inicia sesión con la cuenta propietaria.');
+      } catch (error) { showAuthError(error.message); }
+    });
+
     updateUserBadge();
   }
 
@@ -1635,7 +1805,7 @@
       if (!res.ok) throw new Error('Sesión expirada');
       const profile = await res.json();
       state.user.username = profile.username;
-      state.user.role = profile.role === 'admin' ? 'Administrador de Plataforma' : 'Auditor de Seguridad';
+      state.user.role = profile.role === 'platform_admin' ? 'Platform Admin' : profile.role === 'organization_owner' ? 'Organization Owner' : 'Analyst';
       state.accessRole = profile.role;
       localStorage.setItem('securecode_user', JSON.stringify(state.user));
       updateUserBadge();
@@ -1644,6 +1814,7 @@
       updateEvaluatorAccess();
       loadPersistentHistory();
       refreshAdminUsers();
+      refreshOrganization();
       loadClientSettings();
       loadSubscription();
       loadEnterpriseTrial();
@@ -1656,6 +1827,7 @@
   function openAuthModal() {
     const modal = document.getElementById('authModal');
     removeAuthAlert();
+    showLoginForm();
     if (modal) modal.classList.add('active');
   }
 
@@ -1675,6 +1847,31 @@
     alert.setAttribute('role', 'alert');
     alert.textContent = message;
     form.before(alert);
+  }
+
+  function showAuthSuccess(message) {
+    const form = document.getElementById('loginForm');
+    if (!form) return;
+    removeAuthAlert();
+    const alert = document.createElement('div');
+    alert.id = 'authErrorAlert'; alert.className = 'auth-success-alert'; alert.setAttribute('role', 'status'); alert.textContent = message;
+    form.before(alert);
+  }
+
+  function showRegistrationForm() {
+    removeAuthAlert();
+    document.getElementById('loginForm').hidden = true;
+    document.getElementById('registrationForm').hidden = false;
+    document.getElementById('authModalTitle').textContent = 'Crear organización';
+    document.getElementById('authAccountNote').textContent = 'Crearás la primera cuenta Organization Owner. Después podrás crear Analyst desde Mi Organización.';
+    document.getElementById('registrationOrganizationName')?.focus();
+  }
+
+  function showLoginForm() {
+    document.getElementById('registrationForm').hidden = true;
+    document.getElementById('loginForm').hidden = false;
+    document.getElementById('authModalTitle').textContent = 'Iniciar Sesión';
+    document.getElementById('authAccountNote').textContent = 'Si tu organización aún no usa SecureCode, crea la cuenta propietaria. Los Analyst son creados por su propietario.';
   }
 
   function removeAuthAlert() {
@@ -1709,6 +1906,7 @@
     updateSettingsAccess();
     updateSubscriptionAccess();
     updateFinOpsAccess();
+    refreshOrganization();
     document.getElementById('resultContainer')?.classList.remove('active');
     refreshAdminUsers();
   }

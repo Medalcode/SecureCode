@@ -17,6 +17,7 @@ from securecode.adapters.postgres.models import (
     Organization,
     OrganizationMembership,
 )
+from securecode.domain.roles import ORGANIZATION_OWNER
 
 
 class TrialPolicyError(RuntimeError):
@@ -46,21 +47,31 @@ def _utc(value: datetime) -> datetime:
 def create_trial(
     session: Session,
     *,
-    organization_name: str,
+    organization_name: str | None = None,
     owner_user_id: UUID,
+    organization_id: UUID | None = None,
     policy: TrialPolicy = DEFAULT_TRIAL_POLICY,
     now: datetime | None = None,
 ) -> EnterpriseTrial:
     """Create a tenant, initial owner membership, and inactive-after-expiry trial."""
     current = _utc(now or datetime.now(UTC))
-    normalized_name = organization_name.strip()
-    if not normalized_name:
-        raise ValueError("Organization name is required.")
-    organization = Organization(id=uuid4(), name=normalized_name, created_at=current)
-    # Persist the parent before creating rows that reference its UUID.  SQLite
-    # may not enforce foreign keys by default, while PostgreSQL/Supabase does.
-    session.add(organization)
-    session.flush()
+    if organization_id is None:
+        normalized_name = (organization_name or "").strip()
+        if not normalized_name:
+            raise ValueError("Organization name is required.")
+        organization = Organization(id=uuid4(), name=normalized_name, created_at=current)
+        # Persist the parent before creating rows that reference its UUID.  SQLite
+        # may not enforce foreign keys by default, while PostgreSQL/Supabase does.
+        session.add(organization)
+        session.flush()
+        session.add(OrganizationMembership(
+            id=uuid4(), organization_id=organization.id, user_id=owner_user_id,
+            role=ORGANIZATION_OWNER, created_at=current,
+        ))
+    else:
+        organization = session.query(Organization).filter(Organization.id == organization_id).first()
+        if organization is None:
+            raise ValueError("Organization does not exist.")
     trial = EnterpriseTrial(
         id=uuid4(),
         organization_id=organization.id,
@@ -70,10 +81,7 @@ def create_trial(
         evaluation_limit=policy.evaluation_limit,
         created_at=current,
     )
-    membership = OrganizationMembership(
-        id=uuid4(), organization_id=organization.id, user_id=owner_user_id, role="owner", created_at=current
-    )
-    session.add_all((membership, trial))
+    session.add(trial)
     session.flush()
     return trial
 
@@ -114,7 +122,7 @@ def is_trial_owner(session: Session, *, trial_id: UUID, user_id: UUID) -> bool:
         .filter(
             EnterpriseTrial.id == trial_id,
             OrganizationMembership.user_id == user_id,
-            OrganizationMembership.role == "owner",
+            OrganizationMembership.role == ORGANIZATION_OWNER,
         )
         .first()
         is not None

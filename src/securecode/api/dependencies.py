@@ -107,6 +107,7 @@ from fastapi.security import OAuth2PasswordBearer
 
 from securecode.adapters.postgres.models import User
 from securecode.api.security import verify_access_token
+from securecode.domain.roles import PLATFORM_ADMIN, is_platform_admin
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
 
@@ -142,8 +143,13 @@ def get_current_user(
     return user
 
 
-def require_admin(current_user: User = Depends(get_current_user)) -> User:
-    """Allow administration routes only to persisted administrator accounts."""
-    if getattr(current_user, "role", "auditor") != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator role required")
+def require_platform_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Allow global operations only to internal SecureCode operators."""
+    if not is_platform_admin(getattr(current_user, "role", None)):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Platform administrator role required")
     return current_user
+
+
+# Temporary import compatibility for modules not yet moved to the explicit name.
+# New routes must depend on ``require_platform_admin``.
+require_admin = require_platform_admin

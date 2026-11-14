@@ -13,6 +13,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from securecode.domain.roles import ANALYST
+
 
 class Base(DeclarativeBase):
     pass
@@ -26,7 +28,7 @@ class User(Base):
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     # Roles are deliberately small and explicit. Authorization decisions never
     # depend on client-supplied labels.
-    role: Mapped[str] = mapped_column(String(20), nullable=False, default="auditor", server_default="auditor")
+    role: Mapped[str] = mapped_column(String(32), nullable=False, default=ANALYST, server_default=ANALYST)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -51,7 +53,7 @@ class OrganizationMembership(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True)
     organization_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
-    role: Mapped[str] = mapped_column(String(20), nullable=False, default="member", server_default="member")
+    role: Mapped[str] = mapped_column(String(32), nullable=False, default=ANALYST, server_default=ANALYST)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 
 
@@ -169,7 +171,7 @@ class UserFinOpsSettings(Base):
 
 
 class RepositoryAuthorization(Base):
-    """Explicit repository scope assigned to an auditor by an administrator."""
+    """Explicit repository scope assigned to an analyst by an organization owner."""
 
     __tablename__ = "repository_authorizations"
     __table_args__ = (

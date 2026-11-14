@@ -22,6 +22,7 @@ from securecode.adapters.postgres.models import (
     EvaluationRecord,
     LoginAttempt,
     Organization,
+    OrganizationMembership,
     RepositoryAuthorization,
     SubscriptionEvent,
     User,
@@ -34,7 +35,7 @@ from securecode.api.dependencies import (
     get_current_user,
     get_db_session,
     get_github_token,
-    require_admin,
+    require_platform_admin,
 )
 from securecode.api.schemas import (
     EvaluationResponse,
@@ -62,6 +63,13 @@ from securecode.models.gh001 import GH001Evidence
 from securecode.models.gh002 import GH002Evidence
 from securecode.models.gh003 import GH003Evidence
 from securecode.ports.evaluation_repository import EvaluationRepository
+from securecode.domain.roles import (
+    ANALYST,
+    ORGANIZATION_OWNER,
+    PLATFORM_ADMIN,
+    is_organization_owner,
+    is_platform_admin,
+)
 
 app = FastAPI(
     title="SecureCode API",
@@ -143,7 +151,7 @@ def get_rules_catalog():
     }
 
 @app.get("/api/v1/system/overview")
-def get_system_overview(_: User = Depends(require_admin)):
+def get_system_overview(_: User = Depends(require_platform_admin)):
     """Administrative status only; CI and billing are not live telemetry sources."""
     return {
         "status": "online",
@@ -188,18 +196,30 @@ class Token(BaseModel):
 class CurrentUserResponse(BaseModel):
     username: str
     active: bool
-    role: Literal["admin", "auditor"]
+    role: Literal["platform_admin", "organization_owner", "analyst"]
+
+
+class OrganizationRegistrationRequest(BaseModel):
+    organization_name: str = Field(min_length=2, max_length=120)
+    username: str = Field(min_length=3, max_length=100)
+    password: str = Field(min_length=12, max_length=128)
+    password_confirmation: str = Field(min_length=12, max_length=128)
+
+
+class OrganizationRegistrationResponse(CurrentUserResponse):
+    organization_id: str
+    organization_name: str
 
 
 class UserCreateRequest(BaseModel):
     username: str = Field(min_length=3, max_length=100)
     password: str = Field(min_length=12, max_length=128)
-    role: Literal["admin", "auditor"] = "auditor"
+    role: Literal["platform_admin"] = PLATFORM_ADMIN
 
 
 class UserUpdateRequest(BaseModel):
     active: bool | None = None
-    role: Literal["admin", "auditor"] | None = None
+    role: Literal["platform_admin"] | None = None
     password: str | None = Field(default=None, min_length=12, max_length=128)
 
 
@@ -207,7 +227,7 @@ class UserResponse(BaseModel):
     id: str
     username: str
     active: bool
-    role: Literal["admin", "auditor"]
+    role: Literal["platform_admin", "organization_owner", "analyst"]
     created_at: datetime
     updated_at: datetime | None = None
     last_login_at: datetime | None = None
@@ -220,6 +240,21 @@ class UserAuditEventResponse(BaseModel):
     target_username: str | None = None
     details: dict
     created_at: datetime
+
+
+class OrganizationMemberCreateRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=100)
+    password: str = Field(min_length=12, max_length=128)
+
+
+class OrganizationMemberUpdateRequest(BaseModel):
+    active: bool | None = None
+    password: str | None = Field(default=None, min_length=12, max_length=128)
+
+
+class OrganizationMemberResponse(UserResponse):
+    organization_id: str
+    organization_name: str
 
 
 class RepositoryAuthorizationRequest(BaseModel):
@@ -297,7 +332,7 @@ class FinOpsSettingsUpdateRequest(BaseModel):
 
 
 class FinOpsResponse(BaseModel):
-    scope: Literal["account", "platform"]
+    scope: Literal["account", "organization", "platform"]
     period_start: datetime
     evaluations_current_period: int
     evaluations_all_time: int
@@ -310,7 +345,6 @@ class FinOpsResponse(BaseModel):
 
 
 class EnterpriseTrialActivationRequest(BaseModel):
-    organization_name: str = Field(min_length=2, max_length=120)
     confirmation: bool = False
 
 
@@ -426,8 +460,8 @@ def _normalise_repository(value: str) -> str:
 
 
 def _require_repository_authorization(session: Session, current_user: User, owner: str, repository: str) -> None:
-    """Auditors require account scope or an active trial's explicit scope."""
-    if getattr(current_user, "role", "auditor") == "admin":
+    """Customer users require explicit repository or trial scope."""
+    if is_platform_admin(getattr(current_user, "role", None)):
         return
     canonical = _normalise_repository(f"{owner}/{repository}")
     authorization = session.query(RepositoryAuthorization).filter(
@@ -448,7 +482,7 @@ def _require_repository_authorization(session: Session, current_user: User, owne
             return
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Tu cuenta no está autorizada para evaluar este repositorio. Solicita acceso a un administrador.",
+            detail="Tu cuenta no está autorizada para evaluar este repositorio. Solicita acceso al propietario de tu organización.",
         )
 
 
@@ -466,6 +500,60 @@ def _record_user_audit(session: Session, actor_id: UUID | None, target_id: UUID 
         id=uuid4(), actor_user_id=actor_id, target_user_id=target_id,
         action=action, details=details, created_at=datetime.now(UTC),
     ))
+
+
+def _membership_for_user(session: Session, user_id: UUID) -> OrganizationMembership | None:
+    """Return the single customer tenancy supported by the current MVP."""
+    return (
+        session.query(OrganizationMembership)
+        .filter(OrganizationMembership.user_id == user_id)
+        .order_by(OrganizationMembership.created_at.asc())
+        .first()
+    )
+
+
+def _require_organization_owner(session: Session, current_user: User) -> OrganizationMembership:
+    """Resolve an active customer's owner membership without trusting the UI."""
+    if not is_organization_owner(getattr(current_user, "role", None)):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Organization owner role required")
+    membership = _membership_for_user(session, current_user.id)
+    if membership is None or membership.role != ORGANIZATION_OWNER:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Organization owner membership required")
+    return membership
+
+
+def _organization_response(session: Session, membership: OrganizationMembership) -> tuple[OrganizationMembership, Organization]:
+    organization = session.query(Organization).filter(Organization.id == membership.organization_id).first()
+    if organization is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Organization membership is inconsistent")
+    return membership, organization
+
+
+def _organization_member_response(user: User, organization: Organization) -> dict:
+    return {
+        **_user_response(user),
+        "organization_id": str(organization.id),
+        "organization_name": organization.name,
+    }
+
+
+def _can_access_organization_user(session: Session, current_user: User, target_user_id: UUID | None) -> bool:
+    """Apply the customer boundary to history and evidence reads."""
+    if is_platform_admin(getattr(current_user, "role", None)):
+        return True
+    if target_user_id is None:
+        return False
+    if current_user.id == target_user_id:
+        return True
+    if not is_organization_owner(getattr(current_user, "role", None)):
+        return False
+    membership = _membership_for_user(session, current_user.id)
+    if membership is None:
+        return False
+    return session.query(OrganizationMembership).filter(
+        OrganizationMembership.organization_id == membership.organization_id,
+        OrganizationMembership.user_id == target_user_id,
+    ).first() is not None
 
 
 def _settings_response(settings: UserSettings | None) -> dict:
@@ -541,8 +629,19 @@ def _period_start_utc(now: datetime | None = None) -> datetime:
 
 def _finops_response(session: Session, current_user: User, settings: UserFinOpsSettings) -> dict:
     query = session.query(EvaluationRecord)
-    scope = "platform" if getattr(current_user, "role", "auditor") == "admin" else "account"
-    if scope == "account":
+    if is_platform_admin(getattr(current_user, "role", None)):
+        scope = "platform"
+    elif is_organization_owner(getattr(current_user, "role", None)):
+        membership = _membership_for_user(session, current_user.id)
+        if membership is None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Organization membership required")
+        member_ids = [member_id for (member_id,) in session.query(OrganizationMembership.user_id).filter(
+            OrganizationMembership.organization_id == membership.organization_id
+        ).all()]
+        query = query.filter(EvaluationRecord.requested_by_user_id.in_(member_ids))
+        scope = "organization"
+    else:
+        scope = "account"
         query = query.filter(EvaluationRecord.requested_by_user_id == current_user.id)
     period_start = _period_start_utc()
     all_time = query.count()
@@ -643,13 +742,141 @@ def login_for_access_token(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
+@app.post("/api/v1/auth/register", response_model=OrganizationRegistrationResponse, status_code=status.HTTP_201_CREATED)
+def register_organization_owner(
+    request: OrganizationRegistrationRequest,
+    session: Session = Depends(get_db_session),
+):
+    """Create the first customer identity and its isolated organization.
+
+    Public registration is intentionally limited to the organization owner role.
+    Platform administration can never be requested through this boundary.
+    """
+    if request.password != request.password_confirmation:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Las contraseñas no coinciden")
+    username = _normalise_username(request.username)
+    organization_name = request.organization_name.strip()
+    if len(organization_name) < 2:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="El nombre de la organización debe tener al menos 2 caracteres")
+    _validate_password_strength(request.password)
+    if session.query(User).filter(User.username == username).first() is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists")
+    if session.query(Organization).filter(func.lower(Organization.name) == organization_name.lower()).first() is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Organization name already exists")
+
+    now = datetime.now(UTC)
+    owner = User(
+        id=uuid4(), username=username, password_hash=hash_password(request.password), active=True,
+        role=ORGANIZATION_OWNER, created_at=now, updated_at=now,
+    )
+    organization = Organization(id=uuid4(), name=organization_name, created_at=now)
+    membership = OrganizationMembership(
+        id=uuid4(), organization_id=organization.id, user_id=owner.id,
+        role=ORGANIZATION_OWNER, created_at=now,
+    )
+    try:
+        session.add_all((owner, organization, membership))
+        _record_user_audit(session, owner.id, owner.id, "organization_registered", {
+            "organization_id": str(organization.id), "organization_name": organization.name,
+            "role": ORGANIZATION_OWNER,
+        })
+        session.commit()
+    except SQLAlchemyError as error:
+        session.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No se pudo crear la organización") from error
+    return {
+        "username": owner.username, "active": owner.active, "role": owner.role,
+        "organization_id": str(organization.id), "organization_name": organization.name,
+    }
+
+
+@app.get("/api/v1/organization/members", response_model=list[OrganizationMemberResponse])
+def list_organization_members(
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    membership = _require_organization_owner(session, current_user)
+    _, organization = _organization_response(session, membership)
+    users = (
+        session.query(User)
+        .join(OrganizationMembership, OrganizationMembership.user_id == User.id)
+        .filter(OrganizationMembership.organization_id == organization.id)
+        .order_by(User.username.asc())
+        .all()
+    )
+    return [_organization_member_response(user, organization) for user in users]
+
+
+@app.post("/api/v1/organization/members", response_model=OrganizationMemberResponse, status_code=status.HTTP_201_CREATED)
+def create_organization_member(
+    request: OrganizationMemberCreateRequest,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Let a customer owner provision an analyst without platform privileges."""
+    membership = _require_organization_owner(session, current_user)
+    _, organization = _organization_response(session, membership)
+    username = _normalise_username(request.username)
+    _validate_password_strength(request.password)
+    if session.query(User).filter(User.username == username).first() is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists")
+    now = datetime.now(UTC)
+    analyst = User(
+        id=uuid4(), username=username, password_hash=hash_password(request.password), active=True,
+        role=ANALYST, created_at=now, updated_at=now,
+    )
+    analyst_membership = OrganizationMembership(
+        id=uuid4(), organization_id=organization.id, user_id=analyst.id,
+        role=ANALYST, created_at=now,
+    )
+    session.add_all((analyst, analyst_membership))
+    _record_user_audit(session, current_user.id, analyst.id, "organization_analyst_created", {
+        "organization_id": str(organization.id), "role": ANALYST,
+    })
+    session.commit()
+    return _organization_member_response(analyst, organization)
+
+
+@app.patch("/api/v1/organization/members/{user_id}", response_model=OrganizationMemberResponse)
+def update_organization_member(
+    user_id: UUID,
+    request: OrganizationMemberUpdateRequest,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    membership = _require_organization_owner(session, current_user)
+    _, organization = _organization_response(session, membership)
+    target_membership = session.query(OrganizationMembership).filter(
+        OrganizationMembership.organization_id == organization.id,
+        OrganizationMembership.user_id == user_id,
+        OrganizationMembership.role == ANALYST,
+    ).first()
+    target = session.query(User).filter(User.id == user_id).first()
+    if target_membership is None or target is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analyst not found in this organization")
+    changes: dict[str, object] = {}
+    if request.active is not None and target.active != request.active:
+        changes["active"] = {"from": target.active, "to": request.active}
+        target.active = request.active
+    if request.password is not None:
+        _validate_password_strength(request.password)
+        target.password_hash = hash_password(request.password)
+        changes["password_reset"] = True
+    if not changes:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se recibió ningún cambio para aplicar")
+    target.updated_at = datetime.now(UTC)
+    _record_user_audit(session, current_user.id, target.id, "organization_analyst_updated", changes)
+    session.commit()
+    return _organization_member_response(target, organization)
+
+
 @app.get("/api/v1/auth/me", response_model=CurrentUserResponse)
 def get_current_user_profile(current_user: User = Depends(get_current_user)):
     """Return the authenticated identity; never expose password material."""
     return {
         "username": current_user.username,
         "active": current_user.active,
-        "role": getattr(current_user, "role", "auditor"),
+        "role": getattr(current_user, "role", ANALYST),
     }
 
 
@@ -719,7 +946,8 @@ def get_subscription(
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-    """Return the authenticated account's current 30-day demo subscription."""
+    """Return the current organization's 30-day demo subscription."""
+    _require_organization_owner(session, current_user)
     return _subscription_response(_ensure_subscription(session, current_user.id))
 
 
@@ -730,6 +958,7 @@ def change_subscription(
     current_user: User = Depends(get_current_user),
 ):
     """Confirm one subscription change per 30-day period; this endpoint never bills."""
+    _require_organization_owner(session, current_user)
     if not request.confirmation:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Debes confirmar el cambio de plan")
     subscription = _ensure_subscription(session, current_user.id)
@@ -766,7 +995,8 @@ def subscription_history(
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-    """List only the current user's confirmed subscription lifecycle events."""
+    """List the organization owner's confirmed subscription lifecycle events."""
+    _require_organization_owner(session, current_user)
     events = (
         session.query(SubscriptionEvent)
         .filter(SubscriptionEvent.user_id == current_user.id)
@@ -787,7 +1017,8 @@ def get_finops(
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-    """Return measurable evaluation consumption and non-billable FinOps preferences."""
+    """Return measurable organization consumption and non-billable preferences."""
+    _require_organization_owner(session, current_user)
     settings = _ensure_finops_settings(session, current_user.id)
     return _finops_response(session, current_user, settings)
 
@@ -798,7 +1029,8 @@ def update_finops(
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-    """Persist alert preferences; never imply a connection to Cloud Billing."""
+    """Persist organization alert preferences; never imply Cloud Billing connectivity."""
+    _require_organization_owner(session, current_user)
     settings = _ensure_finops_settings(session, current_user.id)
     changes: dict[str, object] = {}
     for field, value in request.model_dump().items():
@@ -820,6 +1052,8 @@ def get_enterprise_trial(
     current_user: User = Depends(get_current_user),
 ):
     """Expose only the caller's non-billable, one-time Enterprise Trial state."""
+    if getattr(current_user, "role", None) not in {ORGANIZATION_OWNER, ANALYST}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Customer role required")
     return _trial_response(session, current_user)
 
 
@@ -834,6 +1068,7 @@ def activate_enterprise_trial(
     The entitlement contains no payment operation, price, invoice, or renewal.
     A user who has started a trial cannot create another one after it expires.
     """
+    membership = _require_organization_owner(session, current_user)
     if not request.confirmation:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Debes confirmar la activación del trial")
     if get_trial_for_user(session, current_user.id) is not None:
@@ -841,8 +1076,8 @@ def activate_enterprise_trial(
     try:
         trial = create_trial(
             session,
-            organization_name=request.organization_name,
             owner_user_id=current_user.id,
+            organization_id=membership.organization_id,
         )
         _record_user_audit(session, current_user.id, current_user.id, "enterprise_trial_activated", {
             "trial_id": str(trial.id), "billing_mode": "trial_non_billable",
@@ -945,7 +1180,7 @@ def _user_response(user: User) -> dict:
         "id": str(user.id),
         "username": user.username,
         "active": user.active,
-        "role": getattr(user, "role", "auditor"),
+        "role": getattr(user, "role", ANALYST),
         "created_at": user.created_at,
         "updated_at": getattr(user, "updated_at", user.created_at),
         "last_login_at": getattr(user, "last_login_at", None),
@@ -955,7 +1190,7 @@ def _user_response(user: User) -> dict:
 @app.get("/api/v1/admin/users", response_model=list[UserResponse])
 def list_users(
     session: Session = Depends(get_db_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_platform_admin),
 ):
     return [_user_response(user) for user in session.query(User).order_by(User.username).all()]
 
@@ -964,7 +1199,7 @@ def list_users(
 def create_user(
     request: UserCreateRequest,
     session: Session = Depends(get_db_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_platform_admin),
 ):
     username = _normalise_username(request.username)
     _validate_password_strength(request.password)
@@ -990,16 +1225,16 @@ def update_user(
     user_id: UUID,
     request: UserUpdateRequest,
     session: Session = Depends(get_db_session),
-    current_admin: User = Depends(require_admin),
+    current_admin: User = Depends(require_platform_admin),
 ):
     user = session.query(User).filter(User.id == user_id).first()
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    if str(user.id) == str(current_admin.id) and (request.active is False or request.role == "auditor"):
+    if str(user.id) == str(current_admin.id) and request.active is False:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Administrators cannot remove their own access")
-    removes_admin_access = user.role == "admin" and user.active and (request.active is False or request.role == "auditor")
+    removes_admin_access = user.role == PLATFORM_ADMIN and user.active and request.active is False
     if removes_admin_access:
-        active_admins = session.query(User).filter(User.role == "admin", User.active.is_(True)).count()
+        active_admins = session.query(User).filter(User.role == PLATFORM_ADMIN, User.active.is_(True)).count()
         if active_admins <= 1:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Debe existir al menos un administrador activo")
     changes: dict[str, object] = {}
@@ -1028,7 +1263,7 @@ def update_user(
 def list_user_audit_events(
     limit: int = Query(default=50, ge=1, le=100),
     session: Session = Depends(get_db_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_platform_admin),
 ):
     """Expose an administrator-only, credential-free account audit trail."""
     events = session.query(UserAuditEvent).order_by(UserAuditEvent.created_at.desc()).limit(limit).all()
@@ -1055,7 +1290,7 @@ def _repository_authorization_response(authorization: RepositoryAuthorization, u
 def list_repository_authorizations(
     user_id: UUID | None = None,
     session: Session = Depends(get_db_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_platform_admin),
 ):
     query = session.query(RepositoryAuthorization)
     if user_id is not None:
@@ -1071,7 +1306,7 @@ def list_repository_authorizations(
 def create_repository_authorization(
     request: RepositoryAuthorizationRequest,
     session: Session = Depends(get_db_session),
-    current_admin: User = Depends(require_admin),
+    current_admin: User = Depends(require_platform_admin),
 ):
     target_user = session.query(User).filter(User.id == request.user_id).first()
     if target_user is None:
@@ -1106,7 +1341,7 @@ def update_repository_authorization(
     authorization_id: UUID,
     request: RepositoryAuthorizationUpdateRequest,
     session: Session = Depends(get_db_session),
-    current_admin: User = Depends(require_admin),
+    current_admin: User = Depends(require_platform_admin),
 ):
     authorization = session.query(RepositoryAuthorization).filter(RepositoryAuthorization.id == authorization_id).first()
     if authorization is None:
@@ -1124,15 +1359,108 @@ def update_repository_authorization(
     return _repository_authorization_response(authorization, user.username if user else None)
 
 
+def _organization_analyst(session: Session, organization_id: UUID, user_id: UUID) -> User:
+    membership = session.query(OrganizationMembership).filter(
+        OrganizationMembership.organization_id == organization_id,
+        OrganizationMembership.user_id == user_id,
+        OrganizationMembership.role == ANALYST,
+    ).first()
+    user = session.query(User).filter(User.id == user_id, User.role == ANALYST).first()
+    if membership is None or user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analyst not found in this organization")
+    return user
+
+
+@app.get("/api/v1/organization/repository-authorizations", response_model=list[RepositoryAuthorizationResponse])
+def list_organization_repository_authorizations(
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    membership = _require_organization_owner(session, current_user)
+    member_ids = [member_id for (member_id,) in session.query(OrganizationMembership.user_id).filter(
+        OrganizationMembership.organization_id == membership.organization_id,
+        OrganizationMembership.role == ANALYST,
+    ).all()]
+    authorizations = session.query(RepositoryAuthorization).filter(
+        RepositoryAuthorization.user_id.in_(member_ids)
+    ).order_by(RepositoryAuthorization.repository.asc()).all() if member_ids else []
+    users = session.query(User).filter(User.id.in_(member_ids)).all() if member_ids else []
+    usernames = {user.id: user.username for user in users}
+    return [_repository_authorization_response(item, usernames.get(item.user_id)) for item in authorizations]
+
+
+@app.post("/api/v1/organization/repository-authorizations", response_model=RepositoryAuthorizationResponse, status_code=status.HTTP_201_CREATED)
+def create_organization_repository_authorization(
+    request: RepositoryAuthorizationRequest,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    membership = _require_organization_owner(session, current_user)
+    target_user = _organization_analyst(session, membership.organization_id, request.user_id)
+    repository = _normalise_repository(request.repository)
+    authorization = session.query(RepositoryAuthorization).filter(
+        RepositoryAuthorization.user_id == target_user.id,
+        func.lower(RepositoryAuthorization.repository) == repository,
+    ).first()
+    if authorization is not None and authorization.active:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El repositorio ya está autorizado para esta cuenta")
+    if authorization is None:
+        authorization = RepositoryAuthorization(
+            id=uuid4(), user_id=target_user.id, repository=repository, active=True,
+            created_at=datetime.now(UTC), updated_at=datetime.now(UTC),
+        )
+        session.add(authorization)
+        action = "organization_repository_authorization_created"
+    else:
+        authorization.active = True
+        authorization.updated_at = datetime.now(UTC)
+        action = "organization_repository_authorization_reactivated"
+    _record_user_audit(session, current_user.id, target_user.id, action, {
+        "organization_id": str(membership.organization_id), "repository": repository,
+    })
+    session.commit()
+    return _repository_authorization_response(authorization, target_user.username)
+
+
+@app.patch("/api/v1/organization/repository-authorizations/{authorization_id}", response_model=RepositoryAuthorizationResponse)
+def update_organization_repository_authorization(
+    authorization_id: UUID,
+    request: RepositoryAuthorizationUpdateRequest,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    membership = _require_organization_owner(session, current_user)
+    authorization = session.query(RepositoryAuthorization).filter(RepositoryAuthorization.id == authorization_id).first()
+    if authorization is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository authorization not found")
+    target_user = _organization_analyst(session, membership.organization_id, authorization.user_id)
+    if authorization.active == request.active:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se recibió ningún cambio para aplicar")
+    authorization.active = request.active
+    authorization.updated_at = datetime.now(UTC)
+    _record_user_audit(session, current_user.id, target_user.id, "organization_repository_authorization_updated", {
+        "organization_id": str(membership.organization_id), "repository": authorization.repository,
+        "active": request.active,
+    })
+    session.commit()
+    return _repository_authorization_response(authorization, target_user.username)
+
+
 @app.get("/api/v1/evaluations/history")
 def evaluation_history(
     limit: int = Query(default=50, ge=1, le=100),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-    """Return immutable evaluation metadata; auditors can only see their own work."""
+    """Return immutable evaluation metadata within the caller's authorized scope."""
     query = session.query(EvaluationRecord)
-    if getattr(current_user, "role", "auditor") != "admin":
+    if is_organization_owner(getattr(current_user, "role", None)):
+        membership = _require_organization_owner(session, current_user)
+        member_ids = [member_id for (member_id,) in session.query(OrganizationMembership.user_id).filter(
+            OrganizationMembership.organization_id == membership.organization_id
+        ).all()]
+        query = query.filter(EvaluationRecord.requested_by_user_id.in_(member_ids))
+    elif not is_platform_admin(getattr(current_user, "role", None)):
         query = query.filter(EvaluationRecord.requested_by_user_id == current_user.id)
     records = query.order_by(EvaluationRecord.evaluated_at.desc()).limit(limit).all()
     return {
@@ -1162,8 +1490,7 @@ def evaluation_detail(
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluation not found")
 
-    is_admin = getattr(current_user, "role", "auditor") == "admin"
-    if not is_admin and record.requested_by_user_id != current_user.id:
+    if not _can_access_organization_user(session, current_user, record.requested_by_user_id):
         # Do not disclose the existence of another auditor's evaluation.
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluation not found")
 

@@ -72,6 +72,11 @@
           <span>Configuración</span>
         </button>
 
+        <button class="nav-item" data-view="organization" data-title="Mi Organización" hidden aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"></path><path d="M5 21V7l7-4 7 4v14"></path><path d="M9 21v-6h6v6"></path></svg>
+          <span>Mi Organización</span>
+        </button>
+
         <button class="nav-item" data-view="admin" data-title="Consola de Administración" hidden aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="4 17 10 11 4 5"></polyline>
@@ -448,7 +453,7 @@
               </div>
               <div id="enterpriseTrialNotStarted" hidden>
                 <form id="enterpriseTrialActivateForm" class="enterprise-trial-form" novalidate>
-                  <label for="enterpriseTrialOrganization">Nombre de organización<input class="input-control" id="enterpriseTrialOrganization" maxlength="120" required placeholder="Ej.: Empresa SpA"></label>
+                  <p class="input-help">El trial se asociará a tu organización autenticada. Sólo su Organization Owner puede activarlo.</p>
                   <label class="finops-toggle"><input id="enterpriseTrialConfirmation" type="checkbox"> Confirmo que el trial dura 14 días, permite hasta 3 repositorios y 100 evaluaciones, y no es facturable.</label>
                   <button class="btn-primary" id="btnActivateEnterpriseTrial" type="submit" disabled>Activar Enterprise Trial</button>
                 </form>
@@ -544,7 +549,30 @@
           <div class="security-notice" id="settingsAccessNotice">Inicia sesión para administrar tus preferencias personales.</div>
         </section>
 
-        <!-- ================= VISTA 5: CONSOLA DE ADMINISTRACIÓN ================= -->
+        <!-- ================= VISTA 5: ORGANIZACIÓN CLIENTE ================= -->
+        <section class="view-panel" id="view-organization">
+          <div class="evaluator-hero" style="text-align: left; margin-bottom: 24px;"><h1>Mi Organización</h1><p>Gestiona analistas y el alcance autorizado de repositorios de tu organización.</p></div>
+          <div id="organizationPanel" hidden>
+            <div class="data-table-wrapper">
+              <div class="data-table-header"><div><div class="data-table-title">Equipo de análisis</div><div class="admin-helper">El propietario crea y administra únicamente cuentas Analyst de su propia organización.</div></div><button type="button" class="btn-copy" id="btnRefreshOrganization">Actualizar</button></div>
+              <form id="createOrganizationMemberForm" class="admin-user-form" novalidate>
+                <div class="input-group"><label for="organizationMemberUsername">Correo del analista</label><input class="input-control" id="organizationMemberUsername" type="email" maxlength="100" required></div>
+                <div class="input-group"><label for="organizationMemberPassword">Contraseña temporal</label><input class="input-control" id="organizationMemberPassword" type="password" minlength="12" autocomplete="new-password" required></div>
+                <div class="admin-form-actions"><div class="admin-feedback" id="organizationMemberFeedback" role="status" aria-live="polite"></div><button class="btn-primary" type="submit">Crear Analyst</button></div>
+              </form>
+              <table class="modern-table"><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Acción</th></tr></thead><tbody id="organizationMembersBody"></tbody></table>
+            </div>
+            <section class="repository-scope-panel">
+              <div><span class="section-kicker">Alcance autorizado</span><h2>Repositorios de los analistas</h2><p>Un Analyst sólo puede evaluar repositorios que el propietario haya autorizado en su organización.</p></div>
+              <form id="organizationRepositoryAuthorizationForm" class="repository-authorization-form" novalidate><select class="input-control" id="organizationAuthorizationUserId" required></select><input class="input-control" id="organizationAuthorizationRepository" placeholder="owner/repo" maxlength="201" required><button class="btn-primary" type="submit">Autorizar repositorio</button></form>
+              <div class="admin-feedback" id="organizationRepositoryFeedback" role="status" aria-live="polite"></div>
+              <table class="modern-table"><thead><tr><th>Analyst</th><th>Repositorio</th><th>Estado</th><th>Acción</th></tr></thead><tbody id="organizationAuthorizationsBody"></tbody></table>
+            </section>
+          </div>
+          <div class="security-notice" id="organizationAccessNotice">Inicia sesión con la cuenta propietaria de tu organización para administrar el equipo.</div>
+        </section>
+
+        <!-- ================= VISTA 6: CONSOLA DE ADMINISTRACIÓN ================= -->
         <section class="view-panel" id="view-admin">
           <div class="evaluator-hero" style="text-align: left; margin-bottom: 24px;">
             <h1>Consola de Administración de la Plataforma</h1>
@@ -634,15 +662,15 @@
                 <div class="input-group"><label for="newUsername">Correo corporativo</label><input class="input-control" id="newUsername" type="email" placeholder="persona@empresa.com" autocomplete="email" maxlength="100" required><span class="input-help">Será normalizado a minúsculas y usado para iniciar sesión.</span></div>
                 <div class="input-group"><label for="newUserPassword">Contraseña temporal</label><div class="password-control"><input class="input-control" id="newUserPassword" type="password" placeholder="12+ caracteres" autocomplete="new-password" minlength="12" required aria-describedby="newUserPasswordPolicy"><button type="button" class="password-toggle" data-password-toggle="newUserPassword">Mostrar</button></div></div>
                 <div class="input-group"><label for="newUserPasswordConfirm">Confirmar contraseña</label><div class="password-control"><input class="input-control" id="newUserPasswordConfirm" type="password" placeholder="Repite la contraseña temporal" autocomplete="new-password" minlength="12" required><button type="button" class="password-toggle" data-password-toggle="newUserPasswordConfirm">Mostrar</button></div><span class="input-help" id="newUserPasswordMatch"></span></div>
-                <div class="input-group"><label for="newUserRole">Rol inicial</label><select class="input-control" id="newUserRole"><option value="auditor">Auditor — evalúa y consulta su propia evidencia</option><option value="admin">Administrador — gestiona cuentas y plataforma</option></select><span class="input-help" id="newUserRoleHelp">Principio de mínimo privilegio: asigna Auditor salvo necesidad administrativa justificada.</span></div>
+                <div class="input-group"><label for="newUserRole">Rol inicial</label><select class="input-control" id="newUserRole"><option value="platform_admin">Platform Admin — operación interna de SecureCode</option></select><span class="input-help" id="newUserRoleHelp">Este módulo sólo crea cuentas internas de operación. Las organizaciones crean sus propios Analyst.</span></div>
                 <div class="password-policy" id="newUserPasswordPolicy" aria-live="polite"><span data-rule="length">○ 12 o más caracteres</span><span data-rule="lower">○ Una minúscula</span><span data-rule="upper">○ Una mayúscula</span><span data-rule="number">○ Un número</span><span data-rule="symbol">○ Un símbolo</span></div>
                 <label class="admin-confirmation" id="newAdminAcknowledgement" hidden><input type="checkbox" id="newAdminAcknowledgementCheck"> Confirmo que esta cuenta requiere privilegios de administración.</label>
                 <div class="admin-form-actions"><div class="admin-feedback" id="adminUserFeedback" role="status" aria-live="polite"></div><button class="btn-primary" id="btnCreateUser" type="submit">Crear cuenta</button></div>
               </form>
             </div>
-            <div class="admin-filter-row" aria-label="Filtros de usuarios"><input class="input-control" id="adminUserSearch" type="search" placeholder="Buscar por correo" autocomplete="off"><select class="input-control" id="adminRoleFilter"><option value="">Todos los roles</option><option value="admin">Administradores</option><option value="auditor">Auditores</option></select><select class="input-control" id="adminStatusFilter"><option value="">Todos los estados</option><option value="active">Activos</option><option value="inactive">Desactivados</option></select><span class="admin-helper" id="adminUserCount"></span></div>
+            <div class="admin-filter-row" aria-label="Filtros de usuarios"><input class="input-control" id="adminUserSearch" type="search" placeholder="Buscar por correo" autocomplete="off"><select class="input-control" id="adminRoleFilter"><option value="">Todos los roles</option><option value="platform_admin">Platform Admin</option></select><select class="input-control" id="adminStatusFilter"><option value="">Todos los estados</option><option value="active">Activos</option><option value="inactive">Desactivados</option></select><span class="admin-helper" id="adminUserCount"></span></div>
             <table class="modern-table"><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Última actividad</th><th>Acciones</th></tr></thead><tbody id="adminUsersBody"></tbody></table>
-            <section class="repository-scope-panel" id="repositoryAuthorizationManagement">
+            <section class="repository-scope-panel" id="repositoryAuthorizationManagement" hidden>
               <div><span class="section-kicker">Alcance de repositorios</span><h2>Autorizaciones por cuenta</h2><p>Los auditores sólo pueden evaluar repositorios activos asignados aquí. Los administradores conservan acceso operativo a la plataforma.</p></div>
               <form id="repositoryAuthorizationForm" class="repository-authorization-form" novalidate><select class="input-control" id="authorizationUserId" required></select><input class="input-control" id="authorizationRepository" placeholder="owner/repo" maxlength="201" required><button class="btn-primary" type="submit">Autorizar repositorio</button></form>
               <div class="admin-feedback" id="repositoryAuthorizationFeedback" role="status" aria-live="polite"></div>
@@ -665,9 +693,9 @@
     <div class="modal-card">
       <div class="modal-header">
         <div class="brand-icon" style="margin: 0 auto 12px; width: 40px; height: 40px; font-size: 20px;">S</div>
-        <h2>Iniciar Sesión</h2>
+        <h2 id="authModalTitle">Iniciar Sesión</h2>
         <p>Autenticación mediante JWT Bearer y hashing Argon2id.</p>
-        <p class="auth-account-note">Las cuentas son aprovisionadas por un administrador de plataforma. Si aún no tienes acceso, solicítalo a tu administrador.</p>
+        <p class="auth-account-note" id="authAccountNote">Si tu organización aún no usa SecureCode, crea la cuenta propietaria. Los Analyst son creados por su propietario.</p>
       </div>
 
       <form id="loginForm">
@@ -686,8 +714,18 @@
         </button>
 
         <div style="text-align: center;">
+          <button type="button" class="chip-btn" id="btnShowRegistration">Crear cuenta de organización</button>
           <button type="button" class="chip-btn" id="btnCloseAuthModal">Cerrar</button>
         </div>
+      </form>
+      <form id="registrationForm" hidden novalidate>
+        <div class="input-group" style="margin-bottom: 14px;"><label for="registrationOrganizationName">Organización</label><input type="text" id="registrationOrganizationName" class="input-control" maxlength="120" required></div>
+        <div class="input-group" style="margin-bottom: 14px;"><label for="registrationUsername">Correo del propietario</label><input type="email" id="registrationUsername" class="input-control" maxlength="100" required></div>
+        <div class="input-group" style="margin-bottom: 14px;"><label for="registrationPassword">Contraseña</label><input type="password" id="registrationPassword" class="input-control" minlength="12" autocomplete="new-password" required></div>
+        <div class="input-group" style="margin-bottom: 20px;"><label for="registrationPasswordConfirmation">Confirmar contraseña</label><input type="password" id="registrationPasswordConfirmation" class="input-control" minlength="12" autocomplete="new-password" required></div>
+        <p class="input-help">Debe incluir 12+ caracteres, mayúscula, minúscula, número y símbolo.</p>
+        <button type="submit" class="btn-primary" style="width:100%; justify-content:center; margin-bottom:12px;">Crear organización</button>
+        <div style="text-align:center;"><button type="button" class="chip-btn" id="btnShowLogin">Ya tengo cuenta</button><button type="button" class="chip-btn" id="btnCloseRegistrationModal">Cerrar</button></div>
       </form>
     </div>
   </div>
@@ -706,6 +744,6 @@
   </div>
 
   <!-- Script Principal de la Aplicación -->
-  <script src="/static/js/app.js?v=20261114-auth-gate"></script>
+  <script src="/static/js/app.js?v=20261114-organization-roles"></script>
 </body>
 </html>

@@ -16,7 +16,7 @@ from securecode.adapters.postgres.models import UserAuditEvent
 
 
 class UserStub:
-    def __init__(self, username="auditor@example.com", role="auditor", active=True):
+    def __init__(self, username="platform@example.com", role="platform_admin", active=True):
         self.id = uuid4()
         self.username = username
         self.role = role
@@ -66,17 +66,17 @@ class SessionStub:
         return None
 
 
-def test_admin_can_create_a_normalized_user_with_hashed_password():
+def test_platform_admin_can_create_a_normalized_platform_user_with_hashed_password():
     session = SessionStub()
     created = create_user(
-        UserCreateRequest(username="  Auditor.Nuevo@Example.com ", password="PasswordTemporal#2026", role="auditor"),
+        UserCreateRequest(username="  Operator.Nuevo@Example.com ", password="PasswordTemporal#2026", role="platform_admin"),
         session,
-        UserStub(role="admin"),
+        UserStub(role="platform_admin"),
     )
 
     stored_user = session.added[0]
-    assert created["username"] == "auditor.nuevo@example.com"
-    assert created["role"] == "auditor"
+    assert created["username"] == "operator.nuevo@example.com"
+    assert created["role"] == "platform_admin"
     assert stored_user.password_hash != "PasswordTemporal#2026"
     assert verify_password("PasswordTemporal#2026", stored_user.password_hash)
     assert isinstance(session.added[1], UserAuditEvent)
@@ -90,9 +90,9 @@ def test_duplicate_username_is_rejected():
 
     with pytest.raises(HTTPException) as exc_info:
         create_user(
-            UserCreateRequest(username="auditor@example.com", password="PasswordTemporal#2026"),
+            UserCreateRequest(username="operator@example.com", password="PasswordTemporal#2026"),
             session,
-            UserStub(role="admin"),
+            UserStub(role="platform_admin"),
         )
 
     assert exc_info.value.status_code == 409
@@ -103,9 +103,9 @@ def test_weak_password_is_rejected_before_persistence():
 
     with pytest.raises(HTTPException) as exc_info:
         create_user(
-            UserCreateRequest(username="auditor@example.com", password="onlylowercase12"),
+            UserCreateRequest(username="operator@example.com", password="onlylowercase12"),
             session,
-            UserStub(role="admin"),
+            UserStub(role="platform_admin"),
         )
 
     assert exc_info.value.status_code == 422
@@ -115,19 +115,19 @@ def test_weak_password_is_rejected_before_persistence():
 def test_admin_can_read_and_update_user_state():
     managed_user = UserStub()
     session = SessionStub(first_result=managed_user, all_results=[managed_user])
-    admin = UserStub(username="admin@example.com", role="admin")
+    admin = UserStub(username="admin@example.com", role="platform_admin")
 
     listed = list_users(session, admin)
-    updated = update_user(str(managed_user.id), UserUpdateRequest(active=False, role="admin"), session, admin)
+    updated = update_user(str(managed_user.id), UserUpdateRequest(active=False, role="platform_admin"), session, admin)
 
-    assert listed[0]["username"] == "auditor@example.com"
+    assert listed[0]["username"] == "platform@example.com"
     assert updated["active"] is False
-    assert updated["role"] == "admin"
+    assert updated["role"] == "platform_admin"
     assert session.commits == 1
 
 
 def test_administrator_cannot_remove_own_access():
-    admin = UserStub(username="admin@example.com", role="admin")
+    admin = UserStub(username="admin@example.com", role="platform_admin")
     session = SessionStub(first_result=admin)
 
     with pytest.raises(HTTPException) as exc_info:
@@ -137,9 +137,9 @@ def test_administrator_cannot_remove_own_access():
 
 
 def test_last_active_administrator_cannot_be_deactivated_by_another_admin():
-    only_admin = UserStub(username="only-admin@example.com", role="admin")
+    only_admin = UserStub(username="only-admin@example.com", role="platform_admin")
     session = SessionStub(first_result=only_admin, count_value=1)
-    actor = UserStub(username="actor@example.com", role="admin")
+    actor = UserStub(username="actor@example.com", role="platform_admin")
 
     with pytest.raises(HTTPException) as exc_info:
         update_user(str(only_admin.id), UserUpdateRequest(active=False), session, actor)

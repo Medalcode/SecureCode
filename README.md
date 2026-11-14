@@ -14,7 +14,7 @@ Desarrollada mediante metodología **SDD (Specification-Driven Development)**, a
 - **Adaptadores GitHub REST API**: Adquisición y normalización de evidencia en tiempo real con degradación elegante ante estados no observables (*tri-state*: `PASS`, `FAIL`, `UNKNOWN`).
 - **Persistencia Inmutable en PostgreSQL**: Almacenamiento auditable con trazabilidad criptográfica (hashing canónico SHA-256 de evidencia cruda), integridad referencial estricta y migraciones versionadas con Alembic.
 - **Autenticación y Seguridad**: Hashing de contraseñas con Argon2id, tokens de acceso JWT (HS256) con expiración configurable, validación de usuarios activos, vinculación de auditoría `requested_by_user_id`, CORS de lista permitida y cabeceras de seguridad para navegador.
-- **Autorización y Auditoría**: Roles persistidos `admin` y `auditor`; los auditores requieren una autorización activa por repositorio (normalizada como `owner/repo`) y sólo acceden a su propio historial. Los administradores conservan el acceso operativo de plataforma y registran cada cambio de alcance.
+- **Autorización y Auditoría**: tres roles explícitos: `platform_admin` para operación interna de SecureCode, `organization_owner` para gestionar una empresa cliente y `analyst` para evaluar repositorios autorizados. Cada empresa queda aislada por membresías y autorizaciones normalizadas como `owner/repo`.
 - **Frontend SPA Minimalista (Estilo Gemini/ChatGPT)**: Interfaz web oscura/clara sin dependencias pesadas, con selector de controles, visor de evidencia en tiempo real, copia de hash SHA-256, telemetría del sistema, simulación en Sandbox y panel FinOps.
 - **Contenedorización para Producción**: `Dockerfile` multi-stage basado en `python:3.11-slim`, sin compilador en runtime, con usuario no privilegiado (`appuser`, UID 10001); Compose ejecuta la API con filesystem de sólo lectura, sin capacidades Linux y sin escalamiento de privilegios.
 
@@ -51,10 +51,10 @@ docker compose up --build -d
 docker compose exec api alembic upgrade head
 
 # 5. Crear usuario inicial (sin contraseña en CLI)
-docker compose exec api sh -c "SEED_USER_EMAIL=auditor@empresa.com SEED_USER_PASSWORD=<contraseña_segura> python scripts/seed_user.py"
+docker compose exec api sh -c "SEED_USER_EMAIL=operator@securecode.cl SEED_USER_PASSWORD=<contraseña_segura> python scripts/seed_user.py"
 ```
 
-> El primer usuario puede inicializarse con `SEED_USER_ROLE=admin`. Las cuentas existentes pasan a `auditor` tras ejecutar la migración de roles, aplicando mínimo privilegio. Cree administradores adicionales sólo mediante una sesión administrativa autorizada.
+> El semillero sólo crea el primer `platform_admin` interno. Las empresas clientes se registran mediante `POST /api/v1/auth/register`, que crea su `organization_owner`; éste crea las cuentas `analyst` y autoriza sus repositorios desde **Mi Organización**. La migración de tres roles convierte `admin` a `platform_admin` y `auditor` a `analyst`.
 
 Acceder: **`http://localhost:8000/`** | Swagger: **`http://localhost:8000/docs`**
 

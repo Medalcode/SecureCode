@@ -32,8 +32,8 @@ class SessionStub:
         return QueryStub(self.authorization)
 
 
-def test_auditor_is_denied_without_an_active_repository_authorization():
-    auditor = SimpleNamespace(id=uuid4(), role="auditor")
+def test_analyst_is_denied_without_an_active_repository_authorization():
+    auditor = SimpleNamespace(id=uuid4(), role="analyst")
 
     with pytest.raises(HTTPException) as exc_info:
         _require_repository_authorization(SessionStub(None), auditor, "Medalcode", "securecode-ground-truth")
@@ -41,15 +41,15 @@ def test_auditor_is_denied_without_an_active_repository_authorization():
     assert exc_info.value.status_code == 403
 
 
-def test_auditor_can_evaluate_an_explicitly_authorized_repository():
-    auditor = SimpleNamespace(id=uuid4(), role="auditor")
+def test_analyst_can_evaluate_an_explicitly_authorized_repository():
+    auditor = SimpleNamespace(id=uuid4(), role="analyst")
     authorization = SimpleNamespace(active=True)
 
     _require_repository_authorization(SessionStub(authorization), auditor, "Medalcode", "securecode-ground-truth")
 
 
 def test_administrator_bypasses_per_account_scope_for_platform_operations():
-    administrator = SimpleNamespace(id=uuid4(), role="admin")
+    administrator = SimpleNamespace(id=uuid4(), role="platform_admin")
 
     _require_repository_authorization(SessionStub(None), administrator, "Medalcode", "securecode-ground-truth")
 
