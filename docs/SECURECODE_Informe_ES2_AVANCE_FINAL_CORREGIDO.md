@@ -12,6 +12,36 @@
 
 ---
 
+## Actualización de evidencia técnica 2026-11-13
+
+Este informe conserva resultados históricos asociados al commit y a la suite
+descritos en cada sección. No deben interpretarse como telemetría ni como una
+certificación del estado actual de `main`.
+
+La evidencia posterior verificable se encuentra en `docs/evidence/2026-11-12/`
+y `docs/evidence/2026-11-13/`:
+
+- El catálogo actual incorpora GH-001, GH-002 y GH-003. Las pruebas locales no
+  permiten salida a GitHub real: el simulador de rendimiento está limitado a
+  `127.0.0.1:8001` y no se reescribe globalmente `urllib.request`.
+- La última suite local ejecutada sobre el commit `406f2d5` registró **199
+  pruebas aprobadas y 13 omitidas**. Esta ejecución no equivale a una métrica
+  de cobertura ni sustituye el resultado histórico de CI citado más abajo.
+- La medición local de consumo posterior ejecutó 900 evaluaciones, con 900
+  exitosas, 0 errores y P95 agregada de 419.0112 ms. Usa perfiles simulados y
+  no demuestra rendimiento de GitHub, Cloud Run ni un SLA productivo.
+- Enterprise Trial tiene una fundación de dominio y migración probadas para 14
+  días, 3 repositorios y 100 evaluaciones. Aún no existe un flujo de cliente
+  UI/API ni cobro asociado.
+- `demo_non_billable` sigue siendo demostrativo. No existen facturas,
+  integración de cobros, costos cloud observados en CLP ni ingresos reconocidos
+  por la plataforma.
+
+Las métricas históricas de 95 pruebas, 89% de cobertura y Locust a 50 usuarios
+deben leerse únicamente dentro de su fecha, commit y configuración original.
+La corrida actual de 900 evaluaciones se documenta como medición local
+controlada, no como reemplazo de aquel ensayo de concurrencia.
+
 ## Índice de tablas
 * Tabla 1. Criterios de clasificación y alcance de la evidencia técnica
 * Tabla 2. Análisis cualitativo y comparativo de alternativas tecnológicas

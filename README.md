@@ -24,7 +24,7 @@ Desarrollada mediante metodología **SDD (Specification-Driven Development)**, a
 
 - **Suite de Pruebas**: la cifra vigente se obtiene exclusivamente ejecutando `pytest -q`; no se publica un total fijo en el README porque evoluciona con cada control y migración.
 - **Cobertura de Código**: se mide en CI con `pytest-cov`; consulte el artefacto de la ejecución vigente, no una cifra histórica.
-- **Rendimiento de Carga (Locust)**: la evidencia ES2 es una medición controlada histórica con mock local. Debe repetirse con el flujo actual de GitHub antes de usarse como capacidad de producción.
+- **Rendimiento de Carga (Locust)**: la evidencia ES2 histórica no representa capacidad de producción. Existe una medición local posterior de 900 evaluaciones con simulador loopback, registrada en `docs/evidence/2026-11-13/`; no mide GitHub, Cloud Run ni costos cloud reales.
 
 ---
 
@@ -234,9 +234,9 @@ gcloud run services update-traffic securecode \
 SecureCode/
 ├── .github/workflows/       # CI/CD: Tests, E2E, Docker Smoke Test
 ├── alembic/                 # Migraciones de esquema PostgreSQL
-├── docs/specs/              # Especificaciones SDD (GH-001, GH-002, DEPLOY-002)
+├── docs/specs/              # Especificaciones SDD (GH-001, GH-002, GH-003, DEPLOY-002)
 ├── docs/figures/            # Diagramas e imágenes del informe
-├── rules/                   # Catálogo canónico de reglas JSON (GH-001, GH-002)
+├── rules/                   # Catálogo canónico de reglas JSON (GH-001, GH-002, GH-003)
 ├── scripts/                 # Semillero de usuarios, Locust, benchmarks
 ├── src/securecode/
 │   ├── adapters/            # Adaptadores externos (GitHub REST API, PostgreSQL)
