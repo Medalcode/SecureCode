@@ -303,6 +303,7 @@
     const repoInput = document.getElementById('repoInput');
     const branchInput = document.getElementById('branchInput');
     const chips = document.querySelectorAll('.chip-btn');
+    const btnSubmit = document.getElementById('btnSubmitEval');
     const btnCancel = document.getElementById('btnCancelEval');
     if (!form) return;
 
@@ -317,6 +318,15 @@
         if (repoInput) repoInput.value = repoVal;
         if (branchInput) branchInput.value = branchVal;
       });
+    });
+
+    // Un visitante debe poder solicitar autenticación incluso si aún no ha
+    // completado los campos required del formulario.
+    btnSubmit?.addEventListener('click', (event) => {
+      if (state.token) return;
+      event.preventDefault();
+      setEvaluatorFeedback('Inicia sesión para ejecutar una evaluación y guardar su evidencia.', 'neutral');
+      openAuthModal();
     });
 
     // Envío del formulario
@@ -869,7 +879,12 @@
     const authenticated = Boolean(state.token && state.accessRole);
     const button = document.getElementById('btnSubmitEval');
     const notice = document.getElementById('evaluatorAccessNotice');
-    if (button) button.disabled = !authenticated;
+    if (button) {
+      button.disabled = false;
+      button.setAttribute('aria-label', authenticated
+        ? 'Ejecutar Evaluación Determinista'
+        : 'Iniciar sesión para ejecutar una evaluación');
+    }
     if (notice) notice.textContent = authenticated
       ? 'Acceso de solo lectura a la API REST de GitHub. La evidencia se asocia a tu cuenta.'
       : 'Inicia sesión para ejecutar una evaluación y guardar evidencia.';
