@@ -180,7 +180,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from securecode.api.security import create_access_token, hash_password, verify_password
 
@@ -200,6 +200,9 @@ class CurrentUserResponse(BaseModel):
 
 
 class OrganizationRegistrationRequest(BaseModel):
+    # Registration is a public privilege boundary: silently ignoring a caller's
+    # requested role would hide malformed or hostile requests from clients.
+    model_config = ConfigDict(extra="forbid")
     organization_name: str = Field(min_length=2, max_length=120)
     username: str = Field(min_length=3, max_length=100)
     password: str = Field(min_length=12, max_length=128)
