@@ -92,6 +92,41 @@ def test_test_mode_accepts_only_the_fixed_loopback_simulator(monkeypatch):
     assert client.base_url == LOCAL_TEST_GITHUB_API_BASE_URL
 
 
+def test_fixed_loopback_client_bypasses_host_proxy_configuration(monkeypatch):
+    class Response:
+        status = 200
+
+        def read(self):
+            return b"{}"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+    class DirectOpener:
+        def __init__(self):
+            self.request = None
+
+        def open(self, request, timeout):
+            self.request = request
+            return Response()
+
+    opener = DirectOpener()
+    monkeypatch.setattr(
+        "securecode.adapters.github.urllib.request.build_opener",
+        lambda *handlers: opener,
+    )
+
+    status, payload = UrllibGitHubHttpClient(LOCAL_TEST_GITHUB_API_BASE_URL).get_json(
+        "/repos/owner/repo", {}
+    )
+
+    assert (status, payload) == (200, {})
+    assert opener.request.full_url.startswith(LOCAL_TEST_GITHUB_API_BASE_URL)
+
+
 @pytest.mark.parametrize("path", ["https://api.github.com/repos/a/b", "//evil.invalid/path", "relative"])
 def test_client_rejects_url_like_paths_before_any_network_request(path):
     client = UrllibGitHubHttpClient(PRODUCTION_GITHUB_API_BASE_URL)

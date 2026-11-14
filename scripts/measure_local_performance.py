@@ -19,7 +19,7 @@ from pathlib import Path
 from statistics import quantiles
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import ProxyHandler, Request, build_opener
 
 import psutil
 from sqlalchemy import create_engine, text
@@ -28,6 +28,9 @@ CONTROLS = ("gh-001", "gh-002", "gh-003")
 PROFILES = ("small", "medium", "large")
 LOCAL_API = "http://127.0.0.1:8000"
 LOCAL_MOCK = "http://127.0.0.1:8001"
+# The collector permits only fixed loopback URLs.  Bypass host-level proxy
+# settings so a corporate proxy cannot intercept or stall local evidence runs.
+LOCAL_OPENER = build_opener(ProxyHandler({}))
 
 
 @dataclass(frozen=True)
@@ -83,12 +86,14 @@ def _request_json(url: str, payload: dict[str, str] | None = None, token: str | 
         headers["Authorization"] = f"Bearer {token}"
     request = Request(url, data=body, headers=headers, method="POST" if body else "GET")
     try:
-        with urlopen(request, timeout=30) as response:
+        with LOCAL_OPENER.open(request, timeout=30) as response:
             return response.status, response.read()
     except HTTPError as error:
         return error.code, error.read()
     except URLError as error:
         raise RuntimeError(f"Local endpoint unavailable: {error.reason}") from error
+    except TimeoutError as error:
+        raise RuntimeError("Local endpoint unavailable: request timed out.") from error
 
 
 def _authenticate(api_base_url: str, username: str, password: str) -> str:
@@ -99,7 +104,7 @@ def _authenticate(api_base_url: str, username: str, password: str) -> str:
         method="POST",
     )
     try:
-        with urlopen(request, timeout=30) as response:
+        with LOCAL_OPENER.open(request, timeout=30) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except HTTPError as error:
         raise RuntimeError(f"Local login failed with HTTP {error.code}.") from error

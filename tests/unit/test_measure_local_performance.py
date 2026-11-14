@@ -13,6 +13,45 @@ def test_fixed_local_urls_reject_remote_targets():
         measurement._require_local_url("https://example.invalid", measurement.LOCAL_API, "API URL")
 
 
+def test_local_requests_use_the_proxy_free_opener(monkeypatch):
+    class Response:
+        status = 200
+
+        def read(self):
+            return b"{}"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+    class LocalOpener:
+        def __init__(self):
+            self.request = None
+
+        def open(self, request, timeout):
+            self.request = request
+            return Response()
+
+    opener = LocalOpener()
+    monkeypatch.setattr(measurement, "LOCAL_OPENER", opener)
+
+    assert measurement._request_json(f"{measurement.LOCAL_MOCK}/__metrics") == (200, b"{}")
+    assert opener.request.full_url == f"{measurement.LOCAL_MOCK}/__metrics"
+
+
+def test_local_request_timeout_has_a_clear_error(monkeypatch):
+    class TimeoutOpener:
+        def open(self, request, timeout):
+            raise TimeoutError
+
+    monkeypatch.setattr(measurement, "LOCAL_OPENER", TimeoutOpener())
+
+    with pytest.raises(RuntimeError, match="request timed out"):
+        measurement._request_json(f"{measurement.LOCAL_MOCK}/__metrics")
+
+
 @pytest.mark.parametrize(
     "database_url",
     [
