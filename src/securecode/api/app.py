@@ -248,16 +248,16 @@ class UserAuditEventResponse(BaseModel):
 
 class OrganizationMemberCreateRequest(BaseModel):
     username: str = Field(min_length=3, max_length=100)
-    password: str | None = Field(default=None, min_length=12, max_length=128,
-        description="ContraseÃ±a del Analyst (minimo 12 caracteres). Dejar vacio para que el sistema genere una temporal.")
-    generate_temp: bool = Field(default=False, description="Si es true, el sistema genera una contraseÃ±a temporal segura y la muestra una sola vez al Owner con aviso de copiarla y entregarla por canal seguro.")
+    password: str | None = Field(default=None, max_length=128,
+        description="Contraseña del Analyst (mínimo 12 caracteres). Ausente, nula, vacía o de sólo espacios equivale a no proporcionada: la estrategia la define generate_temp.")
+    generate_temp: bool = Field(default=False, description="Si es true, el sistema genera una contraseña temporal segura y la muestra una sola vez al Owner con aviso de copiarla y entregarla por canal seguro.")
 
 
 class OrganizationMemberUpdateRequest(BaseModel):
     active: bool | None = None
-    password: str | None = Field(default=None, min_length=12, max_length=128,
-        description="Nueva contraseÃ±a del Analyst (minimo 12 caracteres). Dejar vacio para que el sistema genere una temporal.")
-    generate_temp: bool = Field(default=False, description="Si es true, el sistema genera una contraseÃ±a temporal segura y la muestra una sola vez al Owner con aviso de copiarla y entregarla por canal seguro.")
+    password: str | None = Field(default=None, max_length=128,
+        description="Nueva contraseña del Analyst (mínimo 12 caracteres). Ausente, nula, vacía o de sólo espacios equivale a no proporcionada: la estrategia la define generate_temp.")
+    generate_temp: bool = Field(default=False, description="Si es true, el sistema genera una contraseña temporal segura y la muestra una sola vez al Owner con aviso de copiarla y entregarla por canal seguro.")
 
 
 class OrganizationMemberResponse(UserResponse):
@@ -520,8 +520,22 @@ def _validate_password_strength(password: str) -> None:
     if not (len(password) >= 12 and re.search(r"[a-z]", password) and re.search(r"[A-Z]", password) and re.search(r"\d", password) and re.search(r"[^A-Za-z0-9]", password)):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="La contraseÃ±a debe tener 12+ caracteres, mayÃºscula, minÃºscula, nÃºmero y sÃ­mbolo",
+            detail="La contraseña debe tener 12+ caracteres, mayúscula, minúscula, número y símbolo",
         )
+
+
+def _normalise_requested_password(raw: str | None) -> str | None:
+    """Return the explicit password, or None when it is absent/blank.
+
+    An absent, null, empty or whitespace-only password is treated as "not
+    provided", so the generate_temp flag alone decides the strategy. A
+    non-blank password is trimmed so the value shown, validated and hashed
+    is exactly one password.
+    """
+    if raw is None:
+        return None
+    stripped = raw.strip()
+    return stripped if stripped else None
 
 
 def _generate_secure_temp_password() -> str:
@@ -956,35 +970,34 @@ def create_organization_member(
     username = _normalise_username(request.username)
 
     # --- Password resolution path ---
-    # XOR: exactamente una alternativa debe ser vÃ¡lida
-    password_provided = request.password is not None
+    # XOR: exactamente una alternativa debe ser válida. Una contraseña
+    # ausente, nula, vacía o de sólo espacios equivale a "no proporcionada".
+    explicit_password = _normalise_requested_password(request.password)
     generate_temp_requested = request.generate_temp
 
-    # Ambos proporcionados simultÃ¡neamente: rechazar 422
-    if password_provided and generate_temp_requested:
+    # Contraseña útil y generate_temp a la vez: rechazar 422
+    if explicit_password is not None and generate_temp_requested:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="Invalido: proporcione una alternativa: contraseÃ±a explÃ­cita O generate_temp=true, no los dos.",
+            detail="Invalido: proporcione una alternativa: contraseña explícita O generate_temp=true, no los dos.",
         )
-    # SÃ³lo contraseÃ±a explÃ­cita (sin generate_temp)
-    if password_provided and not generate_temp_requested:
-        # type: ignore[arg-type]
-        _validate_password_strength(request.password)  # type: ignore[arg-type]
-        password_to_use = request.password
+    # Sólo contraseña explícita (sin generate_temp)
+    if explicit_password is not None:
+        _validate_password_strength(explicit_password)
+        password_to_use: str = explicit_password
         temp_password = None
         generate_temp_flag = False
-    # SÃ³lo generate_temp (sin contraseÃ±a)
-    elif generate_temp_requested and not password_provided:
+    # Sólo generate_temp (sin contraseña útil)
+    elif generate_temp_requested:
         password_to_use = _generate_secure_temp_password()
-        # type: ignore[arg-type]
-        _validate_password_strength(password_to_use)  # type: ignore[arg-type]
+        _validate_password_strength(password_to_use)
         temp_password = password_to_use  # Show once in response
         generate_temp_flag = True
-    # Ninguna alternativa: solo es vÃ¡lido si active cambia (manejado mÃ¡s abajo)
+    # Ninguna alternativa
     else:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="Se requiere una contraseÃ±a o definir generate_temp=true para una temporal.",
+            detail="Se requiere una contraseña o definir generate_temp=true para una temporal.",
         )
 
     if session.query(User).filter(User.username == username).first() is not None:
@@ -1041,30 +1054,29 @@ def update_organization_member(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analyst not found in this organization")
     changes: dict[str, object] = {}
     # --- Password resolution path for reset ---
-    password_provided = request.password is not None
+    # XOR: exactamente una de password o generate_temp (si active no cambia).
+    # Una contraseña ausente, nula, vacía o de sólo espacios equivale a "no
+    # proporcionada"; sin contraseña útil ni generate_temp sólo se permite
+    # cambiar active.
+    explicit_password = _normalise_requested_password(request.password)
     generate_temp_requested = request.generate_temp
 
-    # XOR: exactly one of password or generate_temp must be provided (if active not changing)
-    # Both provided together: reject
-    # Neither provided: only OK if active is changing
-    if password_provided and generate_temp_requested:
-        # Both provided simultaneously: reject with 422
+    if explicit_password is not None and generate_temp_requested:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="Invalido: proporcione una alternativa: contraseÃ±a explÃ­cita O generate_temp=true, no los dos.",
+            detail="Invalido: proporcione una alternativa: contraseña explícita O generate_temp=true, no los dos.",
         )
-    elif password_provided and not generate_temp_requested:
-        # Only password provided: validate and hash
-        _validate_password_strength(request.password)  # type: ignore[arg-type]
-        target.password_hash = hash_password(request.password)  # type: ignore[arg-type]
+    elif explicit_password is not None:
+        _validate_password_strength(explicit_password)
+        target.password_hash = hash_password(explicit_password)
         changes["password_reset"] = True
-    elif generate_temp_requested and not password_provided:
+    elif generate_temp_requested:
         # Only generate_temp provided: generate secure temp password (ONE ONLY)
         new_password = _generate_secure_temp_password()
         _validate_password_strength(new_password)
         target.password_hash = hash_password(new_password)
         changes["password_reset"] = True
-        # Guardar la contraseÃ±a temporal para devolverla en la respuesta
+        # Guardar la contraseña temporal para devolverla en la respuesta
         _temp_password_store = new_password
     # If neither password nor generate_temp: only active change is allowed below
 
@@ -1076,7 +1088,7 @@ def update_organization_member(
     # If only active was changed, changes only contains "active"
 
     # --- Rejection: completely empty request (no active, no password, no generate_temp) ---
-    if not changes and request.active is None and not password_provided and not generate_temp_requested:
+    if not changes and request.active is None and explicit_password is None and not generate_temp_requested:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="No se recibiÃ³ ningÃºn cambio para aplicar. Proporcione active, una contraseÃ±a o generate_temp=true.",

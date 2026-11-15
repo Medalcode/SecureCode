@@ -1407,37 +1407,13 @@
   }
 
   function openOrganizationPasswordReset(button) {
-    const username = button.dataset.organizationUsername;
-    // Ask Owner: define password or generate temporary
-    const choice = prompt(`Restablecer contraseña para ${username}\n\nOpciones:\n1="Generar" - El sistema crea una contraseña segura y la muestra una sola vez\n2="Definir" - Tú introduces una contraseña temporal (mínimo 12 caracteres)\n\nElige 1 o 2:`);
-    if (!choice) return; // User cancelled
-    choice = choice.trim();
-    if (choice === '1') {
-      // Generate temporary password - set strategy and open modal with generate pre-selected
-      const strategyRadios = document.querySelectorAll('input[name="passwordStrategy"]');
-      if (strategyRadios.length > 0) {
-        strategyRadios[0].checked = false;
-        strategyRadios[1].checked = true;
-        updatePasswordInputVisibility();
-      }
-      // Open the password reset modal (it will use the selected strategy)
-      openPasswordResetModal(
-        button.dataset.organizationReset,
-        button.dataset.organizationUsername,
-        `/api/v1/organization/members/${encodeURIComponent(button.dataset.organizationReset)}`,
-        'organization'
-      );
-    } else if (choice === '2') {
-      // Define password explicitly - open normal modal
-      openPasswordResetModal(
-        button.dataset.organizationReset,
-        button.dataset.organizationUsername,
-        `/api/v1/organization/members/${encodeURIComponent(button.dataset.organizationReset)}`,
-        'organization'
-      );
-    } else {
-      setOrganizationFeedback('Opción no válida. Se abortó el restablecimiento.', 'error');
-    }
+    // El modal accesible ofrece las dos opciones explícitas: generar o definir.
+    openPasswordResetModal(
+      button.dataset.organizationReset,
+      button.dataset.organizationUsername,
+      `/api/v1/organization/members/${encodeURIComponent(button.dataset.organizationReset)}`,
+      'organization'
+    );
   }
 
   async function saveOrganizationRepositoryAuthorization(event) {
@@ -1493,6 +1469,12 @@
     document.getElementById('repositoryAuthorizationForm')?.addEventListener('submit', saveRepositoryAuthorization);
     document.getElementById('passwordResetForm')?.addEventListener('submit', submitPasswordReset);
     document.getElementById('btnCancelPasswordReset')?.addEventListener('click', closePasswordResetModal);
+    document.getElementById('passwordResetModal')?.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closePasswordResetModal();
+    });
+    document.querySelectorAll('input[name="resetPasswordStrategy"]').forEach(radio => {
+      radio.addEventListener('change', updatePasswordResetVisibility);
+    });
     document.getElementById('newUserPassword')?.addEventListener('input', () => updatePasswordFormState('newUserPassword', 'newUserPasswordConfirm', 'newUserPasswordPolicy', 'newUserPasswordMatch'));
     document.getElementById('newUserPasswordConfirm')?.addEventListener('input', () => updatePasswordFormState('newUserPassword', 'newUserPasswordConfirm', 'newUserPasswordPolicy', 'newUserPasswordMatch'));
     document.getElementById('resetUserPassword')?.addEventListener('input', () => updatePasswordFormState('resetUserPassword', 'resetUserPasswordConfirm', 'resetUserPasswordPolicy', 'resetUserPasswordMatch'));
@@ -1766,16 +1748,36 @@
     feedback.dataset.tone = tone;
   }
 
+  function updatePasswordResetVisibility() {
+    const scope = state.passwordResetTarget?.scope;
+    const strategyGroup = document.getElementById('passwordResetStrategyGroup');
+    const fieldGroup = document.getElementById('passwordResetPasswordFieldGroup');
+    const note = document.getElementById('passwordResetGenerateNote');
+    if (strategyGroup) strategyGroup.hidden = scope !== 'organization';
+    const generate = scope === 'organization'
+      && document.querySelector('input[name="resetPasswordStrategy"]:checked')?.value === 'generate';
+    if (fieldGroup) fieldGroup.hidden = generate;
+    if (note) note.hidden = !generate;
+  }
+
   function openPasswordResetModal(userId, username, endpoint = null, scope = 'platform') {
     state.passwordResetTarget = { userId, username, endpoint, scope };
     const modal = document.getElementById('passwordResetModal');
-    document.getElementById('passwordResetDescription').textContent = `Define una nueva contraseña temporal para ${username}. No será mostrada nuevamente.`;
+    document.getElementById('passwordResetDescription').textContent = scope === 'organization'
+      ? `Restablece la contraseña de ${username}. Genera una temporal segura o defínela tú.`
+      : `Define una nueva contraseña temporal para ${username}. No será mostrada nuevamente.`;
     document.getElementById('passwordResetForm').reset();
     document.getElementById('passwordResetFeedback').textContent = '';
+    if (scope === 'organization') {
+      const generateRadio = document.getElementById('resetStrategyGenerate');
+      if (generateRadio) generateRadio.checked = true;
+    }
+    updatePasswordResetVisibility();
     updatePasswordFormState('resetUserPassword', 'resetUserPasswordConfirm', 'resetUserPasswordPolicy', 'resetUserPasswordMatch');
     modal?.classList.add('active');
     modal?.setAttribute('aria-hidden', 'false');
-    document.getElementById('resetUserPassword')?.focus();
+    const firstFocus = scope === 'organization' ? document.getElementById('resetStrategyGenerate') : document.getElementById('resetUserPassword');
+    firstFocus?.focus();
   }
 
   function closePasswordResetModal() {
@@ -1790,8 +1792,11 @@
     const feedback = document.getElementById('passwordResetFeedback');
     const button = document.getElementById('btnConfirmPasswordReset');
     const target = state.passwordResetTarget;
-    const generateTemp = document.querySelector('input[name="passwordStrategy"]:checked')?.value === 'generate';
-    if (!target || !validatePasswordForm('resetUserPassword', 'resetUserPasswordConfirm', 'resetUserPasswordPolicy', 'resetUserPasswordMatch')) {
+    if (!target) return;
+    // En modo generado el backend crea la contraseña: no se valida el campo.
+    const generateTemp = target.scope === 'organization'
+      && document.querySelector('input[name="resetPasswordStrategy"]:checked')?.value === 'generate';
+    if (!generateTemp && !validatePasswordForm('resetUserPassword', 'resetUserPasswordConfirm', 'resetUserPasswordPolicy', 'resetUserPasswordMatch')) {
       if (feedback) feedback.textContent = 'Revisa los requisitos y confirma la contraseña.';
       return;
     }
@@ -1808,8 +1813,11 @@
         body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error(await getApiError(res, 'No se pudo restablecer la contraseña.'));
+      const data = await res.json();
+      const tempPassword = target.scope === 'organization' ? data.temporary_password : null;
       closePasswordResetModal();
       if (target.scope === 'organization') {
+        if (tempPassword) openOrganizationPasswordPanel(target.username, tempPassword);
         setOrganizationFeedback(`Contraseña restablecida para ${target.username}.`, 'success');
         await refreshOrganization();
       } else {

@@ -783,9 +783,24 @@
     <div class="modal-card modal-card-compact" role="dialog" aria-modal="true" aria-labelledby="passwordResetTitle">
       <div class="modal-header"><div class="brand-icon" style="margin: 0 auto 12px; width: 40px; height: 40px; font-size: 20px;">↺</div><h2 id="passwordResetTitle">Restablecer contraseña</h2><p id="passwordResetDescription">Define una nueva contraseña temporal para la cuenta seleccionada.</p></div>
       <form id="passwordResetForm" novalidate>
-        <div class="input-group" style="margin-bottom: 14px;"><label for="resetUserPassword">Nueva contraseña temporal</label><div class="password-control"><input type="password" id="resetUserPassword" class="input-control" autocomplete="new-password" minlength="12" required><button type="button" class="password-toggle" data-password-toggle="resetUserPassword">Mostrar</button></div></div>
-        <div class="input-group"><label for="resetUserPasswordConfirm">Confirmar contraseña</label><div class="password-control"><input type="password" id="resetUserPasswordConfirm" class="input-control" autocomplete="new-password" minlength="12" required><button type="button" class="password-toggle" data-password-toggle="resetUserPasswordConfirm">Mostrar</button></div><span class="input-help" id="resetUserPasswordMatch"></span></div>
-        <div class="password-policy" id="resetUserPasswordPolicy" aria-live="polite"><span data-rule="length">○ 12 o más caracteres</span><span data-rule="lower">○ Una minúscula</span><span data-rule="upper">○ Una mayúscula</span><span data-rule="number">○ Un número</span><span data-rule="symbol">○ Un símbolo</span></div>
+        <div class="input-group" id="passwordResetStrategyGroup" hidden>
+          <div class="password-strategy-radio">
+            <input type="radio" id="resetStrategyGenerate" name="resetPasswordStrategy" value="generate" checked>
+            <label for="resetStrategyGenerate">Generar contraseña segura</label>
+            <small class="text-faint">El sistema crea una y la muestra una sola vez</small>
+          </div>
+          <div class="password-strategy-radio">
+            <input type="radio" id="resetStrategyDefined" name="resetPasswordStrategy" value="defined">
+            <label for="resetStrategyDefined">Definir contraseña</label>
+            <small class="text-faint">Mínimo 12 caracteres: mayúscula, minúscula, número y símbolo</small>
+          </div>
+        </div>
+        <p class="text-faint" id="passwordResetGenerateNote" hidden>El sistema generará una contraseña segura y la mostrará una sola vez para que la entregues por un canal seguro.</p>
+        <div id="passwordResetPasswordFieldGroup">
+          <div class="input-group" style="margin-bottom: 14px;"><label for="resetUserPassword">Nueva contraseña temporal</label><div class="password-control"><input type="password" id="resetUserPassword" class="input-control" autocomplete="new-password" minlength="12" required><button type="button" class="password-toggle" data-password-toggle="resetUserPassword">Mostrar</button></div></div>
+          <div class="input-group"><label for="resetUserPasswordConfirm">Confirmar contraseña</label><div class="password-control"><input type="password" id="resetUserPasswordConfirm" class="input-control" autocomplete="new-password" minlength="12" required><button type="button" class="password-toggle" data-password-toggle="resetUserPasswordConfirm">Mostrar</button></div><span class="input-help" id="resetUserPasswordMatch"></span></div>
+          <div class="password-policy" id="resetUserPasswordPolicy" aria-live="polite"><span data-rule="length">○ 12 o más caracteres</span><span data-rule="lower">○ Una minúscula</span><span data-rule="upper">○ Una mayúscula</span><span data-rule="number">○ Un número</span><span data-rule="symbol">○ Un símbolo</span></div>
+        </div>
         <div class="admin-feedback" id="passwordResetFeedback" role="status" aria-live="polite"></div>
         <div class="modal-actions"><button type="button" class="chip-btn" id="btnCancelPasswordReset">Cancelar</button><button type="submit" class="btn-primary" id="btnConfirmPasswordReset">Confirmar restablecimiento</button></div>
       </form>
@@ -793,6 +808,6 @@
   </div>
 
   <!-- Script Principal de la Aplicación -->
-  <script src="/static/js/app.js?v=20261115-visitor-navigation"></script>
+  <script src="/static/js/app.js?v=20261117-analyst-password-ux"></script>
 </body>
 </html>
