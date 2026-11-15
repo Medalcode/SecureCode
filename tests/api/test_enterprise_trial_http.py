@@ -108,6 +108,29 @@ def test_trial_endpoints_require_authentication(trial_client):
     }).status_code == 401
 
 
+def test_enterprise_trial_allows_only_one_active_analyst(trial_client):
+    client, headers = trial_client
+    assert client.post("/api/v1/enterprise-trial", headers=headers, json={
+        "confirmation": True,
+    }).status_code == 201
+
+    entitlement = client.get("/api/v1/organization/analyst-entitlements", headers=headers)
+    assert entitlement.status_code == 200
+    assert entitlement.json() == {
+        "analyst_limit": 1, "active_analysts": 0, "analysts_remaining": 1, "source": "Enterprise Trial",
+    }
+
+    first = client.post("/api/v1/organization/members", headers=headers, json={
+        "username": "first.analyst@trial.test", "password": "AnalystPassword#2026",
+    })
+    assert first.status_code == 201
+    second = client.post("/api/v1/organization/members", headers=headers, json={
+        "username": "second.analyst@trial.test", "password": "AnalystPassword#2026",
+    })
+    assert second.status_code == 409
+    assert "1/1" in second.json()["detail"]
+
+
 @patch("securecode.api.app.evaluate_and_store_gh001")
 def test_active_trial_enforces_scope_and_idempotency_for_evaluations(mock_evaluate, trial_client):
     client, headers = trial_client
