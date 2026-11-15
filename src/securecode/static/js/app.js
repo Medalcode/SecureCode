@@ -387,7 +387,7 @@
 
       const normalizedRepository = normalizeGithubRepository(rawRepo);
       if (!normalizedRepository) {
-        setEvaluatorFeedback('Ingresa un repositorio válido. Ejemplo: Medalcode/SecureCode o https://github.com/Medalcode/SecureCode', 'error');
+        setEvaluatorFeedback('Ingresa un repositorio válido con formato owner/repo o una URL completa de GitHub.', 'error');
         repoInput.focus();
         return;
       }
@@ -1267,14 +1267,17 @@
     }
     try {
       const headers = { Authorization: `Bearer ${state.token}` };
-      const [membersResult, authorizationsResult] = await Promise.all([
+      const [membersResult, authorizationsResult, entitlementsResult] = await Promise.all([
         fetch('/api/v1/organization/members', { headers }),
-        fetch('/api/v1/organization/repository-authorizations', { headers })
+        fetch('/api/v1/organization/repository-authorizations', { headers }),
+        fetch('/api/v1/organization/analyst-entitlements', { headers })
       ]);
       if (!membersResult.ok) throw new Error(await getApiError(membersResult, 'No se pudo cargar el equipo.'));
       state.organizationMembers = await membersResult.json();
       if (!authorizationsResult.ok) throw new Error(await getApiError(authorizationsResult, 'No se pudieron cargar los repositorios.'));
       state.organizationAuthorizations = await authorizationsResult.json();
+      if (!entitlementsResult.ok) throw new Error(await getApiError(entitlementsResult, 'No se pudo cargar el cupo de Analyst.'));
+      state.organizationAnalystEntitlements = await entitlementsResult.json();
       renderOrganizationMembers();
       renderOrganizationAuthorizations();
       panel.hidden = false;
@@ -1289,8 +1292,19 @@
   function renderOrganizationMembers() {
     const body = document.getElementById('organizationMembersBody');
     const select = document.getElementById('organizationAuthorizationUserId');
+    const quota = document.getElementById('organizationAnalystQuota');
+    const createButton = document.getElementById('btnCreateOrganizationAnalyst');
     if (!body || !select) return;
     const members = state.organizationMembers || [];
+    const entitlement = state.organizationAnalystEntitlements;
+    if (quota && entitlement) {
+      quota.textContent = `Cupos Analyst: ${entitlement.active_analysts} de ${entitlement.analyst_limit} utilizados (${entitlement.source}).`;
+    }
+    if (createButton && entitlement) {
+      const exhausted = entitlement.analysts_remaining <= 0;
+      createButton.disabled = exhausted;
+      createButton.title = exhausted ? 'No quedan cupos disponibles para crear Analyst.' : '';
+    }
     body.innerHTML = members.map(member => {
       const owner = member.role === 'organization_owner';
       const action = owner ? '<span class="admin-helper">Propietario</span>' : `<div class="admin-action-group"><button type="button" class="btn-inline-danger" data-organization-member="${escapeHTML(member.id)}" data-active="${member.active}">${member.active ? 'Desactivar' : 'Activar'}</button><button type="button" class="btn-copy" data-organization-reset="${escapeHTML(member.id)}" data-organization-username="${escapeHTML(member.username)}">Restablecer</button></div>`;
@@ -1374,7 +1388,7 @@
           control_id: 'GH-001',
           rule: { id: 'GH-001-RULE', version: 1 },
           status: 'PASS',
-          source: { type: 'GitHub', repository: 'Medalcode/SecureCode', branch: 'main' },
+          source: { type: 'GitHub', repository: 'example/controlled-repository', branch: 'main' },
           evidence: {
             required_review_approvals: 2,
             dismiss_stale_reviews: true,
@@ -1921,14 +1935,41 @@
     if (logoutButton) logoutButton.hidden = !signedIn;
   }
 
+  function resetVisitorEvaluationState() {
+    // Signing out must not leave account-scoped input, error text, or evidence
+    // from the previous person visible to the next visitor on this device.
+    const form = document.getElementById('evaluatorForm');
+    form?.reset();
+    const repoInput = document.getElementById('repoInput');
+    const branchInput = document.getElementById('branchInput');
+    if (repoInput) repoInput.value = '';
+    if (branchInput) branchInput.value = 'main';
+    state.selectedControl = 'GH-001';
+    renderControlSelector();
+    setEvaluatorFeedback();
+    document.getElementById('resultContainer')?.classList.remove('active');
+    document.getElementById('resRepository').textContent = 'Aún no se ha realizado una evaluación';
+    document.getElementById('resEvaluationId').textContent = '—';
+    document.getElementById('resultHashText').textContent = '—';
+    document.getElementById('jsonPayloadBody').textContent = 'La evidencia estructurada aparecerá aquí después de una evaluación.';
+  }
+
   function clearAuthenticatedSession() {
     state.token = null;
     state.accessRole = null;
     state.evalHistory = [];
+    state.adminUsers = [];
+    state.finops = null;
+    state.subscriptionData = null;
+    state.enterpriseTrial = null;
+    state.organizationMembers = [];
+    state.organizationAuthorizations = [];
+    state.organizationAnalystEntitlements = null;
     localStorage.removeItem('securecode_token');
     localStorage.removeItem('securecode_user');
     localStorage.removeItem('securecode_history');
-    state.user.username = 'Sesión requerida';
+    state.user = { username: 'Iniciar sesión', role: 'Acceso seguro requerido' };
+    resetVisitorEvaluationState();
     updateUserBadge();
     updateAdminAccess();
     updateHistoryAccess();
@@ -1937,7 +1978,6 @@
     updateSubscriptionAccess();
     updateFinOpsAccess();
     refreshOrganization();
-    document.getElementById('resultContainer')?.classList.remove('active');
     refreshAdminUsers();
   }
 

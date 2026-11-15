@@ -171,7 +171,7 @@
               <div class="form-grid">
                 <div class="input-group">
                   <label for="repoInput">Repositorio de Código (owner/repo)</label>
-                  <input type="text" id="repoInput" class="input-control" placeholder="Medalcode/SecureCode o https://github.com/Medalcode/SecureCode" required autocomplete="off" aria-describedby="repoInputHelp">
+                  <input type="text" id="repoInput" class="input-control" placeholder="owner/repo o https://github.com/owner/repo" required autocomplete="off" aria-describedby="repoInputHelp">
                   <span class="input-help" id="repoInputHelp">Acepta <code>owner/repo</code> o una URL completa de GitHub.</span>
                 </div>
 
@@ -180,14 +180,6 @@
                   <input type="text" id="branchInput" class="input-control" placeholder="main" value="main" autocomplete="off" aria-describedby="branchInputHelp">
                   <span class="input-help" id="branchInputHelp">Se valida el formato de referencia de GitHub antes de consultar la API.</span>
                 </div>
-              </div>
-
-              <!-- Chips de selección rápida -->
-              <div class="chips-row">
-                <span class="chips-label">Ejemplos rápidos:</span>
-                <button type="button" class="chip-btn" data-repo="Medalcode/SecureCode" data-branch="main">Medalcode/SecureCode:main</button>
-                <button type="button" class="chip-btn" data-repo="facebook/react" data-branch="main">facebook/react:main</button>
-                <button type="button" class="chip-btn" data-repo="torvalds/linux" data-branch="master">torvalds/linux:master</button>
               </div>
 
               <div class="card-actions">
@@ -259,7 +251,7 @@
               </div>
               <div class="detail-item">
                 <span class="detail-label">Repositorio y Rama</span>
-                <span class="detail-value" id="resRepository">Medalcode/SecureCode (main)</span>
+                <span class="detail-value" id="resRepository">Aún no se ha realizado una evaluación</span>
               </div>
               <div class="detail-item">
                 <span class="detail-label">Fecha de Evaluación (UTC)</span>
@@ -554,11 +546,11 @@
           <div class="evaluator-hero" style="text-align: left; margin-bottom: 24px;"><h1>Mi Organización</h1><p>Gestiona analistas y el alcance autorizado de repositorios de tu organización.</p></div>
           <div id="organizationPanel" hidden>
             <div class="data-table-wrapper">
-              <div class="data-table-header"><div><div class="data-table-title">Equipo de análisis</div><div class="admin-helper">El propietario crea y administra únicamente cuentas Analyst de su propia organización.</div></div><button type="button" class="btn-copy" id="btnRefreshOrganization">Actualizar</button></div>
+              <div class="data-table-header"><div><div class="data-table-title">Equipo de análisis</div><div class="admin-helper">El propietario crea y administra únicamente cuentas Analyst de su propia organización.</div><div class="admin-helper" id="organizationAnalystQuota" aria-live="polite"></div></div><button type="button" class="btn-copy" id="btnRefreshOrganization">Actualizar</button></div>
               <form id="createOrganizationMemberForm" class="admin-user-form" novalidate>
                 <div class="input-group"><label for="organizationMemberUsername">Correo del analista</label><input class="input-control" id="organizationMemberUsername" type="email" maxlength="100" required></div>
                 <div class="input-group"><label for="organizationMemberPassword">Contraseña temporal</label><input class="input-control" id="organizationMemberPassword" type="password" minlength="12" autocomplete="new-password" required></div>
-                <div class="admin-form-actions"><div class="admin-feedback" id="organizationMemberFeedback" role="status" aria-live="polite"></div><button class="btn-primary" type="submit">Crear Analyst</button></div>
+                <div class="admin-form-actions"><div class="admin-feedback" id="organizationMemberFeedback" role="status" aria-live="polite"></div><button class="btn-primary" id="btnCreateOrganizationAnalyst" type="submit">Crear Analyst</button></div>
               </form>
               <table class="modern-table"><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Acción</th></tr></thead><tbody id="organizationMembersBody"></tbody></table>
             </div>

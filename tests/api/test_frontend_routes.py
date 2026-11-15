@@ -51,6 +51,11 @@ def test_admin_navigation_is_gated_by_the_server_validated_role():
     assert "id=\"registrationForm\"" in Path("src/securecode/static/index.html").read_text(encoding="utf-8")
     assert "id=\"organizationPanel\"" in Path("src/securecode/static/index.html").read_text(encoding="utf-8")
     assert "function clearAuthenticatedSession()" in script
+    assert "function resetVisitorEvaluationState()" in script
+    assert "repoInput.value = '';" in script
+    assert "setEvaluatorFeedback();" in script
+    assert "state.organizationMembers = [];" in script
+    assert "state.organizationAuthorizations = [];" in script
     assert "function updateHistoryAccess()" in script
     assert "function updateEvaluatorAccess()" in script
     assert """if (!state.token) {

@@ -66,6 +66,11 @@ def test_roles_enforce_platform_and_organization_boundaries(monkeypatch):
             "username": "analyst@acme.test", "password": "AnalystPassword#2026",
         })
         assert analyst.status_code == 201
+        entitlement = client.get("/api/v1/organization/analyst-entitlements", headers=owner_a)
+        assert entitlement.status_code == 200
+        assert entitlement.json() == {
+            "analyst_limit": 3, "active_analysts": 1, "analysts_remaining": 2, "source": "Pro",
+        }
         analyst_headers = _headers(client, "analyst@acme.test", "AnalystPassword#2026")
 
         assert client.get("/api/v1/admin/users", headers=owner_a).status_code == 403
@@ -111,6 +116,35 @@ def test_roles_enforce_platform_and_organization_boundaries(monkeypatch):
 
         platform_headers = {"Authorization": f"Bearer {create_access_token(str(platform_admin.id))}"}
         assert client.get("/api/v1/admin/users", headers=platform_headers).status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+        session.close()
+        engine.dispose()
+
+
+def test_pro_plan_rejects_a_fourth_active_analyst(monkeypatch):
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-that-is-at-least-32-bytes-long")
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    app.dependency_overrides[get_db_session] = lambda: session
+    try:
+        client = TestClient(app)
+        assert client.post("/api/v1/auth/register", json={
+            "organization_name": "Seat Limited", "username": "owner@seats.test",
+            "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+        }).status_code == 201
+        owner_headers = _headers(client, "owner@seats.test", "OwnerPassword#2026")
+        for number in range(1, 4):
+            created = client.post("/api/v1/organization/members", headers=owner_headers, json={
+                "username": f"analyst{number}@seats.test", "password": "AnalystPassword#2026",
+            })
+            assert created.status_code == 201
+        rejected = client.post("/api/v1/organization/members", headers=owner_headers, json={
+            "username": "analyst4@seats.test", "password": "AnalystPassword#2026",
+        })
+        assert rejected.status_code == 409
+        assert "3/3" in rejected.json()["detail"]
     finally:
         app.dependency_overrides.clear()
         session.close()

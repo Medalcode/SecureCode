@@ -328,6 +328,15 @@ class SubscriptionResponse(BaseModel):
     catalog: list[dict]
 
 
+class OrganizationAnalystEntitlementsResponse(BaseModel):
+    """The active Analyst-seat entitlement for one customer organization."""
+
+    analyst_limit: int
+    active_analysts: int
+    analysts_remaining: int
+    source: str
+
+
 class FinOpsSettingsUpdateRequest(BaseModel):
     budget_clp: Literal[10, 50, 100, 200, 500, 1000]
     alert_threshold_pct: Literal[50, 80, 100]
@@ -378,13 +387,15 @@ _PLAN_CATALOG = {
         "id": "pro",
         "name": "Pro",
         "price_clp": 150025,
-        "features": ["3 controles canónicos", "Evidencia SHA-256", "Historial y exportación CSV"],
+        "analyst_limit": 3,
+        "features": ["3 controles canónicos", "Hasta 3 Analyst", "Evidencia SHA-256", "Historial y exportación CSV"],
     },
     "premium": {
         "id": "premium",
         "name": "Premium",
         "price_clp": 375064,
-        "features": ["Todo lo incluido en Pro", "Capacidad ampliada según contrato", "Soporte prioritario según contrato"],
+        "analyst_limit": 10,
+        "features": ["Todo lo incluido en Pro", "Hasta 10 Analyst", "Soporte prioritario según contrato"],
     },
 }
 
@@ -592,7 +603,7 @@ def _ensure_subscription(session: Session, user_id: UUID) -> UserSubscription:
         occurred_at=now, effective_from=now, effective_until=subscription.expires_at,
         event_type="initialized",
     ))
-    session.commit()
+    session.flush()
     session.refresh(subscription)
     return subscription
 
@@ -612,6 +623,41 @@ def _subscription_response(subscription: UserSubscription) -> dict:
         "billing_mode": "demo_non_billable",
         "catalog": list(_PLAN_CATALOG.values()),
     }
+
+
+def _organization_analyst_entitlement(
+    session: Session,
+    *,
+    owner: User,
+    organization: Organization,
+) -> tuple[int, int, str]:
+    """Resolve active Analyst seats from the owner's plan or active trial.
+
+    A technical Enterprise Trial deliberately permits one Analyst only. Normal
+    subscriptions use the catalogued seat count. Enterprise contractual seats
+    must be modelled as an organization entitlement before that plan is sold;
+    they are not inferred or treated as unlimited here.
+    """
+    trial = get_active_trial_for_user(session, owner.id)
+    if trial is not None and trial.organization_id == organization.id:
+        limit, source = 1, "Enterprise Trial"
+    else:
+        subscription = _ensure_subscription(session, owner.id)
+        plan = _PLAN_CATALOG.get(subscription.plan_id, _PLAN_CATALOG["pro"])
+        limit, source = int(plan["analyst_limit"]), str(plan["name"])
+
+    active = (
+        session.query(func.count(OrganizationMembership.id))
+        .join(User, User.id == OrganizationMembership.user_id)
+        .filter(
+            OrganizationMembership.organization_id == organization.id,
+            OrganizationMembership.role == ANALYST,
+            User.active.is_(True),
+        )
+        .scalar()
+        or 0
+    )
+    return limit, int(active), source
 
 
 def _ensure_finops_settings(session: Session, user_id: UUID) -> UserFinOpsSettings:
@@ -830,6 +876,25 @@ def list_organization_members(
     return [_organization_member_response(user, organization) for user in users]
 
 
+@app.get("/api/v1/organization/analyst-entitlements", response_model=OrganizationAnalystEntitlementsResponse)
+def get_organization_analyst_entitlements(
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Show the Owner the seat limit that is enforced on Analyst creation."""
+    membership = _require_organization_owner(session, current_user)
+    _, organization = _organization_response(session, membership)
+    limit, active, source = _organization_analyst_entitlement(
+        session, owner=current_user, organization=organization,
+    )
+    return {
+        "analyst_limit": limit,
+        "active_analysts": active,
+        "analysts_remaining": max(0, limit - active),
+        "source": source,
+    }
+
+
 @app.post("/api/v1/organization/members", response_model=OrganizationMemberResponse, status_code=status.HTTP_201_CREATED)
 def create_organization_member(
     request: OrganizationMemberCreateRequest,
@@ -839,10 +904,21 @@ def create_organization_member(
     """Let a customer owner provision an analyst without platform privileges."""
     membership = _require_organization_owner(session, current_user)
     _, organization = _organization_response(session, membership)
+    # Lock the organization while counting seats. This prevents two concurrent
+    # requests from both observing the final available Analyst seat.
+    organization = session.query(Organization).filter(Organization.id == organization.id).with_for_update().one()
     username = _normalise_username(request.username)
     _validate_password_strength(request.password)
     if session.query(User).filter(User.username == username).first() is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists")
+    limit, active, source = _organization_analyst_entitlement(
+        session, owner=current_user, organization=organization,
+    )
+    if active >= limit:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Límite de Analyst alcanzado para el plan {source} ({active}/{limit}). Desactiva un Analyst o cambia de plan.",
+        )
     now = datetime.now(UTC)
     analyst = User(
         id=uuid4(), username=username, password_hash=hash_password(request.password), active=True,
