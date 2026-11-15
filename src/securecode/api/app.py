@@ -4,6 +4,7 @@ import logging
 import os
 import re
 from pathlib import Path
+from typing import TypedDict
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -382,7 +383,17 @@ class EnterpriseTrialResponse(BaseModel):
 
 _EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 _SUBSCRIPTION_PERIOD = timedelta(days=30)
-_PLAN_CATALOG = {
+class PlanCatalogEntry(TypedDict):
+    """A commercial plan exposed by the subscription catalogue."""
+
+    id: str
+    name: str
+    price_clp: int
+    analyst_limit: int
+    features: list[str]
+
+
+_PLAN_CATALOG: dict[str, PlanCatalogEntry] = {
     "pro": {
         "id": "pro",
         "name": "Pro",
