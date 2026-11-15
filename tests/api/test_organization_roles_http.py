@@ -354,3 +354,239 @@ def test_password_not_persisted_in_subsequent_reads(monkeypatch):
         app.dependency_overrides.clear()
         session.close()
         engine.dispose()
+
+
+def test_analyst_creation_generate_temp_accepts_empty_password(monkeypatch):
+    """generate_temp=true con password "" equivale a contraseña generada."""
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-that-is-at-least-32-bytes-long")
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    app.dependency_overrides[get_db_session] = lambda: session
+    try:
+        client = TestClient(app)
+        assert client.post("/api/v1/auth/register", json={
+            "organization_name": "EmptyPwdOrg", "username": "owner@emptypwd.test",
+            "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+        }).status_code == 201
+        owner_headers = _headers(client, "owner@emptypwd.test", "OwnerPassword#2026")
+        analyst = client.post("/api/v1/organization/members", headers=owner_headers, json={
+            "username": "analyst@emptypwd.test", "password": "", "generate_temp": True,
+        })
+        assert analyst.status_code == 201
+        temp_pwd = analyst.json()["temporary_password"]
+        assert temp_pwd is not None and len(temp_pwd) >= 12
+        _temp_password_headers(client, "analyst@emptypwd.test", temp_pwd)
+        members = client.get("/api/v1/organization/members", headers=owner_headers)
+        assert all(member.get("temporary_password") is None for member in members.json())
+    finally:
+        app.dependency_overrides.clear()
+        session.close()
+        engine.dispose()
+
+
+def test_analyst_creation_generate_temp_accepts_whitespace_password(monkeypatch):
+    """generate_temp=true con password de sólo espacios equivale a generada."""
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-that-is-at-least-32-bytes-long")
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    app.dependency_overrides[get_db_session] = lambda: session
+    try:
+        client = TestClient(app)
+        assert client.post("/api/v1/auth/register", json={
+            "organization_name": "BlankPwdOrg", "username": "owner@blankpwd.test",
+            "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+        }).status_code == 201
+        owner_headers = _headers(client, "owner@blankpwd.test", "OwnerPassword#2026")
+        analyst = client.post("/api/v1/organization/members", headers=owner_headers, json={
+            "username": "analyst@blankpwd.test", "password": "   ", "generate_temp": True,
+        })
+        assert analyst.status_code == 201
+        temp_pwd = analyst.json()["temporary_password"]
+        assert temp_pwd is not None and len(temp_pwd) >= 12
+        _temp_password_headers(client, "analyst@blankpwd.test", temp_pwd)
+    finally:
+        app.dependency_overrides.clear()
+        session.close()
+        engine.dispose()
+
+
+def test_analyst_creation_rejects_explicit_password_with_generate_temp(monkeypatch):
+    """Contraseña útil + generate_temp=true se rechaza con 422 y no crea la cuenta."""
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-that-is-at-least-32-bytes-long")
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    app.dependency_overrides[get_db_session] = lambda: session
+    try:
+        client = TestClient(app)
+        assert client.post("/api/v1/auth/register", json={
+            "organization_name": "XorCreateOrg", "username": "owner@xorcreate.test",
+            "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+        }).status_code == 201
+        owner_headers = _headers(client, "owner@xorcreate.test", "OwnerPassword#2026")
+        rejected = client.post("/api/v1/organization/members", headers=owner_headers, json={
+            "username": "analyst@xorcreate.test", "password": "AnalystPassword#2026!", "generate_temp": True,
+        })
+        assert rejected.status_code == 422
+        members = client.get("/api/v1/organization/members", headers=owner_headers)
+        assert {m["username"] for m in members.json()} == {"owner@xorcreate.test"}
+    finally:
+        app.dependency_overrides.clear()
+        session.close()
+        engine.dispose()
+
+
+def test_analyst_password_reset_generate_temp_accepts_empty_and_whitespace_password(monkeypatch):
+    """PATCH generate_temp=true con password "" o de espacios genera y devuelve una sola contraseña."""
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-that-is-at-least-32-bytes-long")
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    app.dependency_overrides[get_db_session] = lambda: session
+    try:
+        client = TestClient(app)
+        assert client.post("/api/v1/auth/register", json={
+            "organization_name": "BlankResetOrg", "username": "owner@blankreset.test",
+            "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+        }).status_code == 201
+        owner_headers = _headers(client, "owner@blankreset.test", "OwnerPassword#2026")
+        created = client.post("/api/v1/organization/members", headers=owner_headers, json={
+            "username": "analyst@blankreset.test", "password": "AnalystBasePassword#2026!",
+        })
+        assert created.status_code == 201
+        analyst_id = created.json()["id"]
+        first = client.patch(f"/api/v1/organization/members/{analyst_id}", headers=owner_headers, json={
+            "generate_temp": True, "password": "",
+        })
+        assert first.status_code == 200
+        temp_pwd = first.json()["temporary_password"]
+        assert temp_pwd is not None and len(temp_pwd) >= 12
+        assert first.json().get("temporary_password") == temp_pwd
+        _temp_password_headers(client, "analyst@blankreset.test", temp_pwd)
+        second = client.patch(f"/api/v1/organization/members/{analyst_id}", headers=owner_headers, json={
+            "generate_temp": True, "password": "   ",
+        })
+        assert second.status_code == 200
+        temp_pwd_two = second.json()["temporary_password"]
+        assert temp_pwd_two is not None and temp_pwd_two != temp_pwd
+        _temp_password_headers(client, "analyst@blankreset.test", temp_pwd_two)
+        assert client.post("/api/v1/auth/token", data={
+            "username": "analyst@blankreset.test", "password": temp_pwd,
+        }).status_code == 401
+    finally:
+        app.dependency_overrides.clear()
+        session.close()
+        engine.dispose()
+
+
+def test_analyst_password_reset_rejects_explicit_password_with_generate_temp(monkeypatch):
+    """PATCH con contraseña útil + generate_temp=true se rechaza con 422 sin aplicar cambios."""
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-that-is-at-least-32-bytes-long")
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    app.dependency_overrides[get_db_session] = lambda: session
+    try:
+        client = TestClient(app)
+        assert client.post("/api/v1/auth/register", json={
+            "organization_name": "XorResetOrg", "username": "owner@xorreset.test",
+            "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+        }).status_code == 201
+        owner_headers = _headers(client, "owner@xorreset.test", "OwnerPassword#2026")
+        created = client.post("/api/v1/organization/members", headers=owner_headers, json={
+            "username": "analyst@xorreset.test", "password": "AnalystOldPassword#2026!",
+        })
+        assert created.status_code == 201
+        analyst_id = created.json()["id"]
+        rejected = client.patch(f"/api/v1/organization/members/{analyst_id}", headers=owner_headers, json={
+            "password": "AnalystNewPassword#2026@", "generate_temp": True,
+        })
+        assert rejected.status_code == 422
+        assert rejected.json().get("temporary_password") is None
+        assert client.post("/api/v1/auth/token", data={
+            "username": "analyst@xorreset.test", "password": "AnalystOldPassword#2026!",
+        }).status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+        session.close()
+        engine.dispose()
+
+
+def test_analyst_password_reset_accepts_active_only_change(monkeypatch):
+    """PATCH exclusivo de active tiene éxito y no genera ninguna contraseña."""
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-that-is-at-least-32-bytes-long")
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    app.dependency_overrides[get_db_session] = lambda: session
+    try:
+        client = TestClient(app)
+        assert client.post("/api/v1/auth/register", json={
+            "organization_name": "ActiveOnlyOrg", "username": "owner@activeonly.test",
+            "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+        }).status_code == 201
+        owner_headers = _headers(client, "owner@activeonly.test", "OwnerPassword#2026")
+        created = client.post("/api/v1/organization/members", headers=owner_headers, json={
+            "username": "analyst@activeonly.test", "password": "AnalystBasePassword#2026!",
+        })
+        assert created.status_code == 201
+        analyst_id = created.json()["id"]
+        deactivated = client.patch(f"/api/v1/organization/members/{analyst_id}", headers=owner_headers, json={
+            "active": False,
+        })
+        assert deactivated.status_code == 200
+        assert deactivated.json()["active"] is False
+        assert deactivated.json().get("temporary_password") is None
+        assert client.post("/api/v1/auth/token", data={
+            "username": "analyst@activeonly.test", "password": "AnalystBasePassword#2026!",
+        }).status_code == 401
+        reactivated = client.patch(f"/api/v1/organization/members/{analyst_id}", headers=owner_headers, json={
+            "active": True,
+        })
+        assert reactivated.status_code == 200
+        assert reactivated.json()["active"] is True
+        assert reactivated.json().get("temporary_password") is None
+        assert client.post("/api/v1/auth/token", data={
+            "username": "analyst@activeonly.test", "password": "AnalystBasePassword#2026!",
+        }).status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+        session.close()
+        engine.dispose()
+
+
+def test_analyst_password_reset_without_usable_alternative_is_rejected(monkeypatch):
+    """Sin contraseña útil y sin generate_temp el PATCH se rechaza con 422."""
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-that-is-at-least-32-bytes-long")
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    app.dependency_overrides[get_db_session] = lambda: session
+    try:
+        client = TestClient(app)
+        assert client.post("/api/v1/auth/register", json={
+            "organization_name": "NoChangeOrg", "username": "owner@nochange.test",
+            "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+        }).status_code == 201
+        owner_headers = _headers(client, "owner@nochange.test", "OwnerPassword#2026")
+        created = client.post("/api/v1/organization/members", headers=owner_headers, json={
+            "username": "analyst@nochange.test", "password": "AnalystBasePassword#2026!",
+        })
+        assert created.status_code == 201
+        analyst_id = created.json()["id"]
+        assert client.patch(f"/api/v1/organization/members/{analyst_id}", headers=owner_headers, json={}).status_code == 422
+        assert client.patch(f"/api/v1/organization/members/{analyst_id}", headers=owner_headers, json={
+            "password": "",
+        }).status_code == 422
+        assert client.patch(f"/api/v1/organization/members/{analyst_id}", headers=owner_headers, json={
+            "generate_temp": False,
+        }).status_code == 422
+        assert client.post("/api/v1/auth/token", data={
+            "username": "analyst@nochange.test", "password": "AnalystBasePassword#2026!",
+        }).status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+        session.close()
+        engine.dispose()

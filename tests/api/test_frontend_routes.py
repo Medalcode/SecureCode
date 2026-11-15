@@ -12,7 +12,7 @@ def test_root_serves_html():
     assert "text/html" in response.headers.get("content-type", "")
     assert response.headers.get("cache-control") == "no-store, max-age=0"
     assert "/static/css/app.css?v=20261111-admin-navigation-gate" in response.text
-    assert "/static/js/app.js?v=20261115-visitor-navigation" in response.text
+    assert "/static/js/app.js?v=20261117-analyst-password-ux" in response.text
     assert "Enterprise Trial" in response.text
     assert "enterpriseTrialActivateForm" in response.text
     assert "SecureCode" in response.text
@@ -75,6 +75,31 @@ def test_admin_navigation_is_gated_by_the_server_validated_role():
     assert "const defaultRepository = normalizeOptionalRepository(settings.default_repository);" in script
     assert ".nav-item[hidden]" in stylesheet
     assert "display: none !important;" in stylesheet
+
+def test_analyst_password_reset_modal_replaces_prompt():
+    """El restablecimiento usa un modal accesible, nunca window.prompt()."""
+    script = Path("src/securecode/static/js/app.js").read_text(encoding="utf-8")
+    html = Path("src/securecode/static/index.html").read_text(encoding="utf-8")
+    assert "prompt(" not in script
+    assert 'id="passwordResetModal"' in html
+    assert 'id="passwordResetStrategyGroup"' in html
+    assert 'id="resetStrategyGenerate"' in html
+    assert 'id="resetStrategyDefined"' in html
+    assert 'name="resetPasswordStrategy"' in html
+    assert 'id="passwordResetPasswordFieldGroup"' in html
+    assert 'id="passwordResetGenerateNote"' in html
+    assert "Generar contraseña segura" in html
+    assert "Definir contraseña" in html
+    assert "El sistema crea una y la muestra una sola vez" in html
+    assert "Se muestra una sola vez. Entrégala por un canal seguro." in html
+    assert "function updatePasswordResetVisibility()" in script
+    assert "const generateTemp = target.scope === 'organization'" in script
+    assert ("const payload = generateTemp\n"
+            "        ? { generate_temp: true }\n"
+            "        : { password: document.getElementById('resetUserPassword').value };") in script
+    assert "openOrganizationPasswordPanel(target.username, tempPassword)" in script
+    assert 'id="orgPasswordCopyBtn"' in html
+
 
 def test_rules_catalog_endpoint():
     response = client.get("/api/v1/rules")
