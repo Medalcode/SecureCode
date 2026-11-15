@@ -778,7 +778,11 @@ def register_organization_owner(
         role=ORGANIZATION_OWNER, created_at=now,
     )
     try:
-        session.add_all((owner, organization, membership))
+        # Persist the foreign-key targets first. PostgreSQL enforces these
+        # constraints immediately, while SQLite test configurations may not.
+        session.add_all((owner, organization))
+        session.flush()
+        session.add(membership)
         _record_user_audit(session, owner.id, owner.id, "organization_registered", {
             "organization_id": str(organization.id), "organization_name": organization.name,
             "role": ORGANIZATION_OWNER,
@@ -786,6 +790,22 @@ def register_organization_owner(
         session.commit()
     except SQLAlchemyError as error:
         session.rollback()
+        # Do not disclose persistence failures to the public registration
+        # response. Record only safe diagnostics for operators: exception type
+        # and an optional PostgreSQL constraint identifier, never SQL values.
+        diagnostics = getattr(getattr(error, "orig", None), "diag", None)
+        constraint_name = getattr(diagnostics, "constraint_name", None)
+        if constraint_name:
+            logger.error(
+                "Organization registration persistence failed (type=%s, constraint=%s)",
+                type(error).__name__,
+                constraint_name,
+            )
+        else:
+            logger.error(
+                "Organization registration persistence failed (type=%s)",
+                type(error).__name__,
+            )
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No se pudo crear la organización") from error
     return {
         "username": owner.username, "active": owner.active, "role": owner.role,
@@ -832,7 +852,11 @@ def create_organization_member(
         id=uuid4(), organization_id=organization.id, user_id=analyst.id,
         role=ANALYST, created_at=now,
     )
-    session.add_all((analyst, analyst_membership))
+    # As with public registration, persist the analyst before the membership
+    # row so PostgreSQL can satisfy organization_memberships.user_id_fkey.
+    session.add(analyst)
+    session.flush()
+    session.add(analyst_membership)
     _record_user_audit(session, current_user.id, analyst.id, "organization_analyst_created", {
         "organization_id": str(organization.id), "role": ANALYST,
     })

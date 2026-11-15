@@ -73,6 +73,7 @@
     initOrganizationConsole();
     initClientSettings();
     initAuthModal();
+    updateAdminAccess();
     syncAuthenticatedUser();
     checkSystemHealth();
     setInterval(checkSystemHealth, 30000);
@@ -154,9 +155,16 @@
     }
   }
 
+  function normalizeOptionalRepository(value) {
+    if (typeof value !== 'string') return '';
+    const normalized = value.trim();
+    return ['undefined', 'null'].includes(normalized.toLowerCase()) ? '' : normalized;
+  }
+
   function applyClientSettings(settings) {
     state.clientSettings = settings;
-    document.getElementById('settingsRepository').value = settings.default_repository || '';
+    const defaultRepository = normalizeOptionalRepository(settings.default_repository);
+    document.getElementById('settingsRepository').value = defaultRepository;
     document.getElementById('settingsBranch').value = settings.default_branch || 'main';
     document.getElementById('settingsLocale').value = settings.locale || 'es-CL';
     document.getElementById('settingsTimezone').value = settings.timezone || 'America/Santiago';
@@ -168,7 +176,7 @@
 
     const repoInput = document.getElementById('repoInput');
     const branchInput = document.getElementById('branchInput');
-    if (repoInput && !repoInput.value && settings.default_repository) repoInput.value = settings.default_repository;
+    if (repoInput && !repoInput.value && defaultRepository) repoInput.value = defaultRepository;
     if (branchInput && (!branchInput.value || branchInput.value === 'main') && settings.default_branch) branchInput.value = settings.default_branch;
   }
 
@@ -265,6 +273,9 @@
   function updateAdminAccess() {
     const adminNav = document.querySelector('.nav-item[data-view="admin"]');
     const organizationNav = document.querySelector('.nav-item[data-view="organization"]');
+    const finopsNav = document.querySelector('.nav-item[data-view="usage"]');
+    const subscriptionNav = document.querySelector('.nav-item[data-view="subscription"]');
+    const settingsNav = document.querySelector('.nav-item[data-view="settings"]');
     const allowed = isPlatformAdmin();
     if (adminNav) {
       adminNav.hidden = !allowed;
@@ -274,6 +285,19 @@
     if (organizationNav) {
       organizationNav.hidden = !ownerAllowed;
       organizationNav.setAttribute('aria-hidden', String(!ownerAllowed));
+    }
+    if (finopsNav) {
+      finopsNav.hidden = !ownerAllowed;
+      finopsNav.setAttribute('aria-hidden', String(!ownerAllowed));
+    }
+    if (subscriptionNav) {
+      subscriptionNav.hidden = !ownerAllowed;
+      subscriptionNav.setAttribute('aria-hidden', String(!ownerAllowed));
+    }
+    const authenticated = Boolean(state.token && state.accessRole);
+    if (settingsNav) {
+      settingsNav.hidden = !authenticated;
+      settingsNav.setAttribute('aria-hidden', String(!authenticated));
     }
     if (!allowed && state.activeTab === 'admin') switchView('evaluator', 'Evaluador de Controles');
     if (!ownerAllowed && state.activeTab === 'organization') switchView('evaluator', 'Evaluador de Controles');
@@ -317,6 +341,12 @@
     const btnSubmit = document.getElementById('btnSubmitEval');
     const btnCancel = document.getElementById('btnCancelEval');
     if (!form) return;
+
+    // Never expose a technical fallback value in a form field. This also
+    // recovers safely from older local browser state that stored "undefined".
+    if (repoInput && ['undefined', 'null'].includes(repoInput.value.trim().toLowerCase())) {
+      repoInput.value = '';
+    }
 
     renderControlSelector();
     loadControlCatalog();
