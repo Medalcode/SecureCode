@@ -3,10 +3,36 @@ from datetime import UTC, datetime, timedelta
 
 import jwt
 from argon2 import PasswordHasher
+from argon2 import Type
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 
-# Password Hasher
-ph = PasswordHasher()
+# Configuración centralizada de Argon2id.
+# Valores recomendados por OWASP y argon2-cffi por defecto:
+# - memory_cost: 64 MiB (balance seguridad/performance)
+# - time_cost: 3 iteraciones (seguridad razonable sin cuellos de botella)
+# - parallelism: 2 hilos (configurado balanceando seguridad y rendimiento)
+# Estos valores son consistentes con la versión de argon2-cffi instalada.
+# No cambien estos valores sin evaluar: reducir memory_cost debilita el hashing;
+# aumentarlo sin necesidad real afecta performance en producción.
+ARGON2ID_SETTINGS = {
+    "memory_cost": 64 * 1024,  # 64 MiB
+    "time_cost": 3,
+    "parallelism": 2,
+    "hash_len": 32,
+    "type": Type.ID,
+}
+
+# Password Hasher (instancia singleton: reutilización segura porque no conserva
+# estado mutable por solicitud. Argon2id genera una sal aleatoria al crear hashes,
+# por lo que la misma contraseña puede producir hashes diferentes, pero todos deben
+# verificarse correctamente.)
+ph = PasswordHasher(
+    memory_cost=ARGON2ID_SETTINGS["memory_cost"],
+    time_cost=ARGON2ID_SETTINGS["time_cost"],
+    parallelism=ARGON2ID_SETTINGS["parallelism"],
+    hash_len=ARGON2ID_SETTINGS["hash_len"],
+    type=ARGON2ID_SETTINGS["type"],
+)
 
 def hash_password(password: str) -> str:
     return ph.hash(password)
