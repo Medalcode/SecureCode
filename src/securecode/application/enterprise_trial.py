@@ -69,9 +69,10 @@ def create_trial(
             role=ORGANIZATION_OWNER, created_at=current,
         ))
     else:
-        organization = session.query(Organization).filter(Organization.id == organization_id).first()
-        if organization is None:
+        existing_organization = session.query(Organization).filter(Organization.id == organization_id).first()
+        if existing_organization is None:
             raise ValueError("Organization does not exist.")
+        organization = existing_organization
     trial = EnterpriseTrial(
         id=uuid4(),
         organization_id=organization.id,

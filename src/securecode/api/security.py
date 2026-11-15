@@ -1,5 +1,6 @@
 import os
 from datetime import UTC, datetime, timedelta
+from typing import TypedDict
 
 import jwt
 from argon2 import PasswordHasher
@@ -14,7 +15,15 @@ from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatc
 # Estos valores son consistentes con la versión de argon2-cffi instalada.
 # No cambien estos valores sin evaluar: reducir memory_cost debilita el hashing;
 # aumentarlo sin necesidad real afecta performance en producción.
-ARGON2ID_SETTINGS = {
+class Argon2idSettings(TypedDict):
+    memory_cost: int
+    time_cost: int
+    parallelism: int
+    hash_len: int
+    type: Type
+
+
+ARGON2ID_SETTINGS: Argon2idSettings = {
     "memory_cost": 64 * 1024,  # 64 MiB
     "time_cost": 3,
     "parallelism": 2,
