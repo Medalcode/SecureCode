@@ -38,6 +38,7 @@ from securecode.api.dependencies import (
     get_github_token,
     require_platform_admin,
 )
+from securecode.api.public_site import LEGAL_CONTENT, public_page
 from securecode.api.schemas import (
     EvaluationResponse,
     EvidenceResponse,
@@ -74,7 +75,7 @@ from securecode.domain.roles import (
 
 app = FastAPI(
     title="SecureCode API",
-    description="API de evaluaciÃ³n de controles GitHub GH-001, GH-002 y GH-003, con administraciÃ³n, auditorÃ­a y FinOps.",
+    description="API de evaluación de controles GitHub GH-001, GH-002 y GH-003, con administración, auditoría y FinOps.",
     version="1.0.0"
 )
 
@@ -120,8 +121,21 @@ if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 @app.get("/", response_class=HTMLResponse)
+@app.get("/nosotros", response_class=HTMLResponse)
+@app.get("/contacto", response_class=HTMLResponse)
+@app.get("/preguntas-frecuentes", response_class=HTMLResponse)
+@app.get("/legal/{document}", response_class=HTMLResponse)
+def serve_public_site(request: Request, document: str | None = None):
+    """Serve public pages without exposing the authenticated application shell."""
+    no_store_headers = {"Cache-Control": "no-store, max-age=0"}
+    if document is not None and document not in LEGAL_CONTENT:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado")
+    return HTMLResponse(content=public_page(request.url.path), headers=no_store_headers)
+
+
+@app.get("/app", response_class=HTMLResponse)
 def serve_index():
-    """Serve the application shell without caching role-sensitive navigation."""
+    """Serve the authenticated application shell without caching sensitive UI."""
     no_store_headers = {"Cache-Control": "no-store, max-age=0"}
     index_file = STATIC_DIR / "index.html"
     if index_file.exists():
@@ -164,7 +178,7 @@ def get_system_overview(_: User = Depends(require_platform_admin)):
         },
         "performance": {
             "measurement_state": "not_live",
-            "scope": "Las mÃ©tricas de rendimiento se documentan como pruebas controladas, no como telemetrÃ­a de producciÃ³n.",
+            "scope": "Las métricas de rendimiento se documentan como pruebas controladas, no como telemetría de producción.",
             "p95_latency_ms": None,
             "throughput_rps": None,
         },
@@ -404,14 +418,14 @@ _PLAN_CATALOG: dict[str, PlanCatalogEntry] = {
         "name": "Pro",
         "price_clp": 150025,
         "analyst_limit": 3,
-        "features": ["3 controles canÃ³nicos", "Hasta 3 Analyst", "Evidencia SHA-256", "Historial y exportaciÃ³n CSV"],
+        "features": ["3 controles canónicos", "Hasta 3 Analyst", "Evidencia SHA-256", "Historial y exportación CSV"],
     },
     "premium": {
         "id": "premium",
         "name": "Premium",
         "price_clp": 375064,
         "analyst_limit": 10,
-        "features": ["Todo lo incluido en Pro", "Hasta 10 Analyst", "Soporte prioritario segÃºn contrato"],
+        "features": ["Todo lo incluido en Pro", "Hasta 10 Analyst", "Soporte prioritario según contrato"],
     },
 }
 
@@ -476,7 +490,7 @@ def _clear_failed_logins(session: Session, scope_hash: str) -> None:
 def _normalise_username(value: str) -> str:
     username = value.strip().lower()
     if not _EMAIL_PATTERN.fullmatch(username):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="El usuario debe ser un correo electrÃ³nico vÃ¡lido")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="El usuario debe ser un correo electrónico válido")
     return username
 
 
@@ -484,7 +498,7 @@ def _normalise_repository(value: str) -> str:
     repository = value.strip()
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,99}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}", repository):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="El repositorio debe usar el formato owner/repo")
-    # GitHub identifica owner y repository sin distinguir mayÃºsculas.  Canonicalizar
+    # GitHub identifica owner y repository sin distinguir mayúsculas. Canonicalizar.
     # evita que ``Acme/App`` y ``acme/app`` creen alcances distintos por accidente.
     return repository.lower()
 
@@ -512,7 +526,7 @@ def _require_repository_authorization(session: Session, current_user: User, owne
             return
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Tu cuenta no estÃ¡ autorizada para evaluar este repositorio. Solicita acceso al propietario de tu organizaciÃ³n.",
+            detail="Tu cuenta no está autorizada para evaluar este repositorio. Solicita acceso al propietario de tu organización.",
         )
 
 
@@ -862,11 +876,11 @@ def register_organization_owner(
     Platform administration can never be requested through this boundary.
     """
     if request.password != request.password_confirmation:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Las contraseÃ±as no coinciden")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Las contraseñas no coinciden")
     username = _normalise_username(request.username)
     organization_name = request.organization_name.strip()
     if len(organization_name) < 2:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="El nombre de la organizaciÃ³n debe tener al menos 2 caracteres")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="El nombre de la organización debe tener al menos 2 caracteres")
     _validate_password_strength(request.password)
     if session.query(User).filter(User.username == username).first() is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists")
@@ -912,7 +926,7 @@ def register_organization_owner(
                 "Organization registration persistence failed (type=%s)",
                 type(error).__name__,
             )
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No se pudo crear la organizaciÃ³n") from error
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No se pudo crear la organización") from error
     return {
         "username": owner.username, "active": owner.active, "role": owner.role,
         "organization_id": str(organization.id), "organization_name": organization.name,
@@ -1008,7 +1022,7 @@ def create_organization_member(
     if active >= limit:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"LÃ­mite de Analyst alcanzado para el plan {source} ({active}/{limit}). Desactiva un Analyst o cambia de plan.",
+            detail=f"Límite de Analyst alcanzado para el plan {source} ({active}/{limit}). Desactiva un Analyst o cambia de plan.",
         )
     now = datetime.now(UTC)
     analyst = User(
@@ -1091,26 +1105,26 @@ def update_organization_member(
     if not changes and request.active is None and explicit_password is None and not generate_temp_requested:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="No se recibiÃ³ ningÃºn cambio para aplicar. Proporcione active, una contraseÃ±a o generate_temp=true.",
+            detail="No se recibió ningún cambio para aplicar. Proporcione active, una contraseña o generate_temp=true.",
         )
     target.updated_at = datetime.now(UTC)
     audit_changes = changes.copy()
-    # Eliminar la contraseÃ±a del audit log por seguridad
+    # Eliminar la contraseña del audit log por seguridad.
     if "_temp_password_store" in locals():
         audit_changes.pop("_temp_password_store", None)
     _record_user_audit(session, current_user.id, target.id, "organization_analyst_updated", audit_changes)
     session.commit()
     response = _organization_member_response(target, organization)
-    # Devolver la misma contraseÃ±a temporal que se guardÃ³, nunca una nueva
+    # Devolver la misma contraseña temporal que se guardó, nunca una nueva.
     if "_temp_password_store" in locals():
         response["temporary_password"] = _temp_password_store
     else:
-        # No se generÃ³ contraseÃ±a temporal; si el cliente pide generate_temp pero no habÃ­a estado previo,
+        # No se generó contraseña temporal; si el cliente pide generate_temp pero no había estado previo,
         # se responde 500 controlado sin generar una nueva ni revelar datos sensibles.
         if generate_temp_requested:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Error interno: no fue posible almacenar la contraseÃ±a temporal generada.",
+                detail="Error interno: no fue posible almacenar la contraseña temporal generada.",
             )
     return response
 
@@ -1144,7 +1158,7 @@ def update_client_settings(
     """Persist user preferences without exposing integration credentials or changing canonical rules."""
     incoming = request.model_dump(exclude_unset=True)
     if not incoming:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se recibiÃ³ ninguna preferencia para actualizar")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se recibió ninguna preferencia para actualizar")
 
     repository = incoming.get("default_repository")
     if repository is not None:
@@ -1157,7 +1171,7 @@ def update_client_settings(
     if branch is not None:
         branch = branch.strip()
         if not branch or any(character.isspace() for character in branch):
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="La rama no puede estar vacÃ­a ni contener espacios")
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="La rama no puede estar vacía ni contener espacios")
         incoming["default_branch"] = branch
 
     timezone_name = incoming.get("timezone")
@@ -1165,7 +1179,7 @@ def update_client_settings(
         try:
             ZoneInfo(timezone_name)
         except ZoneInfoNotFoundError as error:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="La zona horaria indicada no es vÃ¡lida") from error
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="La zona horaria indicada no es válida") from error
 
     settings = session.query(UserSettings).filter(UserSettings.user_id == current_user.id).first()
     if settings is None:
@@ -1208,13 +1222,13 @@ def change_subscription(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Debes confirmar el cambio de plan")
     subscription = _ensure_subscription(session, current_user.id)
     if request.plan_id == subscription.plan_id:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="El plan seleccionado ya estÃ¡ activo")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="El plan seleccionado ya está activo")
     now = datetime.now(UTC)
     next_change_at = _as_utc(subscription.last_changed_at) + _SUBSCRIPTION_PERIOD
     if now < next_change_at:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"El prÃ³ximo cambio estarÃ¡ disponible el {next_change_at.isoformat()}",
+            detail=f"El próximo cambio estará disponible el {next_change_at.isoformat()}",
         )
     previous_plan_id = subscription.plan_id
     subscription.plan_id = request.plan_id
@@ -1315,9 +1329,9 @@ def activate_enterprise_trial(
     """
     membership = _require_organization_owner(session, current_user)
     if not request.confirmation:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Debes confirmar la activaciÃ³n del trial")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Debes confirmar la activación del trial")
     if get_trial_for_user(session, current_user.id) is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Esta cuenta ya utilizÃ³ su Enterprise Trial")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Esta cuenta ya utilizó su Enterprise Trial")
     try:
         trial = create_trial(
             session,
@@ -1386,7 +1400,7 @@ def _reserve_trial_evaluation(
     if existing is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Esta solicitud de trial ya fue procesada o estÃ¡ en curso",
+            detail="Esta solicitud de trial ya fue procesada o está en curso",
         )
     try:
         reservation = reserve_evaluation(
@@ -1496,7 +1510,7 @@ def update_user(
         user.password_hash = hash_password(request.password)
         changes["password_reset"] = True
     if not changes:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se recibiÃ³ ningÃºn cambio para aplicar")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se recibió ningún cambio para aplicar")
     user.updated_at = datetime.now(UTC)
     _record_user_audit(session, current_admin.id, user.id, "account_updated", changes)
     session.commit()
@@ -1563,7 +1577,7 @@ def create_repository_authorization(
     ).first()
     if existing is not None:
         if existing.active:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El repositorio ya estÃ¡ autorizado para esta cuenta")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El repositorio ya está autorizado para esta cuenta")
         existing.active = True
         existing.updated_at = datetime.now(UTC)
         action = "repository_authorization_reactivated"
@@ -1592,7 +1606,7 @@ def update_repository_authorization(
     if authorization is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository authorization not found")
     if authorization.active == request.active:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se recibiÃ³ ningÃºn cambio para aplicar")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se recibió ningún cambio para aplicar")
     authorization.active = request.active
     authorization.updated_at = datetime.now(UTC)
     _record_user_audit(session, current_admin.id, authorization.user_id, "repository_authorization_updated", {
@@ -1648,7 +1662,7 @@ def create_organization_repository_authorization(
         func.lower(RepositoryAuthorization.repository) == repository,
     ).first()
     if authorization is not None and authorization.active:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El repositorio ya estÃ¡ autorizado para esta cuenta")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El repositorio ya está autorizado para esta cuenta")
     if authorization is None:
         authorization = RepositoryAuthorization(
             id=uuid4(), user_id=target_user.id, repository=repository, active=True,
@@ -1680,7 +1694,7 @@ def update_organization_repository_authorization(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository authorization not found")
     target_user = _organization_analyst(session, membership.organization_id, authorization.user_id)
     if authorization.active == request.active:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se recibiÃ³ ningÃºn cambio para aplicar")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se recibió ningún cambio para aplicar")
     authorization.active = request.active
     authorization.updated_at = datetime.now(UTC)
     _record_user_audit(session, current_user.id, target_user.id, "organization_repository_authorization_updated", {

@@ -6,8 +6,19 @@ from securecode.api.app import app
 
 client = TestClient(app)
 
-def test_root_serves_html():
+def test_public_home_serves_html():
     response = client.get("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers.get("content-type", "")
+    assert response.headers.get("cache-control") == "no-store, max-age=0"
+    assert "/static/public/site.css?v=20261115-public-site" in response.text
+    assert "Confianza técnica" in response.text
+    assert 'href="/app"' in response.text
+    assert "Borrador académico" not in response.text
+
+
+def test_console_shell_remains_available_at_app_route():
+    response = client.get("/app")
     assert response.status_code == 200
     assert "text/html" in response.headers.get("content-type", "")
     assert response.headers.get("cache-control") == "no-store, max-age=0"
@@ -33,6 +44,42 @@ def test_root_serves_html():
     assert 'id="btnSubmitEval"' in response.text
     assert 'id="btnSubmitEval" disabled' not in response.text
     assert "Validación local verificada" in response.text
+
+
+def test_public_information_and_legal_pages_are_available():
+    for route in (
+        "/nosotros",
+        "/contacto",
+        "/preguntas-frecuentes",
+        "/legal/terminos",
+        "/legal/privacidad",
+        "/legal/cookies",
+        "/legal/eula",
+        "/legal/contratacion",
+        "/legal/sla",
+    ):
+        response = client.get(route)
+        assert response.status_code == 200
+        assert '<meta name="viewport"' in response.text
+        assert "SecureCode" in response.text
+        if route.startswith("/legal/"):
+            assert "Borrador académico" in response.text
+
+
+def test_unknown_legal_page_returns_not_found():
+    assert client.get("/legal/no-existe").status_code == 404
+
+
+def test_public_site_has_responsive_stylesheet():
+    stylesheet = Path("src/securecode/static/public/site.css").read_text(encoding="utf-8")
+    assert "@media (max-width: 760px)" in stylesheet
+    assert ".feature-grid, .content-grid, .contact-layout, .split-section, .public-footer" in stylesheet
+
+
+def test_api_source_has_no_known_mojibake_markers():
+    source = Path("src/securecode/api/app.py").read_text(encoding="utf-8")
+    assert "Ã" not in source
+    assert "Â" not in source
 
 
 def test_admin_navigation_is_gated_by_the_server_validated_role():
