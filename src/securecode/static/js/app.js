@@ -1245,6 +1245,41 @@
     document.getElementById('organizationRepositoryAuthorizationForm')?.addEventListener('submit', saveOrganizationRepositoryAuthorization);
   }
 
+  // --- Panel de contraseña temporal para Organization Owner ---
+  function openOrganizationPasswordPanel(username, tempPassword) {
+    const panel = document.getElementById('organizationPasswordPanel');
+    if (!panel) return;
+    document.getElementById('panelAnalystUsername').textContent = username;
+    document.getElementById('panelTempPassword').textContent = tempPassword;
+    panel.hidden = false;
+    // Focus into the panel for accessibility
+    panel.focus();
+  }
+
+  function closeOrganizationPasswordPanel() {
+    const panel = document.getElementById('organizationPasswordPanel');
+    if (panel) panel.hidden = true;
+  }
+
+  function copyOrganizationPassword() {
+    const tempPasswordText = document.getElementById('panelTempPassword').textContent;
+    if (!tempPasswordText) return;
+    navigator.clipboard.writeText(tempPasswordText).then(() => {
+      const btn = document.getElementById('orgPasswordCopyBtn');
+      const originalText = btn.textContent;
+      btn.textContent = '¡Copiado!';
+      setTimeout(() => { btn.textContent = originalText; }, 2000);
+    });
+  }
+
+  // Event listeners for the password panel
+  document.getElementById('orgPasswordPanelCloseBtn')?.addEventListener('click', closeOrganizationPasswordPanel);
+  document.getElementById('orgPasswordCopyBtn')?.addEventListener('click', copyOrganizationPassword);
+  // Close panel when clicking outside
+  document.getElementById('organizationPasswordPanel')?.addEventListener('click', (e) => {
+    if (e.target.id === 'organizationPasswordPanel') closeOrganizationPasswordPanel();
+  });
+
   function setOrganizationFeedback(message = '', tone = '') {
     const feedback = document.getElementById('organizationMemberFeedback');
     if (feedback) { feedback.textContent = message; feedback.dataset.tone = tone; }
@@ -1258,11 +1293,13 @@
   async function refreshOrganization() {
     const panel = document.getElementById('organizationPanel');
     const notice = document.getElementById('organizationAccessNotice');
-    if (!panel || !notice) return;
+    const passwordPanel = document.getElementById('organizationPasswordPanel');
+    if (!panel || !notice || !passwordPanel) return;
     if (!isOrganizationOwner()) {
       panel.hidden = true;
       notice.hidden = false;
       notice.textContent = state.token ? 'Sólo el propietario de la organización puede administrar el equipo.' : 'Inicia sesión con el propietario de la organización para administrar el equipo.';
+      if (passwordPanel) passwordPanel.hidden = true;
       return;
     }
     try {
@@ -1274,18 +1311,25 @@
       ]);
       if (!membersResult.ok) throw new Error(await getApiError(membersResult, 'No se pudo cargar el equipo.'));
       state.organizationMembers = await membersResult.json();
+      // Verificar si algún Analyst recién creado tiene contraseña temporal para mostrar el panel
+      const recentlyCreatedWithTemp = state.organizationMembers.find(m => m.temporary_password);
+      if (recentlyCreatedWithTemp) {
+        openOrganizationPasswordPanel(recentlyCreatedWithTemp.username, recentlyCreatedWithTemp.temporary_password);
+      }
       if (!authorizationsResult.ok) throw new Error(await getApiError(authorizationsResult, 'No se pudieron cargar los repositorios.'));
       state.organizationAuthorizations = await authorizationsResult.json();
-      if (!entitlementsResult.ok) throw new Error(await getApiError(entitlementsResult, 'No se pudo cargar el cupo de Analyst.'));
       state.organizationAnalystEntitlements = await entitlementsResult.json();
       renderOrganizationMembers();
       renderOrganizationAuthorizations();
       panel.hidden = false;
       notice.hidden = true;
+      // Ocultar panel de contraseña después de un breve período o acción del usuario
+      // (se mantiene visible hasta que el Owner la cierre o copie la contraseña)
     } catch (error) {
       panel.hidden = true;
       notice.hidden = false;
       notice.textContent = error.message;
+      if (passwordPanel) passwordPanel.hidden = true;
     }
   }
 
@@ -1326,12 +1370,29 @@
   async function createOrganizationAnalyst(event) {
     event.preventDefault();
     const username = document.getElementById('organizationMemberUsername').value.trim();
-    const password = document.getElementById('organizationMemberPassword').value;
-    if (!Object.values(passwordRules(password)).every(Boolean)) { setOrganizationFeedback('La contraseña debe cumplir la política de seguridad.', 'error'); return; }
+    const selectedStrategy = document.querySelector('input[name="passwordStrategy"]:checked');
+    if (!selectedStrategy) { setOrganizationFeedback('Seleccione una estrategia de contraseña.', 'error'); return; }
+
+    // Validate password only when strategy is "defined"
+    if (selectedStrategy.value === 'defined') {
+      const password = document.getElementById('organizationMemberPassword').value;
+      if (!Object.values(passwordRules(password)).every(Boolean)) { setOrganizationFeedback('La contraseña debe cumplir la política de seguridad.', 'error'); return; }
+    }
+
+    const passwordInput = document.getElementById('organizationMemberPassword');
+    const password = selectedStrategy.value === 'defined' ? passwordInput.value : null;
+
     try {
-      const res = await fetch('/api/v1/organization/members', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.token}` }, body: JSON.stringify({ username, password }) });
-      if (!res.ok) throw new Error(await getApiError(res, 'No se pudo crear el Analyst.'));
-      event.target.reset(); setOrganizationFeedback('Analyst creado. Entrega la contraseña temporal por un canal seguro.', 'success');
+      const res = await fetch('/api/v1/organization/members', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.token}` }, body: JSON.stringify({ username, password, generate_temp: selectedStrategy.value === 'generate' }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'No se pudo crear el Analyst.');
+
+      // Show temporary password panel if the system generated it
+      if (data.temporary_password) {
+        openOrganizationPasswordPanel(data.username, data.temporary_password);
+      } else {
+        event.target.reset(); setOrganizationFeedback('Analyst creado. Entrega la contraseña temporal por un canal seguro.', 'success');
+      }
       await refreshOrganization();
     } catch (error) { setOrganizationFeedback(error.message, 'error'); }
   }
@@ -1346,12 +1407,37 @@
   }
 
   function openOrganizationPasswordReset(button) {
-    openPasswordResetModal(
-      button.dataset.organizationReset,
-      button.dataset.organizationUsername,
-      `/api/v1/organization/members/${encodeURIComponent(button.dataset.organizationReset)}`,
-      'organization'
-    );
+    const username = button.dataset.organizationUsername;
+    // Ask Owner: define password or generate temporary
+    const choice = prompt(`Restablecer contraseña para ${username}\n\nOpciones:\n1="Generar" - El sistema crea una contraseña segura y la muestra una sola vez\n2="Definir" - Tú introduces una contraseña temporal (mínimo 12 caracteres)\n\nElige 1 o 2:`);
+    if (!choice) return; // User cancelled
+    choice = choice.trim();
+    if (choice === '1') {
+      // Generate temporary password - set strategy and open modal with generate pre-selected
+      const strategyRadios = document.querySelectorAll('input[name="passwordStrategy"]');
+      if (strategyRadios.length > 0) {
+        strategyRadios[0].checked = false;
+        strategyRadios[1].checked = true;
+        updatePasswordInputVisibility();
+      }
+      // Open the password reset modal (it will use the selected strategy)
+      openPasswordResetModal(
+        button.dataset.organizationReset,
+        button.dataset.organizationUsername,
+        `/api/v1/organization/members/${encodeURIComponent(button.dataset.organizationReset)}`,
+        'organization'
+      );
+    } else if (choice === '2') {
+      // Define password explicitly - open normal modal
+      openPasswordResetModal(
+        button.dataset.organizationReset,
+        button.dataset.organizationUsername,
+        `/api/v1/organization/members/${encodeURIComponent(button.dataset.organizationReset)}`,
+        'organization'
+      );
+    } else {
+      setOrganizationFeedback('Opción no válida. Se abortó el restablecimiento.', 'error');
+    }
   }
 
   async function saveOrganizationRepositoryAuthorization(event) {
@@ -1704,6 +1790,7 @@
     const feedback = document.getElementById('passwordResetFeedback');
     const button = document.getElementById('btnConfirmPasswordReset');
     const target = state.passwordResetTarget;
+    const generateTemp = document.querySelector('input[name="passwordStrategy"]:checked')?.value === 'generate';
     if (!target || !validatePasswordForm('resetUserPassword', 'resetUserPasswordConfirm', 'resetUserPasswordPolicy', 'resetUserPasswordMatch')) {
       if (feedback) feedback.textContent = 'Revisa los requisitos y confirma la contraseña.';
       return;
@@ -1712,10 +1799,13 @@
     if (feedback) feedback.textContent = 'Restableciendo contraseña…';
     try {
       const endpoint = target.endpoint || `/api/v1/admin/users/${encodeURIComponent(target.userId)}`;
+      const payload = generateTemp
+        ? { generate_temp: true }
+        : { password: document.getElementById('resetUserPassword').value };
       const res = await fetch(endpoint, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.token}` },
-        body: JSON.stringify({ password: document.getElementById('resetUserPassword').value })
+        body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error(await getApiError(res, 'No se pudo restablecer la contraseña.'));
       closePasswordResetModal();

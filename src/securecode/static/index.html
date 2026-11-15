@@ -549,11 +549,68 @@
               <div class="data-table-header"><div><div class="data-table-title">Equipo de análisis</div><div class="admin-helper">El propietario crea y administra únicamente cuentas Analyst de su propia organización.</div><div class="admin-helper" id="organizationAnalystQuota" aria-live="polite"></div></div><button type="button" class="btn-copy" id="btnRefreshOrganization">Actualizar</button></div>
               <form id="createOrganizationMemberForm" class="admin-user-form" novalidate>
                 <div class="input-group"><label for="organizationMemberUsername">Correo del analista</label><input class="input-control" id="organizationMemberUsername" type="email" maxlength="100" required></div>
-                <div class="input-group"><label for="organizationMemberPassword">Contraseña temporal</label><input class="input-control" id="organizationMemberPassword" type="password" minlength="12" autocomplete="new-password" required></div>
+
+                <div class="input-group" id="passwordStrategyGroup">
+                  <div class="password-strategy-radio">
+                    <input type="radio" id="strategyDefined" name="passwordStrategy" value="defined" checked>
+                    <label for="strategyDefined">Definir contraseña temporal</label>
+                    <small class="text-faint">Mínimo 12 caracteres: mayúscula, minúscula, número y símbolo</small>
+                  </div>
+                  <div class="password-strategy-radio">
+                    <input type="radio" id="strategyGenerate" name="passwordStrategy" value="generate">
+                    <label for="strategyGenerate">Generar contraseña segura</label>
+                    <small class="text-faint">El sistema crea una y la muestra una sola vez</small>
+                  </div>
+                </div>
+
+                <div class="input-group" id="passwordInputGroup">
+                  <label for="organizationMemberPassword">Contraseña temporal</label>
+                  <input class="input-control" id="organizationMemberPassword" type="password" minlength="12" autocomplete="new-password" required>
+                </div>
+
+                <script>
+                  // Sincronizar visibilidad del campo de contraseña según la estrategia seleccionada
+                  const strategyRadios = document.querySelectorAll('input[name="passwordStrategy"]');
+                  const passwordInputGroup = document.getElementById('passwordInputGroup');
+                  function updatePasswordInputVisibility() {
+                    const selected = document.querySelector('input[name="passwordStrategy"]:checked');
+                    if (!selected) return;
+                    if (selected.value === 'generate') {
+                      passwordInputGroup.hidden = true;
+                      organizationMemberPassword.value = '';
+                    } else {
+                      passwordInputGroup.hidden = false;
+                    }
+                  }
+                  strategyRadios.forEach(radio => radio.addEventListener('change', updatePasswordInputVisibility));
+                  updatePasswordInputVisibility();
+                </script>
+
                 <div class="admin-form-actions"><div class="admin-feedback" id="organizationMemberFeedback" role="status" aria-live="polite"></div><button class="btn-primary" id="btnCreateOrganizationAnalyst" type="submit">Crear Analyst</button></div>
               </form>
               <table class="modern-table"><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Acción</th></tr></thead><tbody id="organizationMembersBody"></tbody></table>
             </div>
+
+            <!-- Panel de contraseña temporal (mostrado después de creación o restablecimiento) -->
+            <div id="organizationPasswordPanel" class="password-panel" hidden>
+              <div class="password-panel-header">
+                <span class="panel-title">Contraseña temporal generada</span>
+                <button type="button" class="btn-close" aria-label="Cerrar panel" id="orgPasswordPanelCloseBtn"></button>
+              </div>
+              <div class="password-panel-content">
+                <p class="panel-body-text">
+                  <strong>Analyst:</strong> <span id="panelAnalystUsername"></span>
+                </p>
+                <p class="panel-body-text">
+                  <strong>Contraseña temporal:</strong> <span id="panelTempPassword"></span>
+                </p>
+                <div class="password-panel-actions">
+                  <button type="button" class="btn-copy" id="orgPasswordCopyBtn">Copiar</button>
+                  <strong class="panel-warning">Se muestra una sola vez. Entrégala por un canal seguro.</strong>
+                </div>
+              </div>
+            </div>
+
             <section class="repository-scope-panel">
               <div><span class="section-kicker">Alcance autorizado</span><h2>Repositorios de los analistas</h2><p>Un Analyst sólo puede evaluar repositorios que el propietario haya autorizado en su organización.</p></div>
               <form id="organizationRepositoryAuthorizationForm" class="repository-authorization-form" novalidate><select class="input-control" id="organizationAuthorizationUserId" required></select><input class="input-control" id="organizationAuthorizationRepository" placeholder="owner/repo" maxlength="201" required><button class="btn-primary" type="submit">Autorizar repositorio</button></form>

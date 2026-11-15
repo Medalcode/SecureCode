@@ -1,3 +1,7 @@
+import os
+import string
+import secrets
+os.environ["JWT_SECRET_KEY"] = "test-secret-key-that-is-at-least-32-bytes-long"
 """HTTP authorization contracts for the three explicit SecureCode roles."""
 
 from datetime import UTC, datetime
@@ -145,6 +149,207 @@ def test_pro_plan_rejects_a_fourth_active_analyst(monkeypatch):
         })
         assert rejected.status_code == 409
         assert "3/3" in rejected.json()["detail"]
+    finally:
+        app.dependency_overrides.clear()
+        session.close()
+        engine.dispose()
+
+
+def _temp_password_headers(client: TestClient, username: str, password: str) -> dict[str, str]:
+    """Login and return headers with the temporary password displayed in the analyst response."""
+    response = client.post("/api/v1/auth/token", data={"username": username, "password": password})
+    assert response.status_code == 200
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+def test_analyst_creation_with_owner_provided_password(monkeypatch):
+    """Existing behavior: Owner provides a password, Analyst can login with it."""
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-that-is-at-least-32-bytes-long")
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    app.dependency_overrides[get_db_session] = lambda: session
+    try:
+        client = TestClient(app)
+        _ = client.post("/api/v1/auth/register", json={
+            "organization_name": "PasswordTestOrg", "username": "owner@password.test",
+            "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+        })
+        owner_headers = _headers(client, "owner@password.test", "OwnerPassword#2026")
+        analyst = client.post("/api/v1/organization/members", headers=owner_headers, json={
+            "username": "analyst@password.test", "password": "AnalystPassword#2026!",
+        })
+        assert analyst.status_code == 201
+        response_data = analyst.json()
+        assert response_data.get("temporary_password") is None, f"Expected no temporary_password, got: {response_data.get('temporary_password')}"
+        assert response_data["username"] == "analyst@password.test"
+        assert response_data["active"] is True
+        assert response_data["role"] == "analyst"
+        analyst_headers = _headers(client, "analyst@password.test", "AnalystPassword#2026!")
+        assert client.post("/api/v1/auth/token", headers=analyst_headers, data={"username": "analyst@password.test", "password": "AnalystPassword#2026!"}).status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+        session.close()
+        engine.dispose()
+
+
+def test_analyst_creation_with_system_generated_temp_password(monkeypatch):
+    """New functionality: System generates a temporary password, shown once to Owner."""
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-that-is-at-least-32-bytes-long")
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    app.dependency_overrides[get_db_session] = lambda: session
+    try:
+        client = TestClient(app)
+        _ = client.post("/api/v1/auth/register", json={
+            "organization_name": "TempPwdOrg", "username": "owner@temp.test",
+            "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+        })
+        owner_headers = _headers(client, "owner@temp.test", "OwnerPassword#2026")
+        analyst = client.post("/api/v1/organization/members", headers=owner_headers, json={
+            "username": "analyst@temp.test",
+            "generate_temp": True,
+        })
+        assert analyst.status_code == 201
+        response_data = analyst.json()
+        # Temp password should be shown once in creation response
+        temp_pwd = response_data.get("temporary_password")
+        assert temp_pwd is not None, f"Expected temporary_password in response, got: {response_data}"
+        assert len(temp_pwd) >= 12, f"Temp password too short: {len(temp_pwd)}"
+        assert any(c.islower() for c in temp_pwd), "Temp password must have lowercase"
+        assert any(c.isupper() for c in temp_pwd), "Temp password must have uppercase"
+        assert any(c.isdigit() for c in temp_pwd), "Temp password must have digit"
+        assert any(c in "!@#$%^&*" for c in temp_pwd), "Temp password must have symbol"
+        # Analyst should be able to login with the temp password
+        analyst_headers = _temp_password_headers(client, "analyst@temp.test", temp_pwd)
+        assert analyst_headers is not None
+        # Temp password should NOT persist in subsequent member read (value should be None)
+        members = client.get("/api/v1/organization/members", headers=owner_headers)
+        assert members.status_code == 200
+        member = members.json()[0]
+        assert member.get("temporary_password") is None, f"Temp password should not persist, got: {member.get('temporary_password')}"
+        assert "analyst@temp.test" in {m["username"] for m in members.json()}
+    finally:
+        app.dependency_overrides.clear()
+        session.close()
+        engine.dispose()
+
+
+def test_analyst_password_reset_with_owner_provided_password(monkeypatch):
+    """Existing behavior: Owner resets Analyst password with a new provided password."""
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-that-is-at-least-32-bytes-long")
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    app.dependency_overrides[get_db_session] = lambda: session
+    try:
+        client = TestClient(app)
+        _ = client.post("/api/v1/auth/register", json={
+            "organization_name": "ResetPwdOrg", "username": "owner@reset.test",
+            "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+        })
+        owner_headers = _headers(client, "owner@reset.test", "OwnerPassword#2026")
+        analyst_resp = client.post("/api/v1/organization/members", headers=owner_headers, json={
+            "username": "analyst@reset.test", "password": "AnalystOldPassword#2026!",
+        })
+        assert analyst_resp.status_code == 201
+        analyst_id = analyst_resp.json()["id"]
+        # Reset password
+        reset_resp = client.patch(f"/api/v1/organization/members/{analyst_id}", headers=owner_headers, json={
+            "password": "AnalystNewPassword#2026@!",
+        })
+        assert reset_resp.status_code == 200
+        reset_data = reset_resp.json()
+        assert reset_data.get("temporary_password") is None, f"Expected None temporary_password, got: {reset_data.get('temporary_password')}"
+        # Analyst should be able to login with the new password
+        reset_headers = _headers(client, "analyst@reset.test", "AnalystNewPassword#2026@!")
+        assert client.post("/api/v1/auth/token", headers=reset_headers, data={"username": "analyst@reset.test", "password": "AnalystNewPassword#2026@!"}).status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+        session.close()
+        engine.dispose()
+
+
+def test_analyst_password_reset_with_system_generated_temp_password(monkeypatch):
+    """New functionality: Owner resets Analyst password, system generates temporary password."""
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-that-is-at-least-32-bytes-long")
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    app.dependency_overrides[get_db_session] = lambda: session
+    try:
+        client = TestClient(app)
+        _ = client.post("/api/v1/auth/register", json={
+            "organization_name": "ResetTempOrg", "username": "owner@resettemp.test",
+            "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+        })
+        owner_headers = _headers(client, "owner@resettemp.test", "OwnerPassword#2026")
+        analyst_resp = client.post("/api/v1/organization/members", headers=owner_headers, json={
+            "username": "analyst@resettemp.test", "password": "AnalystBasePassword#2026!",
+        })
+        assert analyst_resp.status_code == 201
+        analyst_id = analyst_resp.json()["id"]
+        # Reset password with generate_temp=true
+        reset_resp = client.patch(f"/api/v1/organization/members/{analyst_id}", headers=owner_headers, json={
+            "generate_temp": True,
+        })
+        assert reset_resp.status_code == 200
+        reset_data = reset_resp.json()
+        # Temp password should be shown once in reset response
+        temp_pwd = reset_data.get("temporary_password")
+        assert temp_pwd is not None, f"Expected temporary_password in reset response, got: {reset_data}"
+        assert len(temp_pwd) >= 12, f"Temp password too short: {len(temp_pwd)}"
+        # Analyst should be able to login with the temp password
+        reset_headers = _temp_password_headers(client, "analyst@resettemp.test", temp_pwd)
+        assert reset_headers is not None
+        # Temp password should not persist in subsequent member read (value should be None)
+        members = client.get("/api/v1/organization/members", headers=owner_headers)
+        assert members.status_code == 200
+        member = members.json()[0]
+        assert member.get("temporary_password") is None, f"Temp password should not persist, got: {member.get('temporary_password')}"
+        # Analyst should still be able to login with the temp password (not the old password)
+        old_pwd = "AnalystBasePassword#2026!"
+        login_with_old = client.post("/api/v1/auth/token", data={"username": "analyst@resettemp.test", "password": old_pwd})
+        assert login_with_old.status_code == 401  # Old password should no longer work
+        assert client.post("/api/v1/auth/token", headers=reset_headers, data={"username": "analyst@resettemp.test", "password": temp_pwd}).status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+        session.close()
+        engine.dispose()
+
+
+def test_password_not_persisted_in_subsequent_reads(monkeypatch):
+    """New functionality: Temporary password must not persist in subsequent member reads."""
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-that-is-at-least-32-bytes-long")
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    app.dependency_overrides[get_db_session] = lambda: session
+    try:
+        client = TestClient(app)
+        _ = client.post("/api/v1/auth/register", json={
+            "organization_name": "PersistOrg", "username": "owner@persist.test",
+            "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+        })
+        owner_headers = _headers(client, "owner@persist.test", "OwnerPassword#2026")
+        # Create analyst with system-generated temp password
+        analyst_resp = client.post("/api/v1/organization/members", headers=owner_headers, json={
+            "username": "analyst@persist.test",
+            "generate_temp": True,
+        })
+        assert analyst_resp.status_code == 201
+        temp_pwd = analyst_resp.json()["temporary_password"]
+        # Verify temp password was shown
+        assert temp_pwd is not None and len(temp_pwd) >= 12
+        # Read members - temp password should NOT persist (value should be None)
+        members = client.get("/api/v1/organization/members", headers=owner_headers)
+        assert members.status_code == 200
+        for member in members.json():
+            assert member.get("temporary_password") is None, f"Temp password should not persist, got: {member.get('temporary_password')}"
+        # Analyst should still be able to login with the temp password
+        analyst_headers = _temp_password_headers(client, "analyst@persist.test", temp_pwd)
+        assert client.post("/api/v1/auth/token", headers=analyst_headers, data={"username": "analyst@persist.test", "password": temp_pwd}).status_code == 200
     finally:
         app.dependency_overrides.clear()
         session.close()
