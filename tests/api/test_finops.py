@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from securecode.adapters.postgres.models import UserAuditEvent, UserFinOpsSettings
+from securecode.adapters.postgres.models import OrganizationMembership, UserAuditEvent, UserFinOpsSettings
 from securecode.api.app import (
     FinOpsSettingsUpdateRequest,
     get_finops,
@@ -9,7 +9,7 @@ from securecode.api.app import (
 
 
 class UserStub:
-    def __init__(self, role="auditor"):
+    def __init__(self, role="organization_owner"):
         self.id = uuid4()
         self.role = role
 
@@ -33,15 +33,37 @@ class EvaluationQuery:
         return 7
 
 
+class MembershipQuery:
+    def __init__(self, user_id):
+        self.membership = type("Membership", (), {
+            "user_id": user_id, "organization_id": uuid4(), "role": "organization_owner",
+        })()
+
+    def filter(self, *_):
+        return self
+
+    def order_by(self, *_):
+        return self
+
+    def first(self):
+        return self.membership
+
+    def all(self):
+        return [(self.membership.user_id,)]
+
+
 class SessionStub:
-    def __init__(self, settings=None):
+    def __init__(self, settings=None, user_id=None):
         self.settings = settings
+        self.user_id = user_id or uuid4()
         self.added = []
         self.commits = 0
 
     def query(self, model):
         if model is UserFinOpsSettings:
             return SettingsQuery(self.settings)
+        if model is OrganizationMembership or getattr(model, "class_", None) is OrganizationMembership:
+            return MembershipQuery(self.user_id)
         return EvaluationQuery()
 
     def add(self, item):
@@ -55,9 +77,10 @@ class SessionStub:
 
 
 def test_finops_initializes_safe_preferences_and_measurable_consumption():
-    response = get_finops(SessionStub(), UserStub())
+    user = UserStub()
+    response = get_finops(SessionStub(user_id=user.id), user)
 
-    assert response["scope"] == "account"
+    assert response["scope"] == "organization"
     assert response["evaluations_current_period"] == 7
     assert response["evaluations_all_time"] == 7
     assert response["budget_clp"] == 1000
@@ -68,7 +91,7 @@ def test_finops_initializes_safe_preferences_and_measurable_consumption():
 def test_finops_preference_update_is_persisted_and_audited():
     user = UserStub()
     settings = UserFinOpsSettings(user_id=user.id, budget_clp=1000, alert_threshold_pct=80, alert_enabled=True)
-    session = SessionStub(settings)
+    session = SessionStub(settings, user.id)
 
     response = update_finops(
         FinOpsSettingsUpdateRequest(budget_clp=200, alert_threshold_pct=50, alert_enabled=False),

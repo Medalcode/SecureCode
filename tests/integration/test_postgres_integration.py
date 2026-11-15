@@ -192,7 +192,10 @@ def test_api_postgres_integration(engine, session, monkeypatch):
         username=f"integration_user_{uuid4().hex[:12]}",
         password_hash=hash_password("securepassword"),
         active=True,
-        role="admin",
+        # The platform bypass is intentionally limited to the explicit
+        # internal role introduced by ORG-001; legacy "admin" is no longer
+        # authorized for platform operations.
+        role="platform_admin",
         created_at=datetime.now(timezone.utc)
     )
     session.add(test_user)

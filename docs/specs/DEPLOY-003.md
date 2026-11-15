@@ -12,7 +12,7 @@ Preparar SecureCode para un despliegue controlado, reduciendo exposición del na
 4. El usuario autenticado debe poder consultar una representación mínima de su identidad sin recibir hashes de contraseña, secretos o datos de otros usuarios.
 5. La imagen de producción debe separar compilación y runtime, usar un usuario sin privilegios y no incluir herramientas de compilación en la capa final.
 6. En Compose, la API debe ejecutarse sin capacidades Linux, sin escalamiento de privilegios y con filesystem de sólo lectura.
-7. Las acciones administrativas deben requerir un rol `admin` persistido y los auditores sólo pueden consultar su propio historial de evaluaciones.
+7. Las acciones de plataforma deben requerir `platform_admin`; las acciones de una empresa requieren `organization_owner`; un `analyst` sólo puede evaluar repositorios autorizados y consultar evidencia permitida de su propia organización.
 
 ## Criterios de aceptación
 
@@ -20,7 +20,7 @@ Preparar SecureCode para un despliegue controlado, reduciendo exposición del na
 - `tests/api/test_auth.py` comprueba que `/api/v1/auth/me` necesita JWT y no expone material de contraseña.
 - La configuración de la interfaz explica que los secretos de GitHub son administrados por el servidor.
 - La guía de despliegue contiene verificaciones de secretos, migración y revisión candidata antes de recibir tráfico.
-- El esquema Alembic agrega el rol con mínimo privilegio (`auditor`) para cuentas existentes; las rutas `/api/v1/admin/users` rechazan usuarios sin rol `admin`.
+- El esquema Alembic convierte los roles heredados a `platform_admin` y `analyst`, y agrega el rol `organization_owner` respaldado por membresías de organización. Las rutas `/api/v1/admin/*` rechazan usuarios sin `platform_admin`.
 - El workflow manual `Candidate Deployment Smoke Test` valida una URL HTTPS candidata con secretos protegidos y conserva un artefacto no sensible.
 
 ## Límites actuales y siguiente incremento

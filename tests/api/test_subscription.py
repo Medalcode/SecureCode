@@ -4,7 +4,7 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
-from securecode.adapters.postgres.models import SubscriptionEvent, UserSubscription
+from securecode.adapters.postgres.models import OrganizationMembership, SubscriptionEvent, UserSubscription
 from securecode.api.app import (
     SubscriptionChangeRequest,
     change_subscription,
@@ -15,6 +15,7 @@ from securecode.api.app import (
 class UserStub:
     def __init__(self):
         self.id = uuid4()
+        self.role = "organization_owner"
 
 
 class QueryStub:
@@ -27,14 +28,27 @@ class QueryStub:
     def first(self):
         return self.result
 
+    def order_by(self, *_):
+        return self
+
+
+class MembershipQuery(QueryStub):
+    def __init__(self, user_id):
+        super().__init__(type("Membership", (), {
+            "user_id": user_id, "organization_id": uuid4(), "role": "organization_owner",
+        })())
+
 
 class SessionStub:
-    def __init__(self, subscription=None):
+    def __init__(self, subscription=None, user_id=None):
         self.query_stub = QueryStub(subscription)
+        self.user_id = user_id or uuid4()
         self.added = []
         self.commits = 0
 
-    def query(self, *_):
+    def query(self, model, *_):
+        if model is OrganizationMembership:
+            return MembershipQuery(self.user_id)
         return self.query_stub
 
     def add(self, item):
@@ -48,7 +62,8 @@ class SessionStub:
 
 
 def test_first_subscription_is_initialized_as_non_billable_pro_period():
-    response = get_subscription(SessionStub(), UserStub())
+    user = UserStub()
+    response = get_subscription(SessionStub(user_id=user.id), user)
 
     assert response["plan_id"] == "pro"
     assert response["billing_mode"] == "demo_non_billable"
@@ -64,11 +79,11 @@ def test_subscription_change_requires_confirmation_and_respects_30_day_lock():
     )
 
     with pytest.raises(HTTPException) as no_confirmation:
-        change_subscription(SubscriptionChangeRequest(plan_id="premium", confirmation=False), SessionStub(locked), user)
+        change_subscription(SubscriptionChangeRequest(plan_id="premium", confirmation=False), SessionStub(locked, user.id), user)
     assert no_confirmation.value.status_code == 422
 
     with pytest.raises(HTTPException) as locked_change:
-        change_subscription(SubscriptionChangeRequest(plan_id="premium", confirmation=True), SessionStub(locked), user)
+        change_subscription(SubscriptionChangeRequest(plan_id="premium", confirmation=True), SessionStub(locked, user.id), user)
     assert locked_change.value.status_code == 409
 
 
@@ -79,7 +94,7 @@ def test_confirmed_change_creates_history_and_new_30_day_period():
         user_id=user.id, plan_id="pro", started_at=old,
         expires_at=old + timedelta(days=30), last_changed_at=old,
     )
-    session = SessionStub(subscription)
+    session = SessionStub(subscription, user.id)
 
     response = change_subscription(SubscriptionChangeRequest(plan_id="premium", confirmation=True), session, user)
 

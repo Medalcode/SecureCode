@@ -6,10 +6,10 @@ en el historial de shell, tablas de procesos (ps aux) y logs de CI/CD.
 
 Modo de uso:
   # Opción 1: Variables de entorno (recomendado para CI/CD y Cloud Run Jobs)
-  SEED_USER_EMAIL=auditor@empresa.com SEED_USER_PASSWORD=<contraseña> python scripts/seed_user.py
+  SEED_USER_EMAIL=operator@securecode.cl SEED_USER_PASSWORD=<contraseña> python scripts/seed_user.py
 
   # Opción 2: Email en argumento, contraseña por prompt interactivo (desarrollo local)
-  python scripts/seed_user.py auditor@empresa.com
+  python scripts/seed_user.py operator@securecode.cl
 
 Requisito obligatorio:
   La variable de entorno DATABASE_URL debe estar configurada en ambos modos.
@@ -35,6 +35,7 @@ from sqlalchemy.orm import sessionmaker
 from securecode.adapters.postgres.models import User
 from securecode.api.dependencies import _normalize_database_url
 from securecode.api.security import hash_password
+from securecode.domain.roles import PLATFORM_ADMIN
 
 
 def _get_credentials() -> tuple[str, str]:
@@ -118,9 +119,9 @@ def seed_user(username: str, password: str) -> None:
     engine = create_engine(_normalize_database_url(db_url))
     Session = sessionmaker(bind=engine)
     session = Session()
-    role = os.environ.get("SEED_USER_ROLE", "admin").strip().lower()
-    if role not in {"admin", "auditor"}:
-        print("[ERROR] SEED_USER_ROLE debe ser 'admin' o 'auditor'.", file=sys.stderr)
+    role = os.environ.get("SEED_USER_ROLE", PLATFORM_ADMIN).strip().lower()
+    if role != PLATFORM_ADMIN:
+        print("[ERROR] SEED_USER_ROLE debe ser 'platform_admin'. Los clientes se registran mediante la API pública.", file=sys.stderr)
         sys.exit(1)
 
     try:

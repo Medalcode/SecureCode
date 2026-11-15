@@ -13,11 +13,12 @@ os.environ["JWT_SECRET_KEY"] = "test-secret-key-that-is-at-least-32-bytes-long"
 os.environ["JWT_ALGORITHM"] = "HS256"
 
 class DummyUser:
-    def __init__(self, id, username, password_hash, active):
+    def __init__(self, id, username, password_hash, active, role="analyst"):
         self.id = id
         self.username = username
         self.password_hash = password_hash
         self.active = active
+        self.role = role
 
 mock_user_id = uuid4()
 mock_user = DummyUser(
@@ -115,7 +116,7 @@ def test_current_user_profile_exposes_no_password_material():
     response = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 200
-    assert response.json() == {"username": "testuser", "active": True, "role": "auditor"}
+    assert response.json() == {"username": "testuser", "active": True, "role": "analyst"}
 
 def test_login_invalid_password():
     response = client.post("/api/v1/auth/token", data={

@@ -12,7 +12,7 @@ def test_root_serves_html():
     assert "text/html" in response.headers.get("content-type", "")
     assert response.headers.get("cache-control") == "no-store, max-age=0"
     assert "/static/css/app.css?v=20261111-admin-navigation-gate" in response.text
-    assert "/static/js/app.js?v=20261114-auth-gate" in response.text
+    assert "/static/js/app.js?v=20261115-visitor-navigation" in response.text
     assert "Enterprise Trial" in response.text
     assert "enterpriseTrialActivateForm" in response.text
     assert "SecureCode" in response.text
@@ -39,8 +39,17 @@ def test_admin_navigation_is_gated_by_the_server_validated_role():
     script = Path("src/securecode/static/js/app.js").read_text(encoding="utf-8")
     stylesheet = Path("src/securecode/static/css/app.css").read_text(encoding="utf-8")
     assert "function updateAdminAccess()" in script
-    assert "return Boolean(state.token && state.accessRole === 'admin');" in script
-    assert "if (item.dataset.view === 'admin' && !isAdministrator()) return;" in script
+    assert "return Boolean(state.token && state.accessRole === 'platform_admin');" in script
+    assert "return Boolean(state.token && state.accessRole === 'organization_owner');" in script
+    assert "const finopsNav = document.querySelector('.nav-item[data-view=\"usage\"]');" in script
+    assert "const subscriptionNav = document.querySelector('.nav-item[data-view=\"subscription\"]');" in script
+    assert "const settingsNav = document.querySelector('.nav-item[data-view=\"settings\"]');" in script
+    assert "finopsNav.hidden = !ownerAllowed;" in script
+    assert "subscriptionNav.hidden = !ownerAllowed;" in script
+    assert "settingsNav.hidden = !authenticated;" in script
+    assert "if (item.dataset.view === 'admin' && !isPlatformAdmin()) return;" in script
+    assert "id=\"registrationForm\"" in Path("src/securecode/static/index.html").read_text(encoding="utf-8")
+    assert "id=\"organizationPanel\"" in Path("src/securecode/static/index.html").read_text(encoding="utf-8")
     assert "function clearAuthenticatedSession()" in script
     assert "function updateHistoryAccess()" in script
     assert "function updateEvaluatorAccess()" in script
@@ -56,6 +65,9 @@ def test_admin_navigation_is_gated_by_the_server_validated_role():
       openAuthModal();
     });""" in script
     assert "localStorage.removeItem('securecode_history');" in script
+    assert "['undefined', 'null'].includes(repoInput.value.trim().toLowerCase())" in script
+    assert "function normalizeOptionalRepository(value)" in script
+    assert "const defaultRepository = normalizeOptionalRepository(settings.default_repository);" in script
     assert ".nav-item[hidden]" in stylesheet
     assert "display: none !important;" in stylesheet
 

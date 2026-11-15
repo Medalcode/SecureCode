@@ -10,7 +10,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from securecode.adapters.postgres.models import Base, User
+from securecode.adapters.postgres.models import Base, Organization, OrganizationMembership, User
 from securecode.api.app import app
 from securecode.api.dependencies import get_db_session
 from securecode.api.security import create_access_token, hash_password
@@ -27,9 +27,14 @@ def trial_client(monkeypatch):
     session = sessionmaker(bind=engine)()
     user = User(
         id=uuid4(), username="trial.owner@example.com", password_hash=hash_password("TrialPassword#2026"),
-        active=True, role="auditor", created_at=datetime.now(UTC),
+        active=True, role="organization_owner", created_at=datetime.now(UTC),
     )
-    session.add(user)
+    organization = Organization(id=uuid4(), name="Trial Example", created_at=datetime.now(UTC))
+    membership = OrganizationMembership(
+        id=uuid4(), organization_id=organization.id, user_id=user.id,
+        role="organization_owner", created_at=datetime.now(UTC),
+    )
+    session.add_all((user, organization, membership))
     session.commit()
     app.dependency_overrides[get_db_session] = lambda: session
     try:
@@ -45,23 +50,23 @@ def test_trial_activation_requires_confirmation_and_is_one_time(trial_client):
     assert client.get("/api/v1/enterprise-trial", headers=headers).json()["status"] == "not_started"
 
     rejected = client.post("/api/v1/enterprise-trial", headers=headers, json={
-        "organization_name": "Example Security", "confirmation": False,
+        "confirmation": False,
     })
     assert rejected.status_code == 422
 
     created = client.post("/api/v1/enterprise-trial", headers=headers, json={
-        "organization_name": "Example Security", "confirmation": True,
+        "confirmation": True,
     })
     assert created.status_code == 201
     body = created.json()
     assert body["status"] == "active"
-    assert body["organization_name"] == "Example Security"
+    assert body["organization_name"] == "Trial Example"
     assert body["repository_limit"] == 3
     assert body["evaluation_limit"] == 100
     assert body["billing_mode"] == "trial_non_billable"
 
     duplicate = client.post("/api/v1/enterprise-trial", headers=headers, json={
-        "organization_name": "Another name", "confirmation": True,
+        "confirmation": True,
     })
     assert duplicate.status_code == 409
 
@@ -69,7 +74,7 @@ def test_trial_activation_requires_confirmation_and_is_one_time(trial_client):
 def test_trial_repository_scope_is_limited_and_idempotent(trial_client):
     client, headers = trial_client
     client.post("/api/v1/enterprise-trial", headers=headers, json={
-        "organization_name": "Scope Example", "confirmation": True,
+        "confirmation": True,
     })
 
     first = client.post("/api/v1/enterprise-trial/repositories", headers=headers, json={
@@ -99,7 +104,7 @@ def test_trial_endpoints_require_authentication(trial_client):
     client, _ = trial_client
     assert client.get("/api/v1/enterprise-trial").status_code == 401
     assert client.post("/api/v1/enterprise-trial", json={
-        "organization_name": "No session", "confirmation": True,
+        "confirmation": True,
     }).status_code == 401
 
 
@@ -107,7 +112,7 @@ def test_trial_endpoints_require_authentication(trial_client):
 def test_active_trial_enforces_scope_and_idempotency_for_evaluations(mock_evaluate, trial_client):
     client, headers = trial_client
     client.post("/api/v1/enterprise-trial", headers=headers, json={
-        "organization_name": "Evaluation scope", "confirmation": True,
+        "confirmation": True,
     })
     client.post("/api/v1/enterprise-trial/repositories", headers=headers, json={
         "repository": "Acme/One",
