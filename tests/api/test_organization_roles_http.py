@@ -118,6 +118,19 @@ def test_roles_enforce_platform_and_organization_boundaries(monkeypatch):
         assert any(item["repository"] == "beta/private" for item in beta_history.json()["evaluations"])
         assert not any(item["repository"] == "acme/private" for item in beta_history.json()["evaluations"])
 
+        beta_report = client.get("/api/v1/management-report", headers=owner_b)
+        assert beta_report.status_code == 200
+        report = beta_report.json()
+        assert report["scope"] == "organization"
+        assert report["organization"]["name"] == "Beta Security"
+        assert report["summary"]["evaluations_all_time"] == 1
+        assert report["summary"]["pass_count"] == 1
+        assert report["summary"]["fail_count"] == 0
+        assert report["summary"]["conformance_rate_pct"] == 100.0
+        assert report["by_repository"] == [{"repository": "beta/private", "total": 1, "pass": 1, "fail": 0, "unknown": 0}]
+        assert report["finops_preferences"]["billing_data_state"] == "not_connected"
+        assert client.get("/api/v1/management-report", headers=analyst_headers).status_code == 403
+
         platform_headers = {"Authorization": f"Bearer {create_access_token(str(platform_admin.id))}"}
         assert client.get("/api/v1/admin/users", headers=platform_headers).status_code == 200
     finally:

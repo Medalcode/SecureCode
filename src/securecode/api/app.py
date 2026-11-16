@@ -778,6 +778,128 @@ def _finops_response(session: Session, current_user: User, settings: UserFinOpsS
     }
 
 
+@app.get("/api/v1/management-report")
+def management_report(
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Return a factual, organization-scoped management report.
+
+    This endpoint deliberately reports persisted SecureCode activity only. It
+    never fabricates billing, availability, or operational metrics that have
+    not been integrated with their source systems.
+    """
+    membership = _require_organization_owner(session, current_user)
+    organization = session.query(Organization).filter(Organization.id == membership.organization_id).first()
+    if organization is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Organization membership required")
+
+    members = (
+        session.query(OrganizationMembership, User)
+        .join(User, User.id == OrganizationMembership.user_id)
+        .filter(OrganizationMembership.organization_id == organization.id)
+        .all()
+    )
+    member_ids = [member.user_id for member, _ in members]
+    usernames = {user.id: user.username for _, user in members}
+    records = (
+        session.query(EvaluationRecord)
+        .filter(EvaluationRecord.requested_by_user_id.in_(member_ids))
+        .order_by(EvaluationRecord.evaluated_at.desc())
+        .all()
+    ) if member_ids else []
+
+    period_start = _period_start_utc()
+    statuses = {"PASS": 0, "FAIL": 0, "UNKNOWN": 0}
+    controls: dict[str, dict[str, int]] = {}
+    repositories: dict[str, dict[str, int]] = {}
+    current_period = 0
+    for record in records:
+        normalized_status = record.status.upper()
+        if normalized_status not in statuses:
+            normalized_status = "UNKNOWN"
+        statuses[normalized_status] += 1
+        evaluated_at = record.evaluated_at
+        # SQLite used by the isolated HTTP tests may return a naive datetime;
+        # production PostgreSQL stores the same value as UTC-aware.
+        if evaluated_at.tzinfo is None:
+            evaluated_at = evaluated_at.replace(tzinfo=UTC)
+        if evaluated_at >= period_start:
+            current_period += 1
+        for bucket, key in ((controls, record.control_id), (repositories, record.source_repository)):
+            metrics = bucket.setdefault(key, {"total": 0, "pass": 0, "fail": 0, "unknown": 0})
+            metrics["total"] += 1
+            metrics[normalized_status.lower()] += 1
+
+    active_analysts = sum(1 for member, user in members if member.role == ANALYST and user.active)
+    authorization_rows = (
+        session.query(RepositoryAuthorization)
+        .filter(
+            RepositoryAuthorization.user_id.in_(member_ids),
+            RepositoryAuthorization.active.is_(True),
+        )
+        .all()
+    ) if member_ids else []
+    subscription = _ensure_subscription(session, current_user.id)
+    plan = _PLAN_CATALOG.get(subscription.plan_id, _PLAN_CATALOG["pro"])
+    finops = _ensure_finops_settings(session, current_user.id)
+    decisive = statuses["PASS"] + statuses["FAIL"]
+
+    def breakdown(source: dict[str, dict[str, int]], label: str) -> list[dict]:
+        return [
+            {label: name, **metrics}
+            for name, metrics in sorted(source.items(), key=lambda item: (-item[1]["total"], item[0]))
+        ]
+
+    return {
+        "generated_at": datetime.now(UTC),
+        "scope": "organization",
+        "organization": {"name": organization.name},
+        "period": {"start": period_start, "label": "Mes calendario actual (UTC)"},
+        "summary": {
+            "evaluations_all_time": len(records),
+            "evaluations_current_period": current_period,
+            "pass_count": statuses["PASS"],
+            "fail_count": statuses["FAIL"],
+            "unknown_count": statuses["UNKNOWN"],
+            "conformance_rate_pct": round((statuses["PASS"] / decisive) * 100, 1) if decisive else None,
+            "active_analysts": active_analysts,
+            "active_repository_authorizations": len(authorization_rows),
+            "unique_authorized_repositories": len({item.repository for item in authorization_rows}),
+        },
+        "subscription": {
+            "plan_id": subscription.plan_id,
+            "plan_name": plan["name"],
+            "expires_at": subscription.expires_at,
+            "billing_mode": "demo_non_billable",
+        },
+        "finops_preferences": {
+            "budget_clp": finops.budget_clp,
+            "alert_threshold_pct": finops.alert_threshold_pct,
+            "alert_enabled": finops.alert_enabled,
+            "billing_data_state": "not_connected",
+        },
+        "by_control": breakdown(controls, "control_id"),
+        "by_repository": breakdown(repositories, "repository"),
+        "recent_evaluations": [
+            {
+                "control_id": record.control_id,
+                "status": record.status.upper(),
+                "repository": record.source_repository,
+                "branch": record.source_branch,
+                "evaluated_at": record.evaluated_at,
+                "requested_by": usernames.get(record.requested_by_user_id, "Cuenta no disponible"),
+            }
+            for record in records[:10]
+        ],
+        "data_sources": {
+            "evaluations": "Base de datos de SecureCode",
+            "subscription": "Configuración de suscripción de demostración",
+            "billing": "not_connected",
+        },
+    }
+
+
 def _trial_response(session: Session, current_user: User) -> dict:
     """Return entitlement state without presenting a trial as a paid plan."""
     trial = get_trial_for_user(session, current_user.id)
