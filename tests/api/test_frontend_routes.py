@@ -14,6 +14,7 @@ def test_public_home_serves_html():
     assert "/static/public/site.css?v=20261115-public-site" in response.text
     assert "Confianza técnica" in response.text
     assert 'href="/app"' in response.text
+    assert '/static/public/securecode-mark.svg' in response.text
     assert "Borrador académico" not in response.text
 
 
