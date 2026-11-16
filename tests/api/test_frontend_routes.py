@@ -24,7 +24,7 @@ def test_console_shell_remains_available_at_app_route():
     assert "text/html" in response.headers.get("content-type", "")
     assert response.headers.get("cache-control") == "no-store, max-age=0"
     assert "/static/css/app.css?v=20261111-admin-navigation-gate" in response.text
-    assert "/static/js/app.js?v=20261117-analyst-password-ux" in response.text
+    assert "/static/js/app.js?v=20261118-management-report" in response.text
     assert "Enterprise Trial" in response.text
     assert "enterpriseTrialActivateForm" in response.text
     assert "SecureCode" in response.text
@@ -32,6 +32,9 @@ def test_console_shell_remains_available_at_app_route():
     assert 'id="clientSettingsForm"' in response.text
     assert 'id="subscriptionConfirmPanel"' in response.text
     assert 'id="finopsPanel"' in response.text
+    assert 'data-view="management-report" data-title="Informe de Gestión" hidden' in response.text
+    assert 'id="managementReportPanel" hidden' in response.text
+    assert 'id="btnDownloadManagementReport"' in response.text
     assert 'id="authErrorAlert"' not in response.text
     assert 'id="createUserForm"' in response.text
     assert 'id="newUserPasswordConfirm"' in response.text
@@ -92,8 +95,10 @@ def test_admin_navigation_is_gated_by_the_server_validated_role():
     assert "const finopsNav = document.querySelector('.nav-item[data-view=\"usage\"]');" in script
     assert "const subscriptionNav = document.querySelector('.nav-item[data-view=\"subscription\"]');" in script
     assert "const settingsNav = document.querySelector('.nav-item[data-view=\"settings\"]');" in script
+    assert "const managementReportNav = document.querySelector('.nav-item[data-view=\"management-report\"]');" in script
     assert "finopsNav.hidden = !ownerAllowed;" in script
     assert "subscriptionNav.hidden = !ownerAllowed;" in script
+    assert "managementReportNav.hidden = !ownerAllowed;" in script
     assert "settingsNav.hidden = !authenticated;" in script
     assert "if (item.dataset.view === 'admin' && !isPlatformAdmin()) return;" in script
     assert "id=\"registrationForm\"" in Path("src/securecode/static/index.html").read_text(encoding="utf-8")
@@ -106,6 +111,9 @@ def test_admin_navigation_is_gated_by_the_server_validated_role():
     assert "state.organizationAuthorizations = [];" in script
     assert "function updateHistoryAccess()" in script
     assert "function updateEvaluatorAccess()" in script
+    assert "function loadManagementReport()" in script
+    assert "'/api/v1/management-report'" in script
+    assert "function downloadManagementReport()" in script
     assert """if (!state.token) {
         setEvaluatorFeedback('Inicia sesión para ejecutar una evaluación y guardar su evidencia.', 'neutral');
         openAuthModal();

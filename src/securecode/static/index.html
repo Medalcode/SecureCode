@@ -56,6 +56,13 @@
           <span>Consumo & FinOps</span>
         </button>
 
+        <button class="nav-item" data-view="management-report" data-title="Informe de Gestión" hidden aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19V5"></path><path d="M4 19h16"></path><path d="M8 15v-4"></path><path d="M12 15V8"></path><path d="M16 15v-7"></path>
+          </svg>
+          <span>Informe de Gestión</span>
+        </button>
+
         <button class="nav-item" data-view="subscription" data-title="Plan & Niveles de Servicio (SLA)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="2" y="5" width="20" height="14" rx="2"></rect>
@@ -399,7 +406,42 @@
           </div>
         </section>
 
-        <!-- ================= VISTA 3: PLAN & SLA ================= -->
+        <!-- ================= VISTA 3: INFORME DE GESTIÓN ================= -->
+        <section class="view-panel" id="view-management-report">
+          <div class="evaluator-hero report-hero">
+            <div>
+              <span class="section-kicker">INFORME OPERATIVO</span>
+              <h1>Informe de Gestión</h1>
+              <p>Indicadores operativos, cobertura de controles y trazabilidad de tu organización.</p>
+            </div>
+            <div class="report-actions">
+              <button type="button" class="btn-secondary" id="btnRefreshManagementReport">Actualizar</button>
+              <button type="button" class="btn-secondary" id="btnDownloadManagementReport">Descargar CSV</button>
+              <button type="button" class="btn-primary" id="btnPrintManagementReport">Imprimir / PDF</button>
+            </div>
+          </div>
+
+          <div class="security-notice" id="managementReportAccessNotice">Inicia sesión como propietario de la organización para generar el informe de gestión.</div>
+          <div id="managementReportPanel" hidden>
+            <div class="report-context">
+              <div><span class="section-kicker">ORGANIZACIÓN</span><strong id="managementReportOrganization">—</strong></div>
+              <div><span class="section-kicker">GENERADO</span><strong id="managementReportGeneratedAt">—</strong></div>
+            </div>
+            <div class="dashboard-grid report-summary-grid">
+              <article class="stat-card"><span class="stat-card-header">Evaluaciones históricas</span><strong class="stat-value" id="reportEvaluationsTotal">0</strong><span class="stat-subtext">Evidencia persistida en la organización</span></article>
+              <article class="stat-card"><span class="stat-card-header">Período actual</span><strong class="stat-value" id="reportPeriodEvaluations">0</strong><span class="stat-subtext" id="reportPeriodLabel">—</span></article>
+              <article class="stat-card"><span class="stat-card-header">Conformidad</span><strong class="stat-value" id="reportConformanceRate">—</strong><span class="stat-subtext" id="reportStatusBreakdown">Sin dictámenes</span></article>
+              <article class="stat-card"><span class="stat-card-header">Cobertura autorizada</span><strong class="stat-value" id="reportAnalystCount">0 Analyst</strong><span class="stat-subtext" id="reportRepositoryCount">0 repositorios autorizados</span></article>
+              <article class="stat-card"><span class="stat-card-header">Plan vigente</span><strong class="stat-value" id="reportPlanName">—</strong><span class="stat-subtext" id="reportPlanPeriod">—</span></article>
+            </div>
+            <p class="report-disclaimer">El consumo de infraestructura y los cobros reales se muestran como no conectados mientras no exista integración con un proveedor de facturación.</p>
+            <div class="data-table-wrapper report-table"><h3>Resultados por control</h3><table class="data-table"><thead><tr><th>Control</th><th>Total</th><th>Conforme</th><th>No conforme</th><th>Sin evidencia</th></tr></thead><tbody id="reportControlsBody"></tbody></table></div>
+            <div class="data-table-wrapper report-table"><h3>Resultados por repositorio</h3><table class="data-table"><thead><tr><th>Repositorio</th><th>Evaluaciones</th><th>Conforme</th><th>No conforme</th><th>Sin evidencia</th></tr></thead><tbody id="reportRepositoriesBody"></tbody></table></div>
+            <div class="data-table-wrapper report-table"><h3>Últimas evaluaciones</h3><table class="data-table"><thead><tr><th>Fecha</th><th>Control</th><th>Repositorio / rama</th><th>Resultado</th><th>Solicitada por</th></tr></thead><tbody id="reportRecentBody"></tbody></table></div>
+          </div>
+        </section>
+
+        <!-- ================= VISTA 4: PLAN & SLA ================= -->
         <section class="view-panel" id="view-subscription">
           <div class="evaluator-hero" style="text-align: left; margin-bottom: 24px;">
             <h1>Plan de Suscripción & Acuerdos de Servicio (SLA)</h1>
@@ -808,6 +850,6 @@
   </div>
 
   <!-- Script Principal de la Aplicación -->
-  <script src="/static/js/app.js?v=20261117-analyst-password-ux"></script>
+  <script src="/static/js/app.js?v=20261118-management-report"></script>
 </body>
 </html>

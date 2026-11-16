@@ -27,6 +27,7 @@
     // Nunca exponer evidencia cacheada antes de validar una sesión.
     evalHistory: [],
     finops: null,
+    managementReport: null,
     enterpriseTrial: null,
     systemHealth: { status: 'checking', latencyMs: null },
     rules: [
@@ -67,6 +68,7 @@
     initEvaluator();
     initHistory();
     initDashboard();
+    initManagementReport();
     initSubscription();
     initEnterpriseTrial();
     initAdminConsole();
@@ -223,6 +225,7 @@
       item.addEventListener('click', () => {
         if (item.dataset.view === 'admin' && !isPlatformAdmin()) return;
         if (item.dataset.view === 'organization' && !isOrganizationOwner()) return;
+        if (item.dataset.view === 'management-report' && !isOrganizationOwner()) return;
         switchView(item.dataset.view, item.dataset.title);
       });
     });
@@ -252,7 +255,8 @@
   }
 
   function switchView(viewId, title) {
-    if ((viewId === 'admin' && !isPlatformAdmin()) || (viewId === 'organization' && !isOrganizationOwner())) {
+    if ((viewId === 'admin' && !isPlatformAdmin()) ||
+      ((viewId === 'organization' || viewId === 'management-report') && !isOrganizationOwner())) {
       viewId = 'evaluator';
       title = 'Evaluador de Controles';
     }
@@ -267,12 +271,14 @@
 
     const pageTitle = document.getElementById('pageTitleText');
     if (title && pageTitle) pageTitle.textContent = title;
+    if (viewId === 'management-report') loadManagementReport();
     if (window.innerWidth <= 768) document.getElementById('sidebar')?.classList.remove('mobile-open');
   }
 
   function updateAdminAccess() {
     const adminNav = document.querySelector('.nav-item[data-view="admin"]');
     const organizationNav = document.querySelector('.nav-item[data-view="organization"]');
+    const managementReportNav = document.querySelector('.nav-item[data-view="management-report"]');
     const finopsNav = document.querySelector('.nav-item[data-view="usage"]');
     const subscriptionNav = document.querySelector('.nav-item[data-view="subscription"]');
     const settingsNav = document.querySelector('.nav-item[data-view="settings"]');
@@ -285,6 +291,10 @@
     if (organizationNav) {
       organizationNav.hidden = !ownerAllowed;
       organizationNav.setAttribute('aria-hidden', String(!ownerAllowed));
+    }
+    if (managementReportNav) {
+      managementReportNav.hidden = !ownerAllowed;
+      managementReportNav.setAttribute('aria-hidden', String(!ownerAllowed));
     }
     if (finopsNav) {
       finopsNav.hidden = !ownerAllowed;
@@ -301,6 +311,7 @@
     }
     if (!allowed && state.activeTab === 'admin') switchView('evaluator', 'Evaluador de Controles');
     if (!ownerAllowed && state.activeTab === 'organization') switchView('evaluator', 'Evaluador de Controles');
+    if (!ownerAllowed && state.activeTab === 'management-report') switchView('evaluator', 'Evaluador de Controles');
   }
 
   // --- Comprobación de Salud de la API (/health) ---
@@ -1005,6 +1016,109 @@
     document.getElementById('budgetAlertEnabled').checked = Boolean(data.alert_enabled);
     document.getElementById('billingStatusBadge').textContent = 'SIN CONEXIÓN';
     document.getElementById('projectedChargeText').textContent = 'No disponible';
+  }
+
+  // --- Informe de gestión de la organización ---
+  function initManagementReport() {
+    document.getElementById('btnRefreshManagementReport')?.addEventListener('click', loadManagementReport);
+    document.getElementById('btnDownloadManagementReport')?.addEventListener('click', downloadManagementReport);
+    document.getElementById('btnPrintManagementReport')?.addEventListener('click', () => window.print());
+    updateManagementReportAccess();
+  }
+
+  function updateManagementReportAccess() {
+    const panel = document.getElementById('managementReportPanel');
+    const notice = document.getElementById('managementReportAccessNotice');
+    const allowed = isOrganizationOwner();
+    if (panel) panel.hidden = !allowed;
+    if (notice) {
+      notice.hidden = allowed;
+      notice.textContent = state.token
+        ? 'Sólo el propietario de la organización puede generar este informe.'
+        : 'Inicia sesión como propietario de la organización para generar el informe de gestión.';
+    }
+  }
+
+  async function loadManagementReport() {
+    updateManagementReportAccess();
+    if (!isOrganizationOwner()) return;
+    try {
+      const response = await fetch('/api/v1/management-report', {
+        headers: { 'Authorization': 'Bearer ' + state.token }
+      });
+      if (!response.ok) throw new Error(await getApiError(response, 'No se pudo generar el informe de gestión.'));
+      state.managementReport = await response.json();
+      renderManagementReport(state.managementReport);
+    } catch (error) {
+      const notice = document.getElementById('managementReportAccessNotice');
+      if (notice) {
+        notice.hidden = false;
+        notice.textContent = error.message;
+      }
+    }
+  }
+
+  function reportCell(value) {
+    return `<td>${escapeHTML(String(value ?? '—'))}</td>`;
+  }
+
+  function renderManagementReport(report) {
+    const summary = report.summary || {};
+    const subscription = report.subscription || {};
+    const period = report.period || {};
+    document.getElementById('managementReportOrganization').textContent = report.organization?.name || '—';
+    document.getElementById('managementReportGeneratedAt').textContent = report.generated_at
+      ? new Date(report.generated_at).toLocaleString('es-CL') : '—';
+    document.getElementById('reportEvaluationsTotal').textContent = String(summary.evaluations_all_time ?? 0);
+    document.getElementById('reportPeriodEvaluations').textContent = String(summary.evaluations_current_period ?? 0);
+    document.getElementById('reportPeriodLabel').textContent = period.label || 'Período actual';
+    document.getElementById('reportConformanceRate').textContent = summary.conformance_rate_pct == null
+      ? '—' : `${summary.conformance_rate_pct}%`;
+    document.getElementById('reportStatusBreakdown').textContent = `PASS ${summary.pass_count ?? 0} · FAIL ${summary.fail_count ?? 0} · UNKNOWN ${summary.unknown_count ?? 0}`;
+    document.getElementById('reportAnalystCount').textContent = `${summary.active_analysts ?? 0} Analyst activos`;
+    document.getElementById('reportRepositoryCount').textContent = `${summary.unique_authorized_repositories ?? 0} repositorios autorizados`;
+    document.getElementById('reportPlanName').textContent = subscription.plan_name || '—';
+    document.getElementById('reportPlanPeriod').textContent = subscription.expires_at
+      ? `Vigente hasta ${new Date(subscription.expires_at).toLocaleDateString('es-CL')}` : 'Sin período informado';
+
+    const controls = report.by_control || [];
+    const repositories = report.by_repository || [];
+    const recent = report.recent_evaluations || [];
+    document.getElementById('reportControlsBody').innerHTML = controls.length
+      ? controls.map(row => `<tr>${reportCell(row.control_id)}${reportCell(row.total)}${reportCell(row.pass)}${reportCell(row.fail)}${reportCell(row.unknown)}</tr>`).join('')
+      : '<tr><td colspan="5">Aún no hay evaluaciones para este informe.</td></tr>';
+    document.getElementById('reportRepositoriesBody').innerHTML = repositories.length
+      ? repositories.map(row => `<tr>${reportCell(row.repository)}${reportCell(row.total)}${reportCell(row.pass)}${reportCell(row.fail)}${reportCell(row.unknown)}</tr>`).join('')
+      : '<tr><td colspan="5">Aún no hay repositorios evaluados.</td></tr>';
+    document.getElementById('reportRecentBody').innerHTML = recent.length
+      ? recent.map(row => `<tr>${reportCell(new Date(row.evaluated_at).toLocaleString('es-CL'))}${reportCell(row.control_id)}${reportCell(`${row.repository} (${row.branch})`)}${reportCell(row.status)}${reportCell(row.requested_by)}</tr>`).join('')
+      : '<tr><td colspan="5">Aún no hay evaluaciones persistidas.</td></tr>';
+  }
+
+  function csvEscape(value) {
+    return `"${String(value ?? '').replaceAll('"', '""')}"`;
+  }
+
+  function downloadManagementReport() {
+    const report = state.managementReport;
+    if (!report) return;
+    const rows = [
+      ['Informe de gestión', report.organization?.name || ''],
+      ['Generado', report.generated_at || ''],
+      ['Período', report.period?.label || ''],
+      [],
+      ['Control', 'Total', 'PASS', 'FAIL', 'UNKNOWN'],
+      ...(report.by_control || []).map(row => [row.control_id, row.total, row.pass, row.fail, row.unknown]),
+      [],
+      ['Repositorio', 'Total', 'PASS', 'FAIL', 'UNKNOWN'],
+      ...(report.by_repository || []).map(row => [row.repository, row.total, row.pass, row.fail, row.unknown])
+    ];
+    const blob = new Blob(['\uFEFF' + rows.map(row => row.map(csvEscape).join(';')).join('\n')], { type: 'text/csv;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `securecode-informe-gestion-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
   }
 
   // --- Ciclo de suscripción administrado por el propietario de la organización ---
@@ -1961,6 +2075,7 @@
       loadSubscription();
       loadEnterpriseTrial();
       loadFinOps();
+      loadManagementReport();
     } catch {
       clearAuthenticatedSession();
     }
@@ -2058,6 +2173,7 @@
     state.evalHistory = [];
     state.adminUsers = [];
     state.finops = null;
+    state.managementReport = null;
     state.subscriptionData = null;
     state.enterpriseTrial = null;
     state.organizationMembers = [];
@@ -2075,6 +2191,7 @@
     updateSettingsAccess();
     updateSubscriptionAccess();
     updateFinOpsAccess();
+    updateManagementReportAccess();
     refreshOrganization();
     refreshAdminUsers();
   }
