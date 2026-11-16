@@ -8,7 +8,7 @@ a { color: inherit; }
 .public-header, .public-footer, main { width: min(1180px, calc(100% - 3rem)); margin-inline: auto; }
 .public-header { min-height: 78px; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .public-brand { display: inline-flex; align-items: center; gap: .65rem; color: var(--ink); text-decoration: none; font-weight: 800; letter-spacing: -.03em; }
-.public-mark { width: 2.15rem; height: 2.15rem; display: grid; place-items: center; color: white; background: var(--navy); border-radius: .68rem; box-shadow: 0 .4rem 1rem #102f3c22; }
+.public-mark { width: 2.15rem; height: 2.15rem; display: block; filter: drop-shadow(0 .4rem .75rem #102f3c22); }
 .public-nav { display: flex; align-items: center; gap: 1.35rem; }
 .public-nav a, .public-login, .public-footer a { text-decoration: none; font-size: .92rem; }
 .public-nav a { color: var(--muted); }

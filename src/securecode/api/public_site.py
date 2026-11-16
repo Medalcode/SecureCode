@@ -35,7 +35,7 @@ def _navigation(active_path: str) -> str:
     return (
         '<header class="public-header">'
         '<a class="public-brand" href="/" aria-label="SecureCode, inicio">'
-        '<span class="public-mark" aria-hidden="true">S</span><span>SecureCode</span></a>'
+        '<img class="public-mark" src="/static/public/securecode-mark.svg" alt=""><span>SecureCode</span></a>'
         '<nav class="public-nav" aria-label="Navegación principal">' + links + "</nav>"
         '<a class="public-login" href="/app">Abrir consola <span aria-hidden="true">→</span></a>'
         "</header>"
@@ -46,7 +46,7 @@ def _footer() -> str:
     legal_links = "".join('<a href="' + href + '">' + label + "</a>" for href, label in LEGAL_LINKS)
     return (
         '<footer class="public-footer"><div>'
-        '<a class="public-brand" href="/"><span class="public-mark" aria-hidden="true">S</span><span>SecureCode</span></a>'
+        '<a class="public-brand" href="/"><img class="public-mark" src="/static/public/securecode-mark.svg" alt=""><span>SecureCode</span></a>'
         "<p>Evaluación verificable de controles para repositorios de código.</p></div>"
         '<nav aria-label="Documentos legales">' + legal_links + "</nav>"
         '<p class="footer-note">Proyecto académico · ' + SITE_UPDATED_AT + "</p></footer>"
