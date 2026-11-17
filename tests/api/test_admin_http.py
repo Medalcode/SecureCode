@@ -58,6 +58,32 @@ def test_admin_user_crud_runs_through_http_contract(admin_client):
     assert duplicate.status_code == 409
 
 
+def test_admin_listing_normalizes_legacy_roles_without_failing(admin_client):
+    """Production data can contain labels from before ORG-001.
+
+    The administration page must still load while the database backfill is
+    completed; only explicit historic aliases may be translated.
+    """
+    client, headers = admin_client
+    session = app.dependency_overrides[get_db_session]()
+    legacy_auditor = User(
+        id=uuid4(),
+        username="legacy.auditor@example.com",
+        password_hash=hash_password("LegacyAuditorPassword#2026"),
+        active=True,
+        role="auditor",
+        created_at=datetime.now(timezone.utc),
+    )
+    session.add(legacy_auditor)
+    session.commit()
+
+    listing = client.get("/api/v1/admin/users", headers=headers)
+
+    assert listing.status_code == 200
+    legacy_entry = next(item for item in listing.json() if item["id"] == str(legacy_auditor.id))
+    assert legacy_entry["role"] == "analyst"
+
+
 def test_admin_user_crud_enforces_jwt_and_password_policy(admin_client):
     client, headers = admin_client
     assert client.get("/api/v1/admin/users").status_code == 401
