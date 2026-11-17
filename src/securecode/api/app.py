@@ -69,6 +69,7 @@ from securecode.domain.roles import (
     ANALYST,
     ORGANIZATION_OWNER,
     PLATFORM_ADMIN,
+    canonical_role,
     is_organization_owner,
     is_platform_admin,
 )
@@ -1257,7 +1258,7 @@ def get_current_user_profile(current_user: User = Depends(get_current_user)):
     return {
         "username": current_user.username,
         "active": current_user.active,
-        "role": getattr(current_user, "role", ANALYST),
+        "role": canonical_role(getattr(current_user, "role", ANALYST)),
     }
 
 
@@ -1561,7 +1562,7 @@ def _user_response(user: User) -> dict:
         "id": str(user.id),
         "username": user.username,
         "active": user.active,
-        "role": getattr(user, "role", ANALYST),
+        "role": canonical_role(getattr(user, "role", ANALYST)),
         "created_at": user.created_at,
         "updated_at": getattr(user, "updated_at", user.created_at),
         "last_login_at": getattr(user, "last_login_at", None),
