@@ -24,7 +24,7 @@ def test_console_shell_remains_available_at_app_route():
     assert "text/html" in response.headers.get("content-type", "")
     assert response.headers.get("cache-control") == "no-store, max-age=0"
     assert "/static/css/app.css?v=20261111-admin-navigation-gate" in response.text
-    assert "/static/js/app.js?v=20261118-management-report" in response.text
+    assert "/static/js/app.js?v=20261117-email-verification" in response.text
     assert "Enterprise Trial" in response.text
     assert "enterpriseTrialActivateForm" in response.text
     assert "SecureCode" in response.text
