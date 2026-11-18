@@ -23,6 +23,8 @@ def test_console_shell_remains_available_at_app_route():
     assert response.status_code == 200
     assert "text/html" in response.headers.get("content-type", "")
     assert response.headers.get("cache-control") == "no-store, max-age=0"
+    assert 'href="/" class="brand-badge"' in response.text
+    assert 'aria-label="Ir a la página de inicio de SecureCode"' in response.text
     assert "/static/css/app.css?v=20261111-admin-navigation-gate" in response.text
     assert "/static/js/app.js?v=20261118-management-report" in response.text
     assert "Enterprise Trial" in response.text
