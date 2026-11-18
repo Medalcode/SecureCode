@@ -806,6 +806,7 @@
 
         <div style="text-align: center;">
           <button type="button" class="chip-btn" id="btnShowRegistration">Crear cuenta de organización</button>
+          <button type="button" class="chip-btn" id="btnShowRecovery">Olvidé mi contraseña</button>
           <button type="button" class="chip-btn" id="btnCloseAuthModal">Cerrar</button>
         </div>
       </form>
@@ -817,6 +818,25 @@
         <p class="input-help">Debe incluir 12+ caracteres, mayúscula, minúscula, número y símbolo.</p>
         <button type="submit" class="btn-primary" style="width:100%; justify-content:center; margin-bottom:12px;">Crear organización</button>
         <div style="text-align:center;"><button type="button" class="chip-btn" id="btnShowLogin">Ya tengo cuenta</button><button type="button" class="chip-btn" id="btnCloseRegistrationModal">Cerrar</button></div>
+      </form>
+      <form id="recoveryForm" hidden novalidate>
+        <div class="input-group" style="margin-bottom: 14px;"><label for="recoveryUsername">Correo de la cuenta</label><input type="email" id="recoveryUsername" class="input-control" maxlength="100" autocomplete="email" required></div>
+        <p class="input-help">Si existe una cuenta activa para este correo, recibirás un enlace de recuperación.</p>
+        <button type="submit" class="btn-primary" style="width:100%; justify-content:center; margin-bottom:12px;">Enviar enlace de recuperación</button>
+        <div style="text-align:center;"><button type="button" class="chip-btn" id="btnShowLoginFromRecovery">Volver a iniciar sesión</button><button type="button" class="chip-btn" id="btnCloseRecoveryModal">Cerrar</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="publicPasswordResetModal" aria-hidden="true">
+    <div class="modal-card modal-card-compact" role="dialog" aria-modal="true" aria-labelledby="publicPasswordResetTitle">
+      <div class="modal-header"><img class="brand-icon" src="/static/public/securecode-mark.svg" alt="SecureCode" style="margin:0 auto 12px;width:40px;height:40px;"><h2 id="publicPasswordResetTitle">Crear nueva contraseña</h2><p>Elige una contraseña segura para volver a acceder a tu cuenta.</p></div>
+      <form id="publicPasswordResetForm" novalidate>
+        <div class="input-group" style="margin-bottom:14px;"><label for="publicResetPassword">Nueva contraseña</label><input type="password" id="publicResetPassword" class="input-control" autocomplete="new-password" minlength="12" required></div>
+        <div class="input-group" style="margin-bottom:14px;"><label for="publicResetPasswordConfirmation">Confirmar contraseña</label><input type="password" id="publicResetPasswordConfirmation" class="input-control" autocomplete="new-password" minlength="12" required></div>
+        <p class="input-help">12+ caracteres, mayúscula, minúscula, número y símbolo.</p>
+        <div class="admin-feedback" id="publicPasswordResetFeedback" role="status" aria-live="polite"></div>
+        <div class="modal-actions"><button type="button" class="chip-btn" id="btnCancelPublicPasswordReset">Cancelar</button><button type="submit" class="btn-primary">Actualizar contraseña</button></div>
       </form>
     </div>
   </div>
@@ -850,6 +870,6 @@
   </div>
 
   <!-- Script Principal de la Aplicación -->
-  <script src="/static/js/app.js?v=20261118-management-report"></script>
+  <script src="/static/js/app.js?v=20261117-email-verification"></script>
 </body>
 </html>

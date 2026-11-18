@@ -23,6 +23,7 @@
     selectedControl: 'GH-001',
     evaluationAbortController: null,
     passwordResetTarget: null,
+    publicRecoveryToken: null,
     adminUsers: [],
     // Nunca exponer evidencia cacheada antes de validar una sesión.
     evalHistory: [],
@@ -75,6 +76,7 @@
     initOrganizationConsole();
     initClientSettings();
     initAuthModal();
+    handleAccountActionLink();
     updateAdminAccess();
     syncAuthenticatedUser();
     checkSystemHealth();
@@ -1984,7 +1986,10 @@
     }
     document.getElementById('btnShowRegistration')?.addEventListener('click', showRegistrationForm);
     document.getElementById('btnShowLogin')?.addEventListener('click', showLoginForm);
+    document.getElementById('btnShowRecovery')?.addEventListener('click', showRecoveryForm);
+    document.getElementById('btnShowLoginFromRecovery')?.addEventListener('click', showLoginForm);
     document.getElementById('btnCloseRegistrationModal')?.addEventListener('click', closeAuthModal);
+    document.getElementById('btnCloseRecoveryModal')?.addEventListener('click', closeAuthModal);
 
     btnClearSession?.addEventListener('click', clearAuthenticatedSession);
     btnLogout?.addEventListener('click', clearAuthenticatedSession);
@@ -2043,10 +2048,30 @@
       try {
         const res = await fetch('/api/v1/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         if (!res.ok) throw new Error(await getApiError(res, 'No se pudo crear la organización.'));
+        const data = await res.json();
         registrationForm.reset(); showLoginForm();
-        showAuthSuccess('Organización creada. Ahora inicia sesión con la cuenta propietaria.');
+        showAuthSuccess(data.verification_required
+          ? 'Organización creada. Revisa tu correo y confirma la cuenta antes de iniciar sesión.'
+          : 'Organización creada. Ahora inicia sesión con la cuenta propietaria.');
       } catch (error) { showAuthError(error.message); }
     });
+
+    document.getElementById('recoveryForm')?.addEventListener('submit', async event => {
+      event.preventDefault();
+      removeAuthAlert();
+      const username = document.getElementById('recoveryUsername').value.trim();
+      try {
+        const res = await fetch('/api/v1/auth/password-recovery', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username })
+        });
+        if (!res.ok) throw new Error(await getApiError(res, 'No fue posible procesar la solicitud.'));
+        document.getElementById('recoveryForm').reset(); showLoginForm();
+        showAuthSuccess('Si existe una cuenta activa para ese correo, recibirás instrucciones para restablecer la contraseña.');
+      } catch (error) { showAuthError(error.message); }
+    });
+
+    document.getElementById('btnCancelPublicPasswordReset')?.addEventListener('click', closePublicPasswordReset);
+    document.getElementById('publicPasswordResetForm')?.addEventListener('submit', submitPublicPasswordReset);
 
     updateUserBadge();
   }
@@ -2095,7 +2120,9 @@
   }
 
   function showAuthError(message) {
-    const form = document.getElementById('loginForm');
+    const form = ['recoveryForm', 'registrationForm', 'loginForm']
+      .map((id) => document.getElementById(id))
+      .find((candidate) => candidate && !candidate.hidden);
     if (!form) return;
     removeAuthAlert();
     const alert = document.createElement('div');
@@ -2124,11 +2151,72 @@
     document.getElementById('registrationOrganizationName')?.focus();
   }
 
+  function showRecoveryForm() {
+    removeAuthAlert();
+    document.getElementById('loginForm').hidden = true;
+    document.getElementById('registrationForm').hidden = true;
+    document.getElementById('recoveryForm').hidden = false;
+    document.getElementById('authModalTitle').textContent = 'Recuperar contraseña';
+    document.getElementById('authAccountNote').textContent = 'Te enviaremos un enlace de un solo uso si existe una cuenta activa para el correo indicado.';
+    document.getElementById('recoveryUsername')?.focus();
+  }
+
   function showLoginForm() {
     document.getElementById('registrationForm').hidden = true;
+    document.getElementById('recoveryForm').hidden = true;
     document.getElementById('loginForm').hidden = false;
     document.getElementById('authModalTitle').textContent = 'Iniciar Sesión';
     document.getElementById('authAccountNote').textContent = 'Si tu organización aún no usa SecureCode, crea la cuenta propietaria. Los Analyst son creados por su propietario.';
+  }
+
+  async function handleAccountActionLink() {
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    const verificationToken = params.get('verify_email');
+    const recoveryToken = params.get('reset_password');
+    if (!verificationToken && !recoveryToken) return;
+    // Do not retain a one-time token in browser history, copied URLs or logs.
+    history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    if (verificationToken) {
+      try {
+        const res = await fetch('/api/v1/auth/email-verification/confirm', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: verificationToken })
+        });
+        if (!res.ok) throw new Error(await getApiError(res, 'No fue posible confirmar el correo.'));
+        openAuthModal();
+        showAuthSuccess('Correo confirmado. Ya puedes iniciar sesión.');
+      } catch (error) { openAuthModal(); showAuthError(error.message); }
+      return;
+    }
+    state.publicRecoveryToken = recoveryToken;
+    document.getElementById('publicPasswordResetModal')?.classList.add('active');
+    document.getElementById('publicResetPassword')?.focus();
+  }
+
+  function closePublicPasswordReset() {
+    state.publicRecoveryToken = null;
+    document.getElementById('publicPasswordResetForm')?.reset();
+    document.getElementById('publicPasswordResetFeedback').textContent = '';
+    document.getElementById('publicPasswordResetModal')?.classList.remove('active');
+  }
+
+  async function submitPublicPasswordReset(event) {
+    event.preventDefault();
+    const feedback = document.getElementById('publicPasswordResetFeedback');
+    const password = document.getElementById('publicResetPassword').value;
+    const confirmation = document.getElementById('publicResetPasswordConfirmation').value;
+    if (!state.publicRecoveryToken) { feedback.textContent = 'El enlace de recuperación ya no está disponible. Solicita uno nuevo.'; return; }
+    if (!Object.values(passwordRules(password)).every(Boolean) || password !== confirmation) {
+      feedback.textContent = 'Revisa la contraseña y su confirmación.'; return;
+    }
+    try {
+      const res = await fetch('/api/v1/auth/password-recovery/confirm', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: state.publicRecoveryToken, password, password_confirmation: confirmation })
+      });
+      if (!res.ok) throw new Error(await getApiError(res, 'No fue posible actualizar la contraseña.'));
+      closePublicPasswordReset(); openAuthModal();
+      showAuthSuccess('Contraseña actualizada. Ya puedes iniciar sesión.');
+    } catch (error) { feedback.textContent = error.message; }
   }
 
   function removeAuthAlert() {
