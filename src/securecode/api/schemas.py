@@ -65,6 +65,7 @@ class EvaluationResponse(BaseModel):
     evidence: EvidenceResponse
     collected_at: str
     evaluated_at: str
+    explanation: dict[str, object] | None = None
 
 class GH002EvaluationRequest(GitHubRepositoryRequest):
     pass
@@ -83,6 +84,7 @@ class GH002EvaluationResponse(BaseModel):
     evidence: GH002EvidenceResponse
     collected_at: str
     evaluated_at: str
+    explanation: dict[str, object] | None = None
 
 
 class GH003EvaluationRequest(GitHubBranchRequest):
@@ -104,3 +106,4 @@ class GH003EvaluationResponse(BaseModel):
     evidence: GH003EvidenceResponse
     collected_at: str
     evaluated_at: str
+    explanation: dict[str, object] | None = None

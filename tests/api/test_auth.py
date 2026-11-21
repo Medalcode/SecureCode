@@ -7,10 +7,13 @@ from uuid import uuid4
 from securecode.api.app import app
 from securecode.api.dependencies import get_db_session
 from securecode.adapters.postgres.models import User
-from securecode.api.security import hash_password, create_access_token
+from securecode.api.security import hash_password
+from tests.conftest import issue_access_token
 
 os.environ["JWT_SECRET_KEY"] = "test-secret-key-that-is-at-least-32-bytes-long"
 os.environ["JWT_ALGORITHM"] = "HS256"
+
+mock_sessions = []
 
 class DummyUser:
     def __init__(self, id, username, password_hash, active, role="analyst"):
@@ -49,16 +52,13 @@ def mock_session():
         def first(self):
             if not self.filters:
                 return None
-            
-            # Inspect the SQLAlchemy expression tree
+
             expr = self.filters[0]
             val = getattr(getattr(expr, "right", None), "value", None)
-            
-            # Fallback if it's an ID equality
-            if val is None:
-                # might be UUID comparison
-                val = getattr(getattr(expr, "right", None), "value", None)
-            
+
+            if self.model.__name__ == "UserSession":
+                return next((item for item in mock_sessions if item.jti == str(val) and item.revoked_at is None), None)
+
             if str(val) == "testuser":
                 return mock_user
             if str(val) == "inactiveuser":
@@ -73,8 +73,9 @@ def mock_session():
         def query(self, model):
             return MockQuery(model)
 
-        def add(self, _):
-            pass
+        def add(self, item):
+            if item.__class__.__name__ == "UserSession":
+                mock_sessions.append(item)
 
         def delete(self, _):
             pass
@@ -112,7 +113,7 @@ def test_login_normalizes_username_case_and_surrounding_whitespace():
     assert response.status_code == 200
 
 def test_current_user_profile_exposes_no_password_material():
-    token = create_access_token(str(mock_user_id))
+    token = issue_access_token(mock_session(), mock_user_id)
     response = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 200
@@ -166,9 +167,9 @@ def test_protected_endpoints_reject_invalid_or_unauthorized_token(route, payload
     if token_kind == "invalid":
         token = "invalid.jwt.token"
     elif token_kind == "inactive":
-        token = create_access_token(str(inactive_user_id))
+        token = issue_access_token(mock_session(), inactive_user_id)
     else:
-        token = create_access_token(str(uuid4()))
+        token = issue_access_token(mock_session(), uuid4())
 
     response = client.post(route, headers={"Authorization": f"Bearer {token}"}, json=payload)
     assert response.status_code == 401
