@@ -1,0 +1,1704 @@
+{
+  "and_precedence": "FAIL > UNKNOWN > PASS",
+  "case_count": 105,
+  "cases": [
+    {
+      "case_id": "GT-GH001-BENCH-066",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - multiple violations",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": 1
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - multiple violations"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-043",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals=0, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 0
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals=0, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-016",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals>2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 3
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals>2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-010",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals=2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 2
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals=2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-100",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing dismiss_stale",
+      "evidence": {
+        "dismiss_stale_reviews": null,
+        "required_review_approvals": 6
+      },
+      "expected_status": "UNKNOWN",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing dismiss_stale"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-059",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals>=2, dismiss=false",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": 5
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals>=2, dismiss=false"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-002",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals=2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 2
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals=2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-074",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing approvals",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": null
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing approvals"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-077",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing approvals",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": null
+      },
+      "expected_status": "UNKNOWN",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing approvals"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-083",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing approvals",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": null
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing approvals"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-081",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing approvals",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": null
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing approvals"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-084",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing approvals",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": null
+      },
+      "expected_status": "UNKNOWN",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing approvals"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-011",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals=2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 2
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals=2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-042",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals=0, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 0
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals=0, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-068",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - multiple violations",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": 0
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - multiple violations"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-067",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - multiple violations",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": 1
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - multiple violations"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-053",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals=1, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 1
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals=1, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-057",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals>=2, dismiss=false",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": 2
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals>=2, dismiss=false"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-034",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals>2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 6
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals>2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-031",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals>2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 3
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals>2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-069",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - multiple violations",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": 1
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - multiple violations"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-061",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals>=2, dismiss=false",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": 2
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals>=2, dismiss=false"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-073",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing approvals",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": null
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing approvals"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-027",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals>2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 6
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals>2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-060",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals>=2, dismiss=false",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": 4
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals>=2, dismiss=false"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-009",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals=2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 2
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals=2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-022",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals>2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 4
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals>2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-064",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals>=2, dismiss=false",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": 2
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals>=2, dismiss=false"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-033",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals>2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 4
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals>2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-085",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing approvals",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": null
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing approvals"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-038",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals=0, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 0
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals=0, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-045",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals=0, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 0
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals=0, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-079",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing approvals",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": null
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing approvals"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-098",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing dismiss_stale",
+      "evidence": {
+        "dismiss_stale_reviews": null,
+        "required_review_approvals": 6
+      },
+      "expected_status": "UNKNOWN",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing dismiss_stale"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-051",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals=1, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 1
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals=1, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-063",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals>=2, dismiss=false",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": 2
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals>=2, dismiss=false"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-046",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals=1, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 1
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals=1, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-050",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals=1, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 1
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals=1, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-048",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals=1, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 1
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals=1, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-104",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing both",
+      "evidence": {
+        "dismiss_stale_reviews": null,
+        "required_review_approvals": null
+      },
+      "expected_status": "UNKNOWN",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing both"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-056",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals>=2, dismiss=false",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": 4
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals>=2, dismiss=false"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-090",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing dismiss_stale",
+      "evidence": {
+        "dismiss_stale_reviews": null,
+        "required_review_approvals": 2
+      },
+      "expected_status": "UNKNOWN",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing dismiss_stale"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-013",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals=2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 2
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals=2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-037",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals=0, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 0
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals=0, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-024",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals>2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 6
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals>2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-040",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals=0, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 0
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals=0, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-041",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals=0, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 0
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals=0, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-019",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals>2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 3
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals>2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-080",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing approvals",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": null
+      },
+      "expected_status": "UNKNOWN",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing approvals"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-006",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals=2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 2
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals=2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-025",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals>2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 5
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals>2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-008",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals=2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 2
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals=2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-035",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals>2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 3
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals>2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-086",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing dismiss_stale",
+      "evidence": {
+        "dismiss_stale_reviews": null,
+        "required_review_approvals": 0
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing dismiss_stale"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-047",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals=1, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 1
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals=1, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-003",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals=2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 2
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals=2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-052",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals=1, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 1
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals=1, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-017",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals>2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 5
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals>2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-039",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals=0, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 0
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals=0, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-062",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals>=2, dismiss=false",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": 2
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals>=2, dismiss=false"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-105",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing both",
+      "evidence": {
+        "dismiss_stale_reviews": null,
+        "required_review_approvals": null
+      },
+      "expected_status": "UNKNOWN",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing both"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-023",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals>2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 3
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals>2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-007",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals=2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 2
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals=2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-049",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals=1, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 1
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals=1, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-088",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing dismiss_stale",
+      "evidence": {
+        "dismiss_stale_reviews": null,
+        "required_review_approvals": 1
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing dismiss_stale"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-096",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing dismiss_stale",
+      "evidence": {
+        "dismiss_stale_reviews": null,
+        "required_review_approvals": 5
+      },
+      "expected_status": "UNKNOWN",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing dismiss_stale"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-071",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing approvals",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": null
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing approvals"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-097",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing dismiss_stale",
+      "evidence": {
+        "dismiss_stale_reviews": null,
+        "required_review_approvals": 2
+      },
+      "expected_status": "UNKNOWN",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing dismiss_stale"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-020",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals>2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 4
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals>2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-075",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing approvals",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": null
+      },
+      "expected_status": "UNKNOWN",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing approvals"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-044",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals=0, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 0
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals=0, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-091",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing dismiss_stale",
+      "evidence": {
+        "dismiss_stale_reviews": null,
+        "required_review_approvals": 1
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing dismiss_stale"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-021",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals>2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 3
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals>2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-001",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals=2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 2
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals=2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-101",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing both",
+      "evidence": {
+        "dismiss_stale_reviews": null,
+        "required_review_approvals": null
+      },
+      "expected_status": "UNKNOWN",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing both"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-092",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing dismiss_stale",
+      "evidence": {
+        "dismiss_stale_reviews": null,
+        "required_review_approvals": 4
+      },
+      "expected_status": "UNKNOWN",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing dismiss_stale"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-058",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals>=2, dismiss=false",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": 4
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals>=2, dismiss=false"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-099",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing dismiss_stale",
+      "evidence": {
+        "dismiss_stale_reviews": null,
+        "required_review_approvals": 5
+      },
+      "expected_status": "UNKNOWN",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing dismiss_stale"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-054",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals=1, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 1
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals=1, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-094",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing dismiss_stale",
+      "evidence": {
+        "dismiss_stale_reviews": null,
+        "required_review_approvals": 3
+      },
+      "expected_status": "UNKNOWN",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing dismiss_stale"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-026",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals>2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 6
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals>2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-072",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing approvals",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": null
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing approvals"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-089",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing dismiss_stale",
+      "evidence": {
+        "dismiss_stale_reviews": null,
+        "required_review_approvals": 5
+      },
+      "expected_status": "UNKNOWN",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing dismiss_stale"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-078",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing approvals",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": null
+      },
+      "expected_status": "UNKNOWN",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing approvals"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-065",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals>=2, dismiss=false",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": 5
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals>=2, dismiss=false"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-030",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals>2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 3
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals>2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-028",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals>2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 6
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals>2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-093",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing dismiss_stale",
+      "evidence": {
+        "dismiss_stale_reviews": null,
+        "required_review_approvals": 1
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing dismiss_stale"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-103",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing both",
+      "evidence": {
+        "dismiss_stale_reviews": null,
+        "required_review_approvals": null
+      },
+      "expected_status": "UNKNOWN",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing both"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-005",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals=2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 2
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals=2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-055",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals=1, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 1
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals=1, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-076",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing approvals",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": null
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing approvals"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-012",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals=2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 2
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals=2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-070",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - multiple violations",
+      "evidence": {
+        "dismiss_stale_reviews": false,
+        "required_review_approvals": 0
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - multiple violations"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-087",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing dismiss_stale",
+      "evidence": {
+        "dismiss_stale_reviews": null,
+        "required_review_approvals": 5
+      },
+      "expected_status": "UNKNOWN",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing dismiss_stale"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-014",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals=2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 2
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals=2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-102",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing both",
+      "evidence": {
+        "dismiss_stale_reviews": null,
+        "required_review_approvals": null
+      },
+      "expected_status": "UNKNOWN",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing both"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-018",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals>2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 6
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals>2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-029",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals>2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 4
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals>2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-032",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals>2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 4
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals>2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-036",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for FAIL - approvals=0, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 0
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "FAIL - approvals=0, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-095",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing dismiss_stale",
+      "evidence": {
+        "dismiss_stale_reviews": null,
+        "required_review_approvals": 1
+      },
+      "expected_status": "FAIL",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing dismiss_stale"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-004",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals=2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 2
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals=2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-015",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for PASS - approvals=2, dismiss=true",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": 2
+      },
+      "expected_status": "PASS",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "PASS - approvals=2, dismiss=true"
+    },
+    {
+      "case_id": "GT-GH001-BENCH-082",
+      "case_type": "synthetic",
+      "control": "GH-001",
+      "control_id": "GH-001",
+      "dataset_version": "1.0",
+      "description": "Synthetic benchmark case for UNKNOWN - missing approvals",
+      "evidence": {
+        "dismiss_stale_reviews": true,
+        "required_review_approvals": null
+      },
+      "expected_status": "UNKNOWN",
+      "provenance": "independent-oracle",
+      "rationale": "Generated via independent Ground Truth oracle specification.",
+      "scenario_family": "UNKNOWN - missing approvals"
+    }
+  ],
+  "cases_canonical_sha256": "0cff674610318d745a9dd136ac7c979c7aa465355944b9efa95a4c680ae7edf8",
+  "changes_from_v1": 14,
+  "control": "GH-001",
+  "created_at": "2026-11-21",
+  "dataset_version": "2.0-proposed",
+  "schema_version": "2.0",
+  "semantics_contract": "docs/specs/EVALUATION-SEMANTICS.md",
+  "source_dataset": {
+    "dataset_version": "1.0",
+    "file_sha256": "8319425d25a1b251f680282495e22a11043093397cf36afcd88a77a1529d7947",
+    "path": "docs/benchmark/gh001/v1/gh001_benchmark_105_v1.snapshot.json"
+  },
+  "status": "PROPOSED_NOT_ADOPTED",
+  "status_distribution": {
+    "FAIL": 49,
+    "PASS": 35,
+    "UNKNOWN": 21
+  }
+}
