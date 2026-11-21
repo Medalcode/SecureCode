@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
-from uuid import uuid4
+from datetime import UTC, datetime
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,7 +10,8 @@ from sqlalchemy.pool import StaticPool
 from securecode.adapters.postgres.models import Base, User
 from securecode.api.app import app
 from securecode.api.dependencies import get_db_session
-from securecode.api.security import create_access_token, hash_password
+from securecode.api.security import hash_password
+from tests.conftest import issue_access_token
 
 
 @pytest.fixture
@@ -21,13 +22,13 @@ def admin_client(monkeypatch):
     session = sessionmaker(bind=engine)()
     admin = User(
         id=uuid4(), username="admin@example.com", password_hash=hash_password("AdminPassword#2026"),
-        active=True, role="platform_admin", created_at=datetime.now(timezone.utc),
+        active=True, role="platform_admin", created_at=datetime.now(UTC),
     )
     session.add(admin)
     session.commit()
     app.dependency_overrides[get_db_session] = lambda: session
     try:
-        yield TestClient(app), {"Authorization": f"Bearer {create_access_token(str(admin.id))}"}
+        yield TestClient(app), {"Authorization": f"Bearer {issue_access_token(session, admin.id)}"}
     finally:
         app.dependency_overrides.clear()
         session.close()
@@ -72,7 +73,7 @@ def test_admin_listing_normalizes_legacy_roles_without_failing(admin_client):
         password_hash=hash_password("LegacyAuditorPassword#2026"),
         active=True,
         role="auditor",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     session.add(legacy_auditor)
     session.commit()
@@ -111,6 +112,10 @@ def test_organization_owner_controls_customer_finops_subscription_and_repository
         "username": "owner.contract@example.com",
         "password": "OwnerPassword#2026",
         "password_confirmation": "OwnerPassword#2026",
+        "accepted_document_package_id": "SECURECODE-ONBOARDING",
+        "accepted_document_package_version": "2026-11-20.1",
+        "accepted_document_package_sha256": "0e5b8853f82fbe9109c516b945f16c63942f85686ebfcb01f9a6986e5d36bc7b",
+        "acceptance_confirmed": True,
     })
     assert registration.status_code == 201
     login = client.post("/api/v1/auth/token", data={
@@ -123,7 +128,8 @@ def test_organization_owner_controls_customer_finops_subscription_and_repository
     })
     assert analyst.status_code == 201
     analyst_id = analyst.json()["id"]
-    analyst_headers = {"Authorization": f"Bearer {create_access_token(analyst_id)}"}
+    session = app.dependency_overrides[get_db_session]()
+    analyst_headers = {"Authorization": f"Bearer {issue_access_token(session, UUID(analyst_id))}"}
 
     settings = client.patch("/api/v1/settings", headers=analyst_headers, json={
         "default_repository": "Medalcode/SecureCode-Ground-Truth",

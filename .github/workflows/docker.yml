@@ -30,6 +30,7 @@ jobs:
       - name: Spin up container for smoke verification
         run: |
           docker run -d --name securecode_smoke -p 8000:8000 \
+            -e APP_ENV=test \
             -e DATABASE_URL=sqlite:///./test.db \
             -e JWT_SECRET_KEY=test-secret-key-that-is-at-least-32-bytes-long \
             securecode:latest

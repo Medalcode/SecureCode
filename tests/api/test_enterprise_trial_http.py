@@ -13,7 +13,8 @@ from sqlalchemy.pool import StaticPool
 from securecode.adapters.postgres.models import Base, Organization, OrganizationMembership, User
 from securecode.api.app import app
 from securecode.api.dependencies import get_db_session
-from securecode.api.security import create_access_token, hash_password
+from securecode.api.security import hash_password
+from tests.conftest import issue_access_token
 from securecode.engine.evaluator import EvaluationStatus
 from securecode.models.gh001 import GH001Evidence
 from securecode.ports.evaluation_repository import PersistedEvaluation
@@ -38,7 +39,7 @@ def trial_client(monkeypatch):
     session.commit()
     app.dependency_overrides[get_db_session] = lambda: session
     try:
-        yield TestClient(app), {"Authorization": f"Bearer {create_access_token(str(user.id))}"}
+        yield TestClient(app), {"Authorization": f"Bearer {issue_access_token(session, user.id)}"}
     finally:
         app.dependency_overrides.clear()
         session.close()

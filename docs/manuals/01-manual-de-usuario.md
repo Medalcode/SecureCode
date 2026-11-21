@@ -25,7 +25,7 @@ Disponible sin iniciar sesión en:
 - Documentos informativos bajo `/legal/{document}` (con encabezado "DOCUMENTO INFORMATIVO" y fecha de última actualización):
   - `/legal/terminos` — Términos de servicio.
   - `/legal/privacidad` — Política de privacidad.
-  - `/legal/cookies` — Política de cookies (uso de almacenamiento local del navegador; sin analítica ni cookies de terceros).
+  - `/legal/cookies` — Política de cookies (cookie de sesión HttpOnly, cookie CSRF y preferencias locales; sin analítica ni cookies de terceros).
   - `/legal/eula` — Acuerdo de licencia de usuario final.
   - `/legal/contratacion` — Condiciones de contratación y reembolsos (no procesa pagos).
   - `/legal/sla` — Acuerdo de nivel de servicio (indicadores de referencia técnica, no compromiso comercial).
@@ -51,9 +51,9 @@ Comportamientos relevantes (verificados con pruebas):
 ### 3.2 Inicio de sesión
 
 - Formulario estándar de usuario y contraseña contra `/api/v1/auth/token`.
-- Al autenticarse, la consola guarda en el almacenamiento local del navegador únicamente: `securecode_token`, `securecode_user` y la preferencia `color-scheme`. **Nunca se guardan contraseñas.**
+- Al autenticarse, la consola guarda en el almacenamiento local del navegador únicamente: `securecode_user` y la preferencia `color-scheme`. La sesión viaja en una cookie HttpOnly y el token CSRF se mantiene en memoria; **nunca se guardan contraseñas ni JWT en `localStorage`**.
 - Tras 5 intentos fallidos (configurable) dentro de una ventana de 15 minutos (configurable), el acceso queda temporalmente bloqueado por límite de tasa.
-- El cierre de sesión elimina el estado autenticado y los datos de visualización asociados.
+- El cierre de sesión revoca la sesión en el servidor y elimina el estado autenticado y los datos de visualización asociados.
 
 ## 4. La consola (`/app`)
 

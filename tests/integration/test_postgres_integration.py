@@ -178,7 +178,8 @@ from unittest.mock import patch
 from securecode.api.app import app
 from securecode.api.dependencies import get_db_session
 from securecode.adapters.postgres.models import User
-from securecode.api.security import hash_password, create_access_token
+from securecode.api.security import hash_password
+from tests.conftest import issue_access_token
 
 def test_api_postgres_integration(engine, session, monkeypatch):
     # Ensure JWT secrets exist for this test
@@ -202,7 +203,7 @@ def test_api_postgres_integration(engine, session, monkeypatch):
     session.commit()
 
     # Generate JWT token
-    token = create_access_token(str(test_user.id))
+    token = issue_access_token(session, test_user.id)
     headers = {"Authorization": f"Bearer {token}"}
 
     # Override FastAPI dependency to use our Postgres test session

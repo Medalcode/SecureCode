@@ -25,7 +25,7 @@ Guion para la demostración presencial y el video de 12 a 15 minutos. Todos los 
 3. **Estado de producción**: el despliegue vigente (revisión `securecode-00046-94s`, 100 % del tráfico) incluye la vista "Informe de Gestión" (bundle `20261118-management-report`) y `/health` responde `ok`. Verificar `https://securecode-n43etfo4dq-uc.a.run.app/health` y el bundle al iniciar el ensayo.
 4. **Conectividad**: verificar acceso a GitHub desde la instancia (la evidencia se consulta vía API de GitHub; sin `GITHUB_TOKEN` aplican límites no autenticados).
 5. **Datos en pantalla**: decidir con antelación qué evaluaciones existentes se muestran (el historial y el informe exponen datos reales de la organización demo).
-6. **Navegador**: usar un perfil limpio (el token de sesión vive en `localStorage`; cerrar sesión al final limpia el estado autenticado).
+6. **Navegador**: usar un perfil limpio (la sesión vive en una cookie HttpOnly y el token CSRF se mantiene en memoria; cerrar sesión revoca la sesión en el servidor y elimina ambas cookies).
 
 ## 3. Guion cronometrado (12–15 minutos)
 

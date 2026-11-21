@@ -1,6 +1,5 @@
 import os
-import string
-import secrets
+
 os.environ["JWT_SECRET_KEY"] = "test-secret-key-that-is-at-least-32-bytes-long"
 """HTTP authorization contracts for the three explicit SecureCode roles."""
 
@@ -12,10 +11,16 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from securecode.adapters.postgres.models import Base, EvaluationRecord, EvidenceRecord, User
+from securecode.adapters.postgres.models import (
+    Base,
+    EvaluationRecord,
+    EvidenceRecord,
+    User,
+)
 from securecode.api.app import app
 from securecode.api.dependencies import get_db_session
-from securecode.api.security import create_access_token, hash_password
+from securecode.api.security import hash_password
+from tests.conftest import issue_access_token
 
 
 def _headers(client: TestClient, username: str, password: str) -> dict[str, str]:
@@ -41,23 +46,28 @@ def test_roles_enforce_platform_and_organization_boundaries(monkeypatch):
         first = client.post("/api/v1/auth/register", json={
             "organization_name": "Acme Security", "username": "owner@acme.test",
             "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+            "accepted_document_package_id": "SECURECODE-ONBOARDING", "accepted_document_package_version": "2026-11-20.1", "accepted_document_package_sha256": "0e5b8853f82fbe9109c516b945f16c63942f85686ebfcb01f9a6986e5d36bc7b", "acceptance_confirmed": True,
         })
         second = client.post("/api/v1/auth/register", json={
             "organization_name": "Beta Security", "username": "owner@beta.test",
             "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+            "accepted_document_package_id": "SECURECODE-ONBOARDING", "accepted_document_package_version": "2026-11-20.1", "accepted_document_package_sha256": "0e5b8853f82fbe9109c516b945f16c63942f85686ebfcb01f9a6986e5d36bc7b", "acceptance_confirmed": True,
         })
         assert first.status_code == second.status_code == 201
         assert client.post("/api/v1/auth/register", json={
             "organization_name": "Another Organization", "username": "owner@acme.test",
             "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+            "accepted_document_package_id": "SECURECODE-ONBOARDING", "accepted_document_package_version": "2026-11-20.1", "accepted_document_package_sha256": "0e5b8853f82fbe9109c516b945f16c63942f85686ebfcb01f9a6986e5d36bc7b", "acceptance_confirmed": True,
         }).status_code == 409
         assert client.post("/api/v1/auth/register", json={
             "organization_name": "Acme Security", "username": "another@acme.test",
             "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+            "accepted_document_package_id": "SECURECODE-ONBOARDING", "accepted_document_package_version": "2026-11-20.1", "accepted_document_package_sha256": "0e5b8853f82fbe9109c516b945f16c63942f85686ebfcb01f9a6986e5d36bc7b", "acceptance_confirmed": True,
         }).status_code == 409
         assert client.post("/api/v1/auth/register", json={
             "organization_name": "Injected Role", "username": "injected@example.test",
             "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+            "accepted_document_package_id": "SECURECODE-ONBOARDING", "accepted_document_package_version": "2026-11-20.1", "accepted_document_package_sha256": "0e5b8853f82fbe9109c516b945f16c63942f85686ebfcb01f9a6986e5d36bc7b", "acceptance_confirmed": True,
             "role": "platform_admin",
         }).status_code == 422
         assert client.post("/api/v1/auth/register", json={
@@ -85,7 +95,7 @@ def test_roles_enforce_platform_and_organization_boundaries(monkeypatch):
             "password": "RenewedPassword#2026",
         })
         assert reset.status_code == 200
-        _headers(client, "analyst@acme.test", "RenewedPassword#2026")
+        analyst_headers = _headers(client, "analyst@acme.test", "RenewedPassword#2026")
 
         cross_tenant = client.post("/api/v1/organization/repository-authorizations", headers=owner_b, json={
             "user_id": analyst.json()["id"], "repository": "Acme/Sensitive",
@@ -131,7 +141,7 @@ def test_roles_enforce_platform_and_organization_boundaries(monkeypatch):
         assert report["finops_preferences"]["billing_data_state"] == "not_connected"
         assert client.get("/api/v1/management-report", headers=analyst_headers).status_code == 403
 
-        platform_headers = {"Authorization": f"Bearer {create_access_token(str(platform_admin.id))}"}
+        platform_headers = {"Authorization": f"Bearer {issue_access_token(session, platform_admin.id)}"}
         assert client.get("/api/v1/admin/users", headers=platform_headers).status_code == 200
     finally:
         app.dependency_overrides.clear()
@@ -150,6 +160,7 @@ def test_pro_plan_rejects_a_fourth_active_analyst(monkeypatch):
         assert client.post("/api/v1/auth/register", json={
             "organization_name": "Seat Limited", "username": "owner@seats.test",
             "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+            "accepted_document_package_id": "SECURECODE-ONBOARDING", "accepted_document_package_version": "2026-11-20.1", "accepted_document_package_sha256": "0e5b8853f82fbe9109c516b945f16c63942f85686ebfcb01f9a6986e5d36bc7b", "acceptance_confirmed": True,
         }).status_code == 201
         owner_headers = _headers(client, "owner@seats.test", "OwnerPassword#2026")
         for number in range(1, 4):
@@ -187,6 +198,7 @@ def test_analyst_creation_with_owner_provided_password(monkeypatch):
         _ = client.post("/api/v1/auth/register", json={
             "organization_name": "PasswordTestOrg", "username": "owner@password.test",
             "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+            "accepted_document_package_id": "SECURECODE-ONBOARDING", "accepted_document_package_version": "2026-11-20.1", "accepted_document_package_sha256": "0e5b8853f82fbe9109c516b945f16c63942f85686ebfcb01f9a6986e5d36bc7b", "acceptance_confirmed": True,
         })
         owner_headers = _headers(client, "owner@password.test", "OwnerPassword#2026")
         analyst = client.post("/api/v1/organization/members", headers=owner_headers, json={
@@ -218,6 +230,7 @@ def test_analyst_creation_with_system_generated_temp_password(monkeypatch):
         _ = client.post("/api/v1/auth/register", json={
             "organization_name": "TempPwdOrg", "username": "owner@temp.test",
             "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+            "accepted_document_package_id": "SECURECODE-ONBOARDING", "accepted_document_package_version": "2026-11-20.1", "accepted_document_package_sha256": "0e5b8853f82fbe9109c516b945f16c63942f85686ebfcb01f9a6986e5d36bc7b", "acceptance_confirmed": True,
         })
         owner_headers = _headers(client, "owner@temp.test", "OwnerPassword#2026")
         analyst = client.post("/api/v1/organization/members", headers=owner_headers, json={
@@ -261,6 +274,7 @@ def test_analyst_password_reset_with_owner_provided_password(monkeypatch):
         _ = client.post("/api/v1/auth/register", json={
             "organization_name": "ResetPwdOrg", "username": "owner@reset.test",
             "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+            "accepted_document_package_id": "SECURECODE-ONBOARDING", "accepted_document_package_version": "2026-11-20.1", "accepted_document_package_sha256": "0e5b8853f82fbe9109c516b945f16c63942f85686ebfcb01f9a6986e5d36bc7b", "acceptance_confirmed": True,
         })
         owner_headers = _headers(client, "owner@reset.test", "OwnerPassword#2026")
         analyst_resp = client.post("/api/v1/organization/members", headers=owner_headers, json={
@@ -296,6 +310,7 @@ def test_analyst_password_reset_with_system_generated_temp_password(monkeypatch)
         _ = client.post("/api/v1/auth/register", json={
             "organization_name": "ResetTempOrg", "username": "owner@resettemp.test",
             "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+            "accepted_document_package_id": "SECURECODE-ONBOARDING", "accepted_document_package_version": "2026-11-20.1", "accepted_document_package_sha256": "0e5b8853f82fbe9109c516b945f16c63942f85686ebfcb01f9a6986e5d36bc7b", "acceptance_confirmed": True,
         })
         owner_headers = _headers(client, "owner@resettemp.test", "OwnerPassword#2026")
         analyst_resp = client.post("/api/v1/organization/members", headers=owner_headers, json={
@@ -344,6 +359,7 @@ def test_password_not_persisted_in_subsequent_reads(monkeypatch):
         _ = client.post("/api/v1/auth/register", json={
             "organization_name": "PersistOrg", "username": "owner@persist.test",
             "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+            "accepted_document_package_id": "SECURECODE-ONBOARDING", "accepted_document_package_version": "2026-11-20.1", "accepted_document_package_sha256": "0e5b8853f82fbe9109c516b945f16c63942f85686ebfcb01f9a6986e5d36bc7b", "acceptance_confirmed": True,
         })
         owner_headers = _headers(client, "owner@persist.test", "OwnerPassword#2026")
         # Create analyst with system-generated temp password
@@ -381,6 +397,7 @@ def test_analyst_creation_generate_temp_accepts_empty_password(monkeypatch):
         assert client.post("/api/v1/auth/register", json={
             "organization_name": "EmptyPwdOrg", "username": "owner@emptypwd.test",
             "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+            "accepted_document_package_id": "SECURECODE-ONBOARDING", "accepted_document_package_version": "2026-11-20.1", "accepted_document_package_sha256": "0e5b8853f82fbe9109c516b945f16c63942f85686ebfcb01f9a6986e5d36bc7b", "acceptance_confirmed": True,
         }).status_code == 201
         owner_headers = _headers(client, "owner@emptypwd.test", "OwnerPassword#2026")
         analyst = client.post("/api/v1/organization/members", headers=owner_headers, json={
@@ -410,6 +427,7 @@ def test_analyst_creation_generate_temp_accepts_whitespace_password(monkeypatch)
         assert client.post("/api/v1/auth/register", json={
             "organization_name": "BlankPwdOrg", "username": "owner@blankpwd.test",
             "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+            "accepted_document_package_id": "SECURECODE-ONBOARDING", "accepted_document_package_version": "2026-11-20.1", "accepted_document_package_sha256": "0e5b8853f82fbe9109c516b945f16c63942f85686ebfcb01f9a6986e5d36bc7b", "acceptance_confirmed": True,
         }).status_code == 201
         owner_headers = _headers(client, "owner@blankpwd.test", "OwnerPassword#2026")
         analyst = client.post("/api/v1/organization/members", headers=owner_headers, json={
@@ -437,6 +455,7 @@ def test_analyst_creation_rejects_explicit_password_with_generate_temp(monkeypat
         assert client.post("/api/v1/auth/register", json={
             "organization_name": "XorCreateOrg", "username": "owner@xorcreate.test",
             "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+            "accepted_document_package_id": "SECURECODE-ONBOARDING", "accepted_document_package_version": "2026-11-20.1", "accepted_document_package_sha256": "0e5b8853f82fbe9109c516b945f16c63942f85686ebfcb01f9a6986e5d36bc7b", "acceptance_confirmed": True,
         }).status_code == 201
         owner_headers = _headers(client, "owner@xorcreate.test", "OwnerPassword#2026")
         rejected = client.post("/api/v1/organization/members", headers=owner_headers, json={
@@ -463,6 +482,7 @@ def test_analyst_password_reset_generate_temp_accepts_empty_and_whitespace_passw
         assert client.post("/api/v1/auth/register", json={
             "organization_name": "BlankResetOrg", "username": "owner@blankreset.test",
             "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+            "accepted_document_package_id": "SECURECODE-ONBOARDING", "accepted_document_package_version": "2026-11-20.1", "accepted_document_package_sha256": "0e5b8853f82fbe9109c516b945f16c63942f85686ebfcb01f9a6986e5d36bc7b", "acceptance_confirmed": True,
         }).status_code == 201
         owner_headers = _headers(client, "owner@blankreset.test", "OwnerPassword#2026")
         created = client.post("/api/v1/organization/members", headers=owner_headers, json={
@@ -506,6 +526,7 @@ def test_analyst_password_reset_rejects_explicit_password_with_generate_temp(mon
         assert client.post("/api/v1/auth/register", json={
             "organization_name": "XorResetOrg", "username": "owner@xorreset.test",
             "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+            "accepted_document_package_id": "SECURECODE-ONBOARDING", "accepted_document_package_version": "2026-11-20.1", "accepted_document_package_sha256": "0e5b8853f82fbe9109c516b945f16c63942f85686ebfcb01f9a6986e5d36bc7b", "acceptance_confirmed": True,
         }).status_code == 201
         owner_headers = _headers(client, "owner@xorreset.test", "OwnerPassword#2026")
         created = client.post("/api/v1/organization/members", headers=owner_headers, json={
@@ -539,6 +560,7 @@ def test_analyst_password_reset_accepts_active_only_change(monkeypatch):
         assert client.post("/api/v1/auth/register", json={
             "organization_name": "ActiveOnlyOrg", "username": "owner@activeonly.test",
             "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+            "accepted_document_package_id": "SECURECODE-ONBOARDING", "accepted_document_package_version": "2026-11-20.1", "accepted_document_package_sha256": "0e5b8853f82fbe9109c516b945f16c63942f85686ebfcb01f9a6986e5d36bc7b", "acceptance_confirmed": True,
         }).status_code == 201
         owner_headers = _headers(client, "owner@activeonly.test", "OwnerPassword#2026")
         created = client.post("/api/v1/organization/members", headers=owner_headers, json={
@@ -582,6 +604,7 @@ def test_analyst_password_reset_without_usable_alternative_is_rejected(monkeypat
         assert client.post("/api/v1/auth/register", json={
             "organization_name": "NoChangeOrg", "username": "owner@nochange.test",
             "password": "OwnerPassword#2026", "password_confirmation": "OwnerPassword#2026",
+            "accepted_document_package_id": "SECURECODE-ONBOARDING", "accepted_document_package_version": "2026-11-20.1", "accepted_document_package_sha256": "0e5b8853f82fbe9109c516b945f16c63942f85686ebfcb01f9a6986e5d36bc7b", "acceptance_confirmed": True,
         }).status_code == 201
         owner_headers = _headers(client, "owner@nochange.test", "OwnerPassword#2026")
         created = client.post("/api/v1/organization/members", headers=owner_headers, json={
