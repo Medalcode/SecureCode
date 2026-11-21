@@ -7,13 +7,20 @@ __pycache__/
 .pytest_cache/
 .coverage
 .test-tmp-*/
+.test-*/
+.mypy_cache/
+.ruff_cache/
 
 # Virtual environments
 venv/
 .venv/
+.venv_sc/
+.venv_securecode/
 
 # Environment variables
 .env
+.env.*
+!.env.example
 
 # IDE
 .vscode/
@@ -28,6 +35,16 @@ Thumbs.db
 
 # Local artifacts
 artifacts/
+backups/
+*.backup
+*.backup.manifest.json
+backup-verification-*.json
+.kiro-role-tests/
+.kiro-test-results.txt
+final_test_results.txt
+output.txt
+pytest_output.txt
+pytest_result.txt
 
 # Local database and execution logs
 securecode.db
@@ -35,3 +52,9 @@ run_logs.txt
 
 local_demo.db
 *.db
+*.pem
+*.key
+*service-account*.json
+credentials*.json
+*.dump
+*.sql

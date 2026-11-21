@@ -40,6 +40,7 @@ COPY rules/ /app/rules/
 COPY alembic/ /app/alembic/
 COPY alembic.ini /app/
 COPY pyproject.toml /app/
+COPY docs/compliance/service_documents.manifest.json /app/docs/compliance/service_documents.manifest.json
 
 # Crear usuario sin privilegios por seguridad (NIST / OWASP)
 RUN useradd -m -u 10001 appuser && \
