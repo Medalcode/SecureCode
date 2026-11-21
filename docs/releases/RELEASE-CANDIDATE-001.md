@@ -1,6 +1,6 @@
 # RELEASE CANDIDATE 001 — Preparación de release
 
-**RELEASE PREPARADO — NO APROBADO PARA PUBLICACIÓN.**
+**RELEASE VERSIONADO LOCALMENTE — NO PUBLICADO.**
 
 ## 1. Datos de preparación
 
@@ -14,22 +14,23 @@
   - `df786a6 fix(admin): normalize legacy role labels in user listing`
   - `dd0d9b6 Merge pull request #22 from Medalcode/feat/management-report-manuals`
   - `6130cc5 feat: add management reporting and delivery manuals`
-- No se creó ninguna versión definitiva, tag, commit, push ni despliegue.
+- No se creó tag, push, PR ni despliegue.
+- Se crearon seis commits locales de código más un commit documental final de manifiesto.
 
 ## 2. Estado del árbol de trabajo
 
-- Modificados: 43.
-- Sin seguimiento y candidatos: 63, incluido este manifiesto.
+- Modificados: 0.
+- Sin seguimiento y candidatos: 0; los 106 candidatos originales quedaron versionados.
 - Eliminados: 0.
 - Conflictos: 0.
 - Cambios en el índice: 0.
-- Rama local sincronizada con `origin/fix/console-logo-landing` según el último estado local conocido.
-- No se ejecutaron `fetch`, `pull`, `push`, `add`, `commit`, `stash`, `reset`, `clean` ni cambios de rama.
+- Rama local adelantada respecto de `origin/fix/console-logo-landing`; no se ejecutaron `fetch`, `pull` ni `push`.
+- No se ejecutaron `stash`, `reset`, `clean`, cambios de rama ni operaciones destructivas.
 - Advertencias CRLF observadas en archivos de texto; no son errores de contenido.
 
 ## 3. Resumen ejecutivo
 
-El árbol contiene un conjunto amplio y coherente de cambios de producto, pruebas, documentación e infraestructura declarativa. La mayor parte del código necesario para el release está sin versionar, incluidas migraciones Alembic, módulos importados por la API, scripts operativos y documentos de cumplimiento.
+El árbol contiene un conjunto amplio y coherente de cambios de producto, pruebas, documentación e infraestructura declarativa. Los 106 candidatos originales quedaron versionados localmente, incluidas migraciones Alembic, módulos importados por la API, scripts operativos y documentos de cumplimiento.
 
 No se encontraron secretos reales ni datos personales reales en los archivos candidatos legibles. Existe un archivo `.env` local ignorado con material de credencial local y credenciales de prueba en workflows; ninguno debe publicarse.
 
@@ -338,9 +339,9 @@ No hay riesgos CRÍTICOS conocidos de secreto expuesto o pérdida de datos inmin
 - Si la aceptación documental falla: conservar evidencia, bloquear publicación y repetir verificación de integridad del manifiesto.
 - Nunca borrar datos de clientes ni bases externas como parte del rollback.
 
-## 19. Plan de commits propuesto
+## 19. Plan de commits ejecutado
 
-Se recomienda la alternativa B: varios commits por componentes. Un único commit de consolidación sería difícil de revisar con 106 rutas candidatas. Los comandos siguientes están preparados pero **no ejecutados**.
+Se aplicó la alternativa B: varios commits por componentes. Un único commit de consolidación habría sido difícil de revisar con 106 rutas candidatas. Los comandos siguientes se ejecutaron con rutas explícitas, sin `git add .` ni `git add -A`.
 
 ### Commit 1 — Higiene y empaquetado de release
 
@@ -378,6 +379,23 @@ git add -- scripts/backup_postgres.py scripts/postgres_backup_lib.py scripts/res
 git add -- .github/workflows/docker.yml .github/workflows/gh001-e2e.yml .github/workflows/postgresql-integration.yml .github/workflows/tests.yml README.md scripts/run_full_e2e.py docs/manuals/01-manual-de-usuario.md docs/manuals/02-manual-administracion-operacional.md docs/manuals/03-guia-demo.md docs/manuals/04-matriz-evidencia.md docs/manuals/README.md docs/specs/DEPLOY-003.md docs/specs/STAGE13-READINESS.md docs/specs/STAGING-001.md deploy/staging/cloud-run-service.yaml tests/api/test_admin_http.py tests/api/test_enterprise_trial_http.py tests/api/test_gh002_app.py tests/api/test_organization_roles_http.py tests/api/test_phase5_audit_regressions.py tests/integration/test_membership_uniqueness.py tests/integration/test_postgres_integration.py tests/integration/test_schema_drift.py tests/integration/test_service_acceptance_migration.py
 ```
 
+### Registro de ejecución de commits
+
+| Commit | SHA | Mensaje |
+|---|---|---|
+| 1 | `de7e9616bcd19a6422ce5372c47f35e5eebf5c57` | `chore(release): add packaging and release manifest guardrails` |
+| 2 | `20206ec16dc9098739f1e5592e56e910001dcdbd` | `feat(api): harden sessions csrf and observability` |
+| 3 | `28f9697fd05b076f7602b632c8697b646dd7ef5a` | `feat(compliance): publish public documents and reports` |
+| 4 | `8f7d6d8e7d9e0465fe27aa86c756090d7024ab12` | `feat(evaluator): add gh001 benchmark evidence` |
+| 5 | `bc3a363d18eda7d475663eb9f3369cd6ba10dab6` | `feat(ops): add backup restore and validation tooling` |
+| 6 | `4e6dceeea5f5774e3a81b60504a432cae71e75a7` | `ci: complete staging docs and regression coverage` |
+| 7 | Commit documental final | `docs(release): record local versioning evidence` |
+
+- HEAD de código: `4e6dceeea5f5774e3a81b60504a432cae71e75a7`.
+- Rango de commits de código: `51beb05..4e6dcee`.
+- Cada commit se preparó con `git add -- <rutas explícitas>`, `git diff --cached --stat` y control de secretos sobre el diff staged; no se publicaron valores sensibles.
+- El escaneo de alta confianza sobre `git diff 51beb05..HEAD` devolvió cero coincidencias para tokens GitHub, JWT, claves privadas, claves AWS y claves GCP.
+
 ## 20. Correcciones menores realizadas en Fase 14
 
 - `.gitignore`: exclusiones adicionales para temporales, salidas ad-hoc, cachés, entornos virtuales, claves, credenciales y dumps; `.env.example` queda permitido.
@@ -397,9 +415,25 @@ git add -- .github/workflows/docker.yml .github/workflows/gh001-e2e.yml .github/
 - Configuración de environment de staging requiere revisión de nombres canónicos.
 - Los 10 archivos marcados `REVISAR` requieren aprobación antes de publicación.
 
-## 22. Estado de aprobación y veredicto
+## 22. Validaciones finales posteriores a commits
 
-- Estado: **RELEASE PREPARADO — NO APROBADO PARA PUBLICACIÓN.**
-- Veredicto: **APTO CON OBSERVACIONES** para preparar commits.
-- No apto para push, tag, despliegue ni producción hasta completar los bloqueos anteriores.
-- No se ejecutaron commits, pushes, despliegues ni operaciones destructivas.
+- Estado Git final: árbol de trabajo limpio, índice limpio, 0 eliminados y 0 conflictos.
+- `pytest -q` sin PostgreSQL: **358 passed, 20 skipped**.
+- `pytest -q` con PostgreSQL aislado en `127.0.0.1:55434`: **378 passed**.
+- `mypy src`: **Success: no issues found in 31 source files**.
+- Ruff scoped de módulos nuevos y de soporte: **All checks passed!**
+- Ruff global `src tests scripts`: **220 errores preexistentes**, deuda conocida documentada.
+- Alembic: único head `d4e9f1a2b3c4`, historial lineal de 17 revisiones.
+- Instalación limpia: migraciones aplicadas hasta `d4e9f1a2b3c4`, 18 tablas y `audit_details` como JSONB.
+- Verificación de respaldo/restauración: `status=ok`, 2 organizaciones sintéticas, 17 tablas y 18 foreign keys verificadas; SHA del respaldo `4e781a94e33db6cd077eb830eb7df5f173d4839ba28074c382632def4bd0ca5d`.
+- E2E de navegador: **OK**, con logout, CSRF y sin JWT expuesto en localStorage.
+- `git diff --check 51beb05..HEAD`: sin errores, sólo advertencias CRLF.
+- Escaneo de secretos: cero coincidencias de alta confianza en cada diff staged y en el rango completo `51beb05..HEAD`.
+- No se ejecutaron `fetch`, `pull`, `push`, creación de PR, tags ni despliegues.
+
+## 23. Estado de aprobación y veredicto
+
+- Estado: **RELEASE VERSIONADO LOCALMENTE — NO PUBLICADO.**
+- Veredicto: **APTO CON OBSERVACIONES** para preparar un pull request desde el historial local.
+- No apto para push, PR remoto, tag, despliegue ni producción hasta completar los bloqueos anteriores.
+- Los seis commits de código y el commit documental final existen sólo en la rama local.
