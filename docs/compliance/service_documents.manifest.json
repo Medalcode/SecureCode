@@ -1,0 +1,23 @@
+{
+  "created_at": "2026-11-21",
+  "documents": [
+    {
+      "document_id": "SERVICE_TERMS",
+      "path": "/legal/terminos",
+      "sha256": "d778d2f568e92ffd8c8272658270da5792330bc430c77cd4120b2a6f73f34632",
+      "title": "Términos de servicio",
+      "version": "2026-11-20.1"
+    },
+    {
+      "document_id": "TECHNICAL_SCOPE",
+      "path": "/alcance",
+      "sha256": "ab9ff212c8576f8acc7416193dd0452193554726a18d8f30cc8129a1a96fe1fd",
+      "title": "Alcance técnico y exclusiones",
+      "version": "2026-11-20.1"
+    }
+  ],
+  "manifest_version": "1.0",
+  "package_id": "SECURECODE-ONBOARDING",
+  "sha256": "0e5b8853f82fbe9109c516b945f16c63942f85686ebfcb01f9a6986e5d36bc7b",
+  "version": "2026-11-20.1"
+}
