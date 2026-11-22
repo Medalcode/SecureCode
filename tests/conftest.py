@@ -35,6 +35,7 @@ def clean_api_state(monkeypatch):
     monkeypatch.setenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60")
     monkeypatch.setenv("LOGIN_MAX_FAILURES", "5")
     monkeypatch.setenv("LOGIN_WINDOW_SECONDS", "900")
+    monkeypatch.setenv("EMAIL_VERIFICATION_REQUIRED", "false")
     app.dependency_overrides.pop(get_db_session, None)
     yield
     app.dependency_overrides.clear()

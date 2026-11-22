@@ -1,4 +1,5 @@
-﻿import hashlib
+import hashlib
+import html
 import ipaddress
 import json
 import logging
@@ -9,6 +10,7 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Any, TypedDict
+from urllib.parse import quote
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -22,6 +24,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from securecode.adapters.postgres.models import (
+    AccountActionToken,
     EnterpriseTrialRepository,
     EnterpriseTrialUsage,
     EvaluationRecord,
@@ -50,6 +53,7 @@ from securecode.api.dependencies import (
     require_platform_admin,
     require_same_origin,
 )
+from securecode.api.email_delivery import EmailDeliveryError, send_resend_email
 from securecode.api.public_site import LEGAL_CONTENT, public_page
 from securecode.api.schemas import (
     EvaluationResponse,
@@ -311,6 +315,20 @@ class OrganizationRegistrationRequest(BaseModel):
 class OrganizationRegistrationResponse(CurrentUserResponse):
     organization_id: str
     organization_name: str
+    verification_required: bool = False
+
+
+class EmailTokenRequest(BaseModel):
+    token: str = Field(min_length=32, max_length=512)
+
+
+class PasswordRecoveryRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=100)
+
+
+class PasswordRecoveryConfirmRequest(EmailTokenRequest):
+    password: str = Field(min_length=12, max_length=128)
+    password_confirmation: str = Field(min_length=12, max_length=128)
 
 
 class ServiceDocumentSummary(BaseModel):
@@ -698,6 +716,102 @@ def _validate_password_strength(password: str) -> None:
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="La contraseña debe tener 12+ caracteres, mayúscula, minúscula, número y símbolo",
         )
+
+
+_EMAIL_VERIFICATION = "email_verification"
+_PASSWORD_RECOVERY = "password_recovery"
+
+
+def _email_verification_required() -> bool:
+    """Enable verification explicitly, so existing development installs keep working."""
+    return os.environ.get("EMAIL_VERIFICATION_REQUIRED", "false").strip().lower() == "true"
+
+
+def _public_app_url() -> str:
+    """Return the public origin used in one-time email links."""
+    value = os.environ.get("PUBLIC_APP_URL", "").strip().rstrip("/")
+    if not value:
+        raise EmailDeliveryError("PUBLIC_APP_URL is not configured")
+    if not re.fullmatch(r"https?://[^/]+(?:/[^?#]*)?", value):
+        raise EmailDeliveryError("PUBLIC_APP_URL is invalid")
+    if value.startswith("http://") and not re.fullmatch(r"http://(localhost|127\.0\.0\.1)(?::\d+)?", value):
+        raise EmailDeliveryError("PUBLIC_APP_URL must use HTTPS outside local development")
+    return value
+
+
+def _action_token_ttl_minutes(purpose: str) -> int:
+    name = "EMAIL_VERIFICATION_TTL_MINUTES" if purpose == _EMAIL_VERIFICATION else "PASSWORD_RECOVERY_TTL_MINUTES"
+    default = 1_440 if purpose == _EMAIL_VERIFICATION else 30
+    return _bounded_int_from_environment(name, default, 10, 1_440)
+
+
+def _issue_account_action_token(session: Session, user: User, purpose: str) -> str:
+    """Create a hashed, single-use token and invalidate earlier unused tokens."""
+    now = datetime.now(UTC)
+    session.query(AccountActionToken).filter(
+        AccountActionToken.user_id == user.id,
+        AccountActionToken.purpose == purpose,
+        AccountActionToken.used_at.is_(None),
+    ).update({AccountActionToken.used_at: now}, synchronize_session=False)
+    plaintext = secrets.token_urlsafe(32)
+    session.add(AccountActionToken(
+        id=uuid4(),
+        user_id=user.id,
+        purpose=purpose,
+        token_hash=hashlib.sha256(plaintext.encode("utf-8")).hexdigest(),
+        expires_at=now + timedelta(minutes=_action_token_ttl_minutes(purpose)),
+        used_at=None,
+        created_at=now,
+    ))
+    return plaintext
+
+
+def _consume_account_action_token(session: Session, token: str, purpose: str) -> User:
+    digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    record = session.query(AccountActionToken).filter(
+        AccountActionToken.token_hash == digest,
+        AccountActionToken.purpose == purpose,
+    ).first()
+    now = datetime.now(UTC)
+    if record is None or record.used_at is not None or _as_utc(record.expires_at) <= now:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El enlace es inválido, expiró o ya fue utilizado")
+    user = session.query(User).filter(User.id == record.user_id).first()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El enlace es inválido, expiró o ya fue utilizado")
+    record.used_at = now
+    return user
+
+
+def _send_account_action_email(*, user: User, purpose: str, token: str) -> None:
+    """Render and deliver a minimal account-action email without logging its token."""
+    fragment = "verify_email" if purpose == _EMAIL_VERIFICATION else "reset_password"
+    action_url = f"{_public_app_url()}/app#{fragment}={quote(token, safe='')}"
+    safe_user = html.escape(user.username)
+    if purpose == _EMAIL_VERIFICATION:
+        subject = "Confirma tu correo electrónico de SecureCode"
+        heading = "Confirma tu correo electrónico"
+        copy = "Activa tu cuenta de SecureCode confirmando que controlas este correo."
+        action = "Confirmar correo"
+    else:
+        subject = "Restablece tu contraseña de SecureCode"
+        heading = "Restablece tu contraseña"
+        copy = "Solicitaste restablecer la contraseña de tu cuenta SecureCode."
+        action = "Restablecer contraseña"
+    expires = _action_token_ttl_minutes(purpose)
+    html_body = (
+        f"<h2>{heading}</h2><p>Hola, {safe_user}.</p><p>{copy}</p>"
+        f"<p><a href=\"{html.escape(action_url, quote=True)}\">{action}</a></p>"
+        f"<p>Este enlace expira en {expires} minutos y solo puede usarse una vez.</p>"
+        "<p>Si no solicitaste esta acción, ignora este mensaje.</p>"
+    )
+    text_body = f"{heading}\n\n{copy}\n\n{action_url}\n\nEste enlace expira en {expires} minutos y solo puede usarse una vez."
+    send_resend_email(
+        to=user.username,
+        subject=subject,
+        html=html_body,
+        text=text_body,
+        idempotency_key=f"securecode-{purpose}-{hashlib.sha256(token.encode()).hexdigest()}",
+    )
 
 
 def _normalise_requested_password(raw: str | None) -> str | None:
@@ -1313,9 +1427,11 @@ def register_organization_owner(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Organization name already exists")
 
     now = datetime.now(UTC)
+    verification_required = _email_verification_required()
     owner = User(
-        id=uuid4(), username=username, password_hash=hash_password(request.password), active=True,
-        role=ORGANIZATION_OWNER, created_at=now, updated_at=now,
+        id=uuid4(), username=username, password_hash=hash_password(request.password),
+        active=not verification_required, role=ORGANIZATION_OWNER, created_at=now,
+        updated_at=now, email_verified_at=None if verification_required else now,
     )
     organization = Organization(id=uuid4(), name=organization_name, created_at=now)
     membership = OrganizationMembership(
@@ -1345,6 +1461,7 @@ def register_organization_owner(
         session.add_all((owner, organization))
         session.flush()
         session.add_all((membership, *acceptances))
+        verification_token = _issue_account_action_token(session, owner, _EMAIL_VERIFICATION) if verification_required else None
         _record_user_audit(session, owner.id, owner.id, "organization_registered", {
             "organization_id": str(organization.id), "organization_name": organization.name,
             "role": ORGANIZATION_OWNER,
@@ -1375,9 +1492,20 @@ def register_organization_owner(
                 type(error).__name__,
             )
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No se pudo crear la organización") from error
+    if verification_required:
+        assert verification_token is not None
+        try:
+            _send_account_action_email(user=owner, purpose=_EMAIL_VERIFICATION, token=verification_token)
+        except EmailDeliveryError:
+            logger.warning("Verification email could not be delivered for a newly registered account")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="La cuenta fue creada, pero no se pudo enviar el correo de confirmación. Solicita un nuevo enlace.",
+            )
     return {
         "username": owner.username, "active": owner.active, "role": owner.role,
         "organization_id": str(organization.id), "organization_name": organization.name,
+        "verification_required": verification_required,
     }
 
 
@@ -1410,6 +1538,66 @@ def list_service_document_acceptances(
         }
         for record in records
     ]
+
+
+@app.post("/api/v1/auth/email-verification/resend", status_code=status.HTTP_202_ACCEPTED)
+def resend_email_verification(request: PasswordRecoveryRequest, session: Session = Depends(get_db_session)):
+    """Reissue a verification link without revealing whether an account exists."""
+    username = _normalise_username(request.username)
+    user = session.query(User).filter(User.username == username).first()
+    if user is not None and user.email_verified_at is None:
+        token = _issue_account_action_token(session, user, _EMAIL_VERIFICATION)
+        try:
+            session.commit()
+            _send_account_action_email(user=user, purpose=_EMAIL_VERIFICATION, token=token)
+        except (SQLAlchemyError, EmailDeliveryError):
+            session.rollback()
+            logger.warning("Verification email resend failed")
+    return {"message": "Si la cuenta requiere confirmación, recibirás un correo con instrucciones."}
+
+
+@app.post("/api/v1/auth/email-verification/confirm")
+def confirm_email_verification(request: EmailTokenRequest, session: Session = Depends(get_db_session)):
+    user = _consume_account_action_token(session, request.token, _EMAIL_VERIFICATION)
+    now = datetime.now(UTC)
+    user.email_verified_at = now
+    user.active = True
+    user.updated_at = now
+    _record_user_audit(session, user.id, user.id, "email_verified", {})
+    session.commit()
+    return {"message": "Correo confirmado. Ya puedes iniciar sesión."}
+
+
+@app.post("/api/v1/auth/password-recovery", status_code=status.HTTP_202_ACCEPTED)
+def request_password_recovery(request: PasswordRecoveryRequest, session: Session = Depends(get_db_session)):
+    """Request a recovery link with a generic response to prevent enumeration."""
+    username = _normalise_username(request.username)
+    user = session.query(User).filter(User.username == username).first()
+    if user is not None and user.active and user.email_verified_at is not None:
+        token = _issue_account_action_token(session, user, _PASSWORD_RECOVERY)
+        try:
+            session.commit()
+            _send_account_action_email(user=user, purpose=_PASSWORD_RECOVERY, token=token)
+        except (SQLAlchemyError, EmailDeliveryError):
+            session.rollback()
+            logger.warning("Password recovery email request failed")
+    return {"message": "Si existe una cuenta activa para este correo, recibirás instrucciones para restablecer la contraseña."}
+
+
+@app.post("/api/v1/auth/password-recovery/confirm")
+def confirm_password_recovery(request: PasswordRecoveryConfirmRequest, session: Session = Depends(get_db_session)):
+    if request.password != request.password_confirmation:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Las contraseñas no coinciden")
+    password = _normalise_requested_password(request.password)
+    if password is None:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="La contraseña es obligatoria")
+    _validate_password_strength(password)
+    user = _consume_account_action_token(session, request.token, _PASSWORD_RECOVERY)
+    user.password_hash = hash_password(password)
+    user.updated_at = datetime.now(UTC)
+    _record_user_audit(session, user.id, user.id, "password_recovered", {})
+    session.commit()
+    return {"message": "Contraseña actualizada. Ya puedes iniciar sesión."}
 
 
 @app.get("/api/v1/organization/members", response_model=list[OrganizationMemberResponse])

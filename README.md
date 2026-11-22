@@ -172,7 +172,8 @@ El detalle de políticas, RPO/RTO propuestos, responsabilidades, incidentes y au
 ### Lista de verificación antes de producción
 
 - Definir `APP_ENV=production`, `CORS_ORIGINS` con los dominios HTTPS exactos y `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` según la política de sesión.
-- Inyectar `DATABASE_URL`, `JWT_SECRET_KEY`, `GITHUB_TOKEN` y las credenciales del usuario inicial exclusivamente desde Secret Manager.
+- Inyectar `DATABASE_URL`, `JWT_SECRET_KEY`, `GITHUB_TOKEN`, `RESEND_API_KEY` y las credenciales del usuario inicial exclusivamente desde Secret Manager.
+- Para confirmar correos y recuperar contraseñas, verificar primero el remitente en Resend y definir `RESEND_FROM_EMAIL`, `PUBLIC_APP_URL` (URL HTTPS pública) y `EMAIL_VERIFICATION_REQUIRED=true`. Los enlaces son de un solo uso; la verificación vence en 24 horas y la recuperación en 30 minutos por defecto.
 - Ejecutar `python scripts/validate_environment.py` con la configuración de la revisión candidata; la API también lo ejecuta en el arranque.
 - Ejecutar `alembic upgrade head` como Job antes de transferir tráfico y confirmar `alembic check` sin deriva.
 - Crear el usuario inicial con una contraseña única y conservar sólo el hash Argon2id; no existe acceso de demostración en producción.
@@ -217,8 +218,8 @@ gcloud run deploy securecode \
   --platform managed \
   --region us-central1 \
   --allow-unauthenticated \
-  --set-env-vars "APP_ENV=production,PORT=8000,LOG_LEVEL=INFO,JWT_ALGORITHM=HS256,CORS_ORIGINS=https://securecode.example.com,LOGIN_MAX_FAILURES=5,LOGIN_WINDOW_SECONDS=900,TRUST_PROXY_HEADERS=true" \
-  --set-secrets "DATABASE_URL=securecode-db-url:latest,JWT_SECRET_KEY=securecode-jwt-secret:latest,GITHUB_TOKEN=securecode-github-token:latest" \
+  --set-env-vars "APP_ENV=production,PORT=8000,LOG_LEVEL=INFO,JWT_ALGORITHM=HS256,CORS_ORIGINS=https://securecode.example.com,LOGIN_MAX_FAILURES=5,LOGIN_WINDOW_SECONDS=900,TRUST_PROXY_HEADERS=true,EMAIL_VERIFICATION_REQUIRED=true,PUBLIC_APP_URL=https://<TU_URL_PUBLICA>,RESEND_FROM_EMAIL=SecureCode <no-reply@<TU_DOMINIO_VERIFICADO>>" \
+  --set-secrets "DATABASE_URL=securecode-db-url:latest,JWT_SECRET_KEY=securecode-jwt-secret:latest,GITHUB_TOKEN=securecode-github-token:latest,RESEND_API_KEY=securecode-resend-api-key:latest" \
   --no-traffic \
   --tag candidate
 ```

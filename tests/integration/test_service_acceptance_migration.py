@@ -19,7 +19,7 @@ def test_service_acceptance_migration_upgrades_and_downgrades_on_sqlite(tmp_path
     Base.metadata.create_all(engine, tables=tables)
     engine.dispose()
 
-    command.stamp(config, "c1a4d9e7f205")
+    command.stamp(config, "e7b1c4d2a809")
     command.upgrade(config, "head")
 
     engine = create_engine(url)
@@ -47,7 +47,7 @@ def test_service_acceptance_migration_upgrades_and_downgrades_on_sqlite(tmp_path
     assert "ix_service_document_acceptances_user_accepted_at" in indexes
     engine.dispose()
 
-    command.downgrade(config, "c1a4d9e7f205")
+    command.downgrade(config, "e7b1c4d2a809")
     engine = create_engine(url)
     assert "service_document_acceptances" not in inspect(engine).get_table_names()
     engine.dispose()

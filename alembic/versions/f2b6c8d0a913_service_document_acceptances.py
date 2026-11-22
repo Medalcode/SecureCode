@@ -1,7 +1,7 @@
 """add append-only service document acceptances
 
 Revision ID: f2b6c8d0a913
-Revises: c1a4d9e7f205
+Revises: e7b1c4d2a809
 """
 
 from collections.abc import Sequence
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "f2b6c8d0a913"
-down_revision: str | Sequence[str] | None = "c1a4d9e7f205"
+down_revision: str | Sequence[str] | None = "e7b1c4d2a809"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
