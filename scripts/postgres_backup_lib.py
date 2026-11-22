@@ -230,6 +230,55 @@ def resolve_tool(name: str, bin_dir: str | None = None) -> Path:
     raise RuntimeError(f"Required PostgreSQL tool not found: {name}")
 
 
+def resolve_compatible_tool(
+    name: str,
+    *,
+    server_major: int | None = None,
+    bin_dir: str | None = None,
+) -> Path:
+    explicit = resolve_tool(name, bin_dir)
+    if server_major is None:
+        return explicit
+
+    def major_for(candidate: Path) -> int:
+        return tool_major(tool_version(candidate))
+
+    try:
+        explicit_major = major_for(explicit)
+    except (OSError, RuntimeError, ValueError):
+        explicit_major = -1
+    if explicit_major == server_major:
+        return explicit
+
+    versioned = shutil.which(f"{name}{server_major}")
+    if versioned:
+        candidate = Path(versioned)
+        try:
+            if major_for(candidate) == server_major:
+                return candidate
+        except (OSError, RuntimeError, ValueError):
+            candidate = None
+
+    common_bins = (
+        Path(f"/usr/lib/postgresql/{server_major}/bin"),
+        Path(f"/usr/pgsql-{server_major}/bin"),
+        Path(f"C:/Program Files/PostgreSQL/{server_major}/bin"),
+    )
+    for directory in common_bins:
+        for candidate in (directory / name, directory / f"{name}.exe"):
+            if not candidate.is_file():
+                continue
+            try:
+                if major_for(candidate) == server_major:
+                    return candidate
+            except (OSError, RuntimeError, ValueError):
+                continue
+
+    raise RuntimeError(
+        f"Compatible PostgreSQL tool not found for {name}: server major {server_major}, resolved {explicit}"
+    )
+
+
 def run_command(command: list[str], environment: Mapping[str, str], secrets_to_hide: Iterable[str]) -> str:
     result = subprocess.run(
         command,
@@ -502,11 +551,11 @@ def create_backup(
     assert_loopback_host(parsed.host)
     assert_database_allowed(parsed.database, [allowed_database])
 
-    dump_tool = resolve_tool("pg_dump", pg_bin_dir)
-    dump_version = tool_version(dump_tool)
     info = server_version(parsed)
-    if tool_major(dump_version) < int(info["major"]):
-        raise RuntimeError("pg_dump is older than the PostgreSQL server and is not compatible")
+    dump_tool = resolve_compatible_tool("pg_dump", server_major=int(info["major"]), bin_dir=pg_bin_dir)
+    dump_version = tool_version(dump_tool)
+    if tool_major(dump_version) != int(info["major"]):
+        raise RuntimeError("pg_dump major version must match the PostgreSQL server major version")
     head = alembic_head(parsed)
     fingerprints = table_fingerprints(parsed)
     integrity = referential_integrity(parsed)
@@ -555,7 +604,7 @@ def create_backup(
         "format": "pg_custom",
         "size_bytes": size,
         "sha256": checksum,
-        "tools": {"pg_dump": dump_version},
+        "tools": {"pg_dump": dump_version, "pg_dump_major": tool_major(dump_version)},
         "table_fingerprints": fingerprints,
         "referential_integrity": integrity,
     }
@@ -641,11 +690,11 @@ def restore_backup(
     if database.lower() == server.database.lower():
         raise BackupSecurityError("Restore target must be different from the maintenance database")
 
-    restore_tool = resolve_tool("pg_restore", pg_bin_dir)
-    restore_version = tool_version(restore_tool)
     expected_major = int(manifest["source"]["server_version_num"]) // 10000
-    if tool_major(restore_version) < expected_major:
-        raise RuntimeError("pg_restore is older than the backup server and is not compatible")
+    restore_tool = resolve_compatible_tool("pg_restore", server_major=expected_major, bin_dir=pg_bin_dir)
+    restore_version = tool_version(restore_tool)
+    if tool_major(restore_version) != expected_major:
+        raise RuntimeError("pg_restore major version must match the backup server major version")
 
     target_url = sqlalchemy_url(server, database=database)
     target = parse_database_url(target_url)

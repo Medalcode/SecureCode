@@ -5,7 +5,7 @@ Artefacto propuesto, no adoptado oficialmente. El dataset canónico externo perm
 - Fecha: 2026-11-21
 - Casos: 105
 - SHA-256 de v1: `8319425d25a1b251f680282495e22a11043093397cf36afcd88a77a1529d7947`
-- SHA-256 del archivo v2 propuesto: `0276a1428e2d29c66fdfbaeb3a5923136149320d96954e234861d964aad0b96a`
+- SHA-256 del archivo v2 propuesto: `1a8a3db4b597195096499c9d2f51e6d4df82260f400c8d9d9b585cdcccc5e278`
 - SHA-256 canónico de casos v2: `0cff674610318d745a9dd136ac7c979c7aa465355944b9efa95a4c680ae7edf8`
 - Distribución v1: PASS=35, FAIL=35, UNKNOWN=35
 - Distribución v2: PASS=35, FAIL=49, UNKNOWN=21
