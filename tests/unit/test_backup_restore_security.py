@@ -36,7 +36,7 @@ def make_manifest(tmp_path: Path, backup_path: Path, **overrides) -> dict:
         "schema": MANIFEST_SCHEMA,
         "created_at": "2026-01-01T00:00:00+00:00",
         "environment": "test",
-        "source": {"database": "securecode_backup_source_x", "alembic_head": "d4e9f1a2b3c4"},
+        "source": {"database": "securecode_backup_source_x", "alembic_head": "ab12cd34ef56"},
         "backup_file": backup_path.name,
         "format": "pg_custom",
         "size_bytes": backup_path.stat().st_size,
@@ -167,7 +167,7 @@ def test_verify_manifest_accepts_valid_synthetic_artifact(tmp_path: Path):
     )
     verified = verify_manifest(manifest, backup_path)
     assert verified["schema"] == MANIFEST_SCHEMA
-    assert verified["alembic_head"] == "d4e9f1a2b3c4"
+    assert verified["alembic_head"] == "ab12cd34ef56"
     assert verified["size_bytes"] == backup_path.stat().st_size
 
 

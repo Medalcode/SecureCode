@@ -79,7 +79,7 @@ def test_backup_restore_end_to_end_isolation(backup_verification):
     assert payload["seeded"]["acceptances"] == 4
     assert payload["seeded"]["sessions"] == 2
     assert payload["source_table_counts"] == payload["restored_table_counts"]
-    assert payload["backup"]["alembic_head"] == "d4e9f1a2b3c4"
+    assert payload["backup"]["alembic_head"] == "ab12cd34ef56"
     assert payload["restore"]["tables_verified"] == 17
     assert payload["restore"]["foreign_keys_verified"] > 0
 

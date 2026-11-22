@@ -42,7 +42,7 @@ from securecode.adapters.postgres.models import (
 from securecode.api.security import hash_password
 from securecode.api.service_documents import current_onboarding_package
 
-EXPECTED_HEAD = "d4e9f1a2b3c4"
+EXPECTED_HEAD = "ab12cd34ef56"
 FIXTURE_NAMES = ("SecureCode Backup Fixture Org A", "SecureCode Backup Fixture Org B")
 
 
