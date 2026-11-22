@@ -10,6 +10,10 @@ Conjunto de manuales de la entrega ES3 del proyecto SecureCode. La documentació
 | [02-manual-administracion-operacional.md](02-manual-administracion-operacional.md) | Operación del servicio: variables de entorno, seguridad, límites, gestión de cuentas, datos no conectados y procedimientos operacionales. | Equipo de operación y Administrador TI |
 | [03-guia-demo.md](03-guia-demo.md) | Guion de demostración presencial y de video (12–15 minutos), con checklist de preparación y campos de contexto académico a completar. | Integrantes del equipo que presentan |
 | [04-matriz-evidencia.md](04-matriz-evidencia.md) | Matriz de evidencia y trazabilidad: validaciones locales, auditorías de producción, mapeo funcionalidad → fuente → prueba → estado. | Profesor evaluador y equipo |
+| [05-respaldos-y-recuperacion.md](05-respaldos-y-recuperacion.md) | Política propuesta, respaldo portable, restauración aislada, verificación sintética, incidentes y automatización no activada. | Equipo de operación y DBA |
+| [06-observabilidad.md](06-observabilidad.md) | Logs JSON, request ID, métricas por proceso, health checks, propuesta de alertas y FinOps de telemetría. | Equipo de operación, DBA y soporte |
+| [STAGING-001.md](../specs/STAGING-001.md) | Arquitectura staging propuesta, plantilla Cloud Run, matriz de alertas, pipeline de release, FinOps y runbook de rollback. | DevSecOps, SRE y DBA |
+| [STAGE13-READINESS.md](../specs/STAGE13-READINESS.md) | Informe final de preparación: Git, build, PostgreSQL, E2E, benchmarks, seguridad, matriz de readiness y veredicto. | Dirección, QA, DevSecOps y revisión contractual |
 
 ## Alcance y convenciones
 
@@ -24,12 +28,12 @@ Conjunto de manuales de la entrega ES3 del proyecto SecureCode. La documentació
 
 | Ámbito | Estado |
 |---|---|
-| Suite de pruebas local (unitarias + API + SQLite) | Validada: 233 aprobadas / 13 omitidas (marcadas `postgres`, requieren base PostgreSQL/Supabase) |
+| Suite de pruebas local (unitarias + API + SQLite) | Validada: 358 aprobadas / 20 omitidas (marcadas `postgres`, requieren base PostgreSQL); con PostgreSQL aislado: 378 aprobadas |
 | Análisis estático (`mypy`, `compileall`, `node --check`, `git diff --check`) | Validado |
 | Auditoría funcional en producción (API) | Validada en esta entrega: 10 verificaciones PASS / 0 FAIL (ver matriz 04) |
 | Auditoría del flujo de restablecimiento de contraseña en producción | Validada en esta entrega: 19/19 pasos PASS |
 | Funcionalidad "Informe de Gestión" | Validada en producción: desplegada en la revisión `securecode-00046-94s` (100 % del tráfico), bundle `20261118-management-report` y `/health` = `ok`. Acceso restringido al rol `Organization Owner` |
-| Operación de infraestructura (despliegue, respaldos, monitoreo) | Despliegue verificado: revisión activa `securecode-00046-94s` con 100 % del tráfico y `/health` = `ok`. Respaldos, monitoreo externo y pipeline de despliegue **pendientes de validación** |
+| Operación de infraestructura (despliegue, respaldos, monitoreo) | Despliegue verificado: revisión activa `securecode-00046-94s` con 100 % del tráfico y `/health` = `ok`. Respaldo y restauración validados en PostgreSQL aislado con datos sintéticos; observabilidad local implementada y probada en el árbol de trabajo. Programación cloud, cobertura real de Supabase, pipeline de despliegue, métricas globales y alertas externas **pendientes de validación** |
 
 ## Hallazgos para revisión del equipo
 
@@ -50,4 +54,4 @@ Incoherencias y pendientes detectados durante la elaboración de estos manuales.
 - Auditorías ejecutadas en esta entrega contra `https://securecode-n43etfo4dq-uc.a.run.app` (detalle en `04-matriz-evidencia.md`).
 - Verificación de despliegue: revisión activa de Cloud Run `securecode-00046-94s` con 100 % del tráfico, HTML de `/app` conteniendo el bundle `20261118-management-report` y `GET /health` = `ok`.
 
-La documentación existente en `docs/` no fue modificada.
+Los manuales se actualizan cuando cambia el estado verificable del sistema; este índice refleja la versión vigente del árbol de trabajo.

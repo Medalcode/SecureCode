@@ -2,7 +2,7 @@ import os
 import sys
 import json
 import platform
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import fastapi
@@ -10,14 +10,14 @@ import sqlalchemy
 from fastapi.testclient import TestClient
 
 from securecode.api.app import app
-from securecode.adapters.postgres.models import EvaluationRecord, EvidenceRecord, Base, User
+from securecode.adapters.postgres.models import EvaluationRecord, EvidenceRecord, Base, User, UserSession
 from securecode.api.dependencies import get_db_session
-from securecode.api.security import hash_password, create_access_token
+from securecode.api.security import hash_password, create_access_token, get_jwt_expire_minutes
 
 def main():
-    token = os.environ.get("VALIDATION_GITHUB_TOKEN")
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("VALIDATION_GITHUB_TOKEN")
     if not token:
-        print("Error: VALIDATION_GITHUB_TOKEN is missing.")
+        print("Error: GITHUB_TOKEN is missing.")
         sys.exit(1)
         
     db_url = os.environ.get("DATABASE_URL")
@@ -54,14 +54,21 @@ def main():
                 username="e2e-runner",
                 password_hash=hash_password("e2e-runner-password-123"),
                 active=True,
-                created_at=datetime.now(timezone.utc)
+                created_at=datetime.now(UTC)
             )
             db_session.add(user)
             db_session.commit()
             db_session.refresh(user)
         user_id = user.id
-
-    access_token = create_access_token(str(user_id))
+        jti = str(uuid4())
+        now = datetime.now(UTC)
+        db_session.add(UserSession(
+            id=uuid4(), user_id=user.id, jti=jti, created_at=now,
+            expires_at=now + timedelta(minutes=get_jwt_expire_minutes()),
+            last_seen_at=now, revoked_at=None, revoked_reason=None,
+        ))
+        db_session.commit()
+        access_token = create_access_token(str(user.id), jti=jti)
     auth_headers = {"Authorization": f"Bearer {access_token}"}
     client = TestClient(app)
     
@@ -162,7 +169,7 @@ def main():
 
     artifact = {
         "validation_type": "gh001_full_real_e2e",
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "timestamp_utc": datetime.now(UTC).isoformat(),
         "securecode_commit": securecode_commit,
         "ground_truth_commit": "main", # Cannot easily extract remote sha securely here
         "python_version": platform.python_version(),

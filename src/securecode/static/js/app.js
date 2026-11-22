@@ -7,9 +7,18 @@
 (() => {
   'use strict';
 
+  function readCsrfCookie() {
+    const prefix = 'securecode_csrf=';
+    for (const part of document.cookie.split(';')) {
+      const item = part.trim();
+      if (item.startsWith(prefix)) return decodeURIComponent(item.slice(prefix.length));
+    }
+    return null;
+  }
+
   // --- Estado de la Aplicación ---
   const state = {
-    token: localStorage.getItem('securecode_token') || null,
+    csrfToken: readCsrfCookie(),
     user: JSON.parse(localStorage.getItem('securecode_user') || 'null') || {
       username: 'Iniciar sesión',
       role: 'Acceso seguro requerido',
@@ -61,6 +70,34 @@
       }
     ]
   };
+
+  async function revokeServerSession() {
+    try {
+      const headers = new Headers();
+      if (state.csrfToken) headers.set('X-CSRF-Token', state.csrfToken);
+      await fetch('/api/v1/auth/logout', {
+        method: 'POST',
+        headers,
+        credentials: 'same-origin'
+      });
+    } catch {
+      console.warn('No fue posible revocar la sesión en el servidor.');
+    }
+  }
+
+  async function authFetch(url, options = {}) {
+    const headers = new Headers(options.headers || {});
+    headers.delete('Authorization');
+    const method = (options.method || 'GET').toUpperCase();
+    if (state.csrfToken && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+      headers.set('X-CSRF-Token', state.csrfToken);
+    }
+    const response = await fetch(url, { ...options, headers, credentials: 'same-origin' });
+    if (response.status === 401 && state.csrfToken) {
+      clearLocalSession();
+    }
+    return response;
+  }
 
   // --- Inicialización al Cargar el DOM ---
   document.addEventListener('DOMContentLoaded', () => {
@@ -141,16 +178,16 @@
   function updateSettingsAccess() {
     const panel = document.getElementById('clientSettingsPanel');
     const notice = document.getElementById('settingsAccessNotice');
-    const authenticated = Boolean(state.token && state.accessRole);
+    const authenticated = Boolean(state.csrfToken && state.accessRole);
     if (panel) panel.hidden = !authenticated;
     if (notice) notice.hidden = authenticated;
   }
 
   async function loadClientSettings() {
     updateSettingsAccess();
-    if (!state.token) return;
+    if (!state.csrfToken) return;
     try {
-      const res = await fetch('/api/v1/settings', { headers: { 'Authorization': 'Bearer ' + state.token } });
+      const res = await authFetch('/api/v1/settings', { headers: {} });
       if (!res.ok) throw new Error('No se pudieron recuperar las preferencias');
       applyClientSettings(await res.json());
     } catch {
@@ -201,9 +238,9 @@
     if (button) button.disabled = true;
     if (feedback) feedback.textContent = 'Guardando preferencias…';
     try {
-      const res = await fetch('/api/v1/settings', {
+      const res = await authFetch('/api/v1/settings', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + state.token },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error(await getApiError(res, 'No se pudieron guardar las preferencias.'));
@@ -249,11 +286,11 @@
   }
 
   function isPlatformAdmin() {
-    return Boolean(state.token && state.accessRole === 'platform_admin');
+    return Boolean(state.csrfToken && state.accessRole === 'platform_admin');
   }
 
   function isOrganizationOwner() {
-    return Boolean(state.token && state.accessRole === 'organization_owner');
+    return Boolean(state.csrfToken && state.accessRole === 'organization_owner');
   }
 
   function switchView(viewId, title) {
@@ -306,7 +343,7 @@
       subscriptionNav.hidden = !ownerAllowed;
       subscriptionNav.setAttribute('aria-hidden', String(!ownerAllowed));
     }
-    const authenticated = Boolean(state.token && state.accessRole);
+    const authenticated = Boolean(state.csrfToken && state.accessRole);
     if (settingsNav) {
       settingsNav.hidden = !authenticated;
       settingsNav.setAttribute('aria-hidden', String(!authenticated));
@@ -377,7 +414,7 @@
     // Un visitante debe poder solicitar autenticación incluso si aún no ha
     // completado los campos required del formulario.
     btnSubmit?.addEventListener('click', (event) => {
-      if (state.token) return;
+      if (state.csrfToken) return;
       event.preventDefault();
       setEvaluatorFeedback('Inicia sesión para ejecutar una evaluación y guardar su evidencia.', 'neutral');
       openAuthModal();
@@ -389,7 +426,7 @@
 
       // La interfaz debe detener al visitante antes de solicitar una
       // evaluación. El servidor conserva su propio 401 como defensa final.
-      if (!state.token) {
+      if (!state.csrfToken) {
         setEvaluatorFeedback('Inicia sesión para ejecutar una evaluación y guardar su evidencia.', 'neutral');
         openAuthModal();
         return;
@@ -586,8 +623,7 @@
       'Accept': 'application/json'
     };
 
-    if (state.token) {
-      headers['Authorization'] = `Bearer ${state.token}`;
+    if (state.csrfToken) {
       if (state.enterpriseTrial?.status === 'active') {
         headers['Idempotency-Key'] = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
           ? crypto.randomUUID()
@@ -595,7 +631,7 @@
       }
     }
 
-    const res = await fetch(endpoint, {
+    const res = await authFetch(endpoint, {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
@@ -637,8 +673,9 @@
     const bannerIcon = document.getElementById('resultBannerIcon');
     const bannerTitle = document.getElementById('resultBannerTitle');
     const bannerBadge = document.getElementById('resultBannerBadge');
-
-    const status = data.status; // 'PASS', 'FAIL', 'UNKNOWN'
+    const explanation = data.explanation || {};
+    const reason = explanation.summary?.reason;
+    const status = data.status;
 
     banner.className = `result-banner ${status.toLowerCase()}`;
 
@@ -646,20 +683,19 @@
       bannerIcon.textContent = '✓';
       bannerTitle.textContent = 'PASS — Control Conforme';
       bannerBadge.textContent = 'CONFORME';
-      renderAction('Sin acción correctiva requerida. La configuración actual satisface todos los criterios de la regla canónica.');
+      renderAction(reason || 'La configuración actual satisface todos los criterios de la regla canónica.');
     } else if (status === 'FAIL') {
       bannerIcon.textContent = '✗';
       bannerTitle.textContent = 'FAIL — Control No Conforme';
       bannerBadge.textContent = 'NO CONFORME';
-      renderAction('Ajuste la configuración de protección en el repositorio de GitHub y vuelva a evaluar para cumplir la política.');
+      renderAction(reason || 'Ajuste la configuración de protección en el repositorio de GitHub y vuelva a evaluar.');
     } else {
       bannerIcon.textContent = '?';
       bannerTitle.textContent = 'UNKNOWN — Evidencia Insuficiente';
       bannerBadge.textContent = 'DESCONOCIDO';
-      renderAction('La evidencia técnica no está disponible o es ambigua (permisos insuficientes o rama no observable). No interpretarlo como incumplimiento.');
+      renderAction(reason || 'La evidencia técnica no está disponible o es ambigua. No interpretarlo como incumplimiento.');
     }
 
-    // Detalles generales
     document.getElementById('resControlId').textContent = data.control_id;
     document.getElementById('resRuleVersion').textContent = data.rule
       ? `${data.rule.id} · v${data.rule.version}`
@@ -669,8 +705,16 @@
     document.getElementById('resEvaluationId').textContent = data.evaluation_id;
     document.getElementById('resultHashText').textContent = data.evidence.hash;
     renderVerificationBreakdown(data);
+    renderExplanation(data);
 
-    // JSON Payload
+    const pdfButton = document.getElementById('btnDownloadEvaluationPdf');
+    if (pdfButton) {
+      pdfButton.hidden = !state.csrfToken || !data.evaluation_id;
+      pdfButton.disabled = false;
+      pdfButton.textContent = 'Descargar informe PDF';
+      pdfButton.dataset.evaluationId = data.evaluation_id || '';
+    }
+
     document.getElementById('jsonPayloadBody').textContent = JSON.stringify(data, null, 2);
 
     container.classList.add('active');
@@ -731,6 +775,107 @@
     }
   }
 
+  function formatExplanationValue(value) {
+    if (value === null || value === undefined || value === '') return 'No disponible';
+    if (typeof value === 'boolean') return value ? 'Sí' : 'No';
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+  }
+
+  function renderExplanation(data) {
+    const panel = document.getElementById('explanationPanel');
+    if (!panel) return;
+    const explanation = data.explanation;
+    if (!explanation) {
+      panel.hidden = true;
+      return;
+    }
+    panel.hidden = false;
+
+    const summary = explanation.summary || {};
+    const reconstruction = explanation.reconstruction || {};
+    const warnings = Array.isArray(reconstruction.warnings) ? reconstruction.warnings : [];
+    const explanationText = [summary.reason, summary.note, ...warnings].filter(Boolean).join(' ');
+    document.getElementById('explanationStatus').textContent = summary.status || data.status || 'UNKNOWN';
+    document.getElementById('explanationSummary').textContent = explanationText || 'No se pudo construir la explicación del dictamen.';
+
+    const conditions = Array.isArray(explanation.conditions) ? explanation.conditions : [];
+    const conditionsEl = document.getElementById('explanationConditions');
+    if (conditions.length) {
+      conditionsEl.innerHTML = conditions.map(condition => `
+        <article class="explanation-condition ${escapeHTML(String(condition.status || 'unknown').toLowerCase())}">
+          <span class="explanation-condition-status">${escapeHTML(condition.status || 'UNKNOWN')}</span>
+          <div>
+            <strong>${escapeHTML(condition.label || condition.field || 'Condición')}</strong>
+            <p>${escapeHTML(condition.explanation || '')}</p>
+            <p class="explanation-condition-values">Política: ${escapeHTML(condition.expected_display || formatExplanationValue(condition.expected))} <span aria-hidden="true">·</span> Encontrado: ${escapeHTML(condition.observed_display || formatExplanationValue(condition.observed))}</p>
+          </div>
+        </article>`).join('');
+    } else {
+      conditionsEl.innerHTML = '<p class="explanation-empty">El catálogo de reglas no estuvo disponible para reconstruir las condiciones evaluadas.</p>';
+    }
+
+    const rule = explanation.rule || {};
+    document.getElementById('explanationRuleExpression').textContent = rule.expression || 'No informada';
+
+    const traceability = explanation.normative_traceability || {};
+    const controls = Array.isArray(traceability.controls) ? traceability.controls : [];
+    document.getElementById('explanationNist').textContent = controls.length
+      ? controls.map(control => `${control.id} (${control.relationship})`).join(', ')
+      : 'No disponible';
+
+    const evidence = explanation.evidence || {};
+    const integrityText = evidence.integrity_valid === true
+      ? 'Huella verificada'
+      : evidence.integrity_valid === false
+        ? 'Huella no coincide con el registro'
+        : 'No disponible';
+    document.getElementById('explanationIntegrity').textContent = integrityText;
+
+    const recommendations = Array.isArray(explanation.recommendations) ? explanation.recommendations : [];
+    document.getElementById('explanationRecommendations').innerHTML = recommendations.length
+      ? recommendations.map(item => `<li>${escapeHTML(item)}</li>`).join('')
+      : '<li>No hay recomendaciones adicionales.</li>';
+    document.getElementById('explanationDisclaimer').textContent = traceability.disclaimer || '';
+  }
+
+  async function downloadEvaluationPdf() {
+    const button = document.getElementById('btnDownloadEvaluationPdf');
+    const evaluationId = button?.dataset.evaluationId;
+    if (!state.csrfToken || !evaluationId) {
+      openAuthModal();
+      return;
+    }
+    button.disabled = true;
+    button.textContent = 'Generando PDF…';
+    try {
+      const res = await authFetch(`/api/v1/evaluations/${encodeURIComponent(evaluationId)}/report.pdf`, {
+        headers: {}
+      });
+      if (res.status === 401) {
+        openAuthModal();
+        throw new Error('La sesión expiró; inicie sesión nuevamente.');
+      }
+      if (!res.ok) {
+        throw new Error(await getApiError(res, 'No fue posible generar el informe PDF.'));
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `securecode-${evaluationId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setEvaluatorFeedback(`Descarga PDF: ${error.message}`, 'error');
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Descargar informe PDF';
+    }
+  }
+
   function renderServiceUnavailable(message) {
     const container = document.getElementById('resultContainer');
     const banner = document.getElementById('resultBanner');
@@ -750,6 +895,9 @@
     document.getElementById('resEvaluationId').textContent = 'Sin persistencia';
     document.getElementById('resultHashText').textContent = '0000000000000000000000000000000000000000000000000000000000000000';
     document.getElementById('jsonPayloadBody').textContent = JSON.stringify({ error: message, code: 502 }, null, 2);
+    document.getElementById('explanationPanel')?.setAttribute('hidden', '');
+    const pdfButton = document.getElementById('btnDownloadEvaluationPdf');
+    if (pdfButton) pdfButton.hidden = true;
 
     container.classList.add('active');
     container.scrollIntoView({ behavior: 'smooth' });
@@ -764,10 +912,11 @@
     localStorage.removeItem('securecode_history');
     updateHistoryAccess();
     document.getElementById('btnExportHistory')?.addEventListener('click', exportHistoryCSV);
+    document.getElementById('btnDownloadEvaluationPdf')?.addEventListener('click', downloadEvaluationPdf);
   }
 
   function addHistoryEntry(data) {
-    if (!state.token || !state.accessRole) return;
+    if (!state.csrfToken || !state.accessRole) return;
     const entry = {
       id: data.evaluation_id,
       control: data.control_id,
@@ -783,14 +932,14 @@
   }
 
   async function loadPersistentHistory() {
-    if (!state.token || !state.accessRole) {
+    if (!state.csrfToken || !state.accessRole) {
       state.evalHistory = [];
       updateHistoryAccess();
       return;
     }
     try {
-      const res = await fetch('/api/v1/evaluations/history?limit=20', {
-        headers: { 'Authorization': `Bearer ${state.token}` }
+      const res = await authFetch('/api/v1/evaluations/history?limit=20', {
+        headers: {}
       });
       if (!res.ok) return;
       const { evaluations } = await res.json();
@@ -807,12 +956,12 @@
   }
 
   async function loadHistoricalEvaluation(record) {
-    if (!record || !state.token) return;
+    if (!record || !state.csrfToken) return;
     openEvaluatorForHistory();
     renderHistoricalLoading(record);
     try {
-      const res = await fetch(`/api/v1/evaluations/${encodeURIComponent(record.id)}`, {
-        headers: { 'Authorization': `Bearer ${state.token}` }
+      const res = await authFetch(`/api/v1/evaluations/${encodeURIComponent(record.id)}`, {
+        headers: {}
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       record.data = await res.json();
@@ -864,7 +1013,7 @@
   }
 
   function exportHistoryCSV() {
-    if (!state.token || !state.accessRole) { openAuthModal(); return; }
+    if (!state.csrfToken || !state.accessRole) { openAuthModal(); return; }
     if (state.evalHistory.length === 0) {
       alert('No hay evaluaciones para exportar.');
       return;
@@ -883,7 +1032,7 @@
   function renderHistoryList() {
     const list = document.getElementById('historyList');
     if (!list) return;
-    if (!state.token || !state.accessRole) {
+    if (!state.csrfToken || !state.accessRole) {
       list.innerHTML = `<div class="history-access-notice">Inicia sesión para consultar y exportar tus auditorías.</div>`;
       return;
     }
@@ -923,14 +1072,14 @@
   }
 
   function updateHistoryAccess() {
-    const authenticated = Boolean(state.token && state.accessRole);
+    const authenticated = Boolean(state.csrfToken && state.accessRole);
     const exportButton = document.getElementById('btnExportHistory');
     if (exportButton) exportButton.hidden = !authenticated;
     renderHistoryList();
   }
 
   function updateEvaluatorAccess() {
-    const authenticated = Boolean(state.token && state.accessRole);
+    const authenticated = Boolean(state.csrfToken && state.accessRole);
     const button = document.getElementById('btnSubmitEval');
     const notice = document.getElementById('evaluatorAccessNotice');
     if (button) {
@@ -967,7 +1116,7 @@
     if (panel) panel.hidden = !allowed;
     if (notice) {
       notice.hidden = allowed;
-      notice.textContent = state.token
+      notice.textContent = state.csrfToken
         ? 'Sólo el propietario de la organización puede administrar consumo y preferencias FinOps.'
         : 'Inicia sesión con el propietario de la organización para administrar consumo y preferencias FinOps.';
     }
@@ -977,7 +1126,7 @@
     updateFinOpsAccess();
     if (!isOrganizationOwner()) return;
     try {
-      const response = await fetch('/api/v1/finops', { headers: { 'Authorization': 'Bearer ' + state.token } });
+      const response = await authFetch('/api/v1/finops', { headers: {} });
       if (!response.ok) throw new Error('No se pudo cargar el consumo.');
       state.finops = await response.json();
       renderFinOps(state.finops);
@@ -989,12 +1138,12 @@
 
   async function saveFinOpsSettings(budget, threshold, enabled) {
     const feedback = document.getElementById('budgetFeedback');
-    if (!state.token) return;
+    if (!state.csrfToken) return;
     if (feedback) feedback.textContent = 'Guardando preferencia…';
     try {
-      const response = await fetch('/api/v1/finops', {
+      const response = await authFetch('/api/v1/finops', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + state.token },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ budget_clp: budget, alert_threshold_pct: threshold, alert_enabled: enabled })
       });
       if (!response.ok) throw new Error(await getApiError(response, 'No se pudo guardar el control.'));
@@ -1035,7 +1184,7 @@
     if (panel) panel.hidden = !allowed;
     if (notice) {
       notice.hidden = allowed;
-      notice.textContent = state.token
+      notice.textContent = state.csrfToken
         ? 'Sólo el propietario de la organización puede generar este informe.'
         : 'Inicia sesión como propietario de la organización para generar el informe de gestión.';
     }
@@ -1045,8 +1194,8 @@
     updateManagementReportAccess();
     if (!isOrganizationOwner()) return;
     try {
-      const response = await fetch('/api/v1/management-report', {
-        headers: { 'Authorization': 'Bearer ' + state.token }
+      const response = await authFetch('/api/v1/management-report', {
+        headers: {}
       });
       if (!response.ok) throw new Error(await getApiError(response, 'No se pudo generar el informe de gestión.'));
       state.managementReport = await response.json();
@@ -1141,7 +1290,7 @@
     if (panel) panel.hidden = !allowed;
     if (notice) {
       notice.hidden = allowed;
-      notice.textContent = state.token
+      notice.textContent = state.csrfToken
         ? 'Sólo el propietario de la organización puede administrar el plan y el SLA.'
         : 'Inicia sesión con el propietario de la organización para administrar el plan y el SLA.';
     }
@@ -1151,10 +1300,10 @@
     updateSubscriptionAccess();
     if (!isOrganizationOwner()) return;
     try {
-      const headers = { 'Authorization': 'Bearer ' + state.token };
+      const headers = {};
       const results = await Promise.all([
-        fetch('/api/v1/subscription', { headers }),
-        fetch('/api/v1/subscription/history?limit=20', { headers })
+        authFetch('/api/v1/subscription', { headers }),
+        authFetch('/api/v1/subscription/history?limit=20', { headers })
       ]);
       if (!results[0].ok) throw new Error('No se pudo cargar la suscripción.');
       state.subscriptionData = await results[0].json();
@@ -1227,9 +1376,9 @@
     if (!state.pendingSubscriptionPlan) return;
     const status = document.getElementById('planSaveStatus');
     try {
-      const response = await fetch('/api/v1/subscription', {
+      const response = await authFetch('/api/v1/subscription', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + state.token },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ plan_id: state.pendingSubscriptionPlan, confirmation: true })
       });
       if (!response.ok) throw new Error(await getApiError(response, 'No se pudo cambiar el plan.'));
@@ -1257,9 +1406,9 @@
   }
 
   async function loadEnterpriseTrial() {
-    if (!state.token) return;
+    if (!state.csrfToken) return;
     try {
-      const response = await fetch('/api/v1/enterprise-trial', { headers: { Authorization: 'Bearer ' + state.token } });
+      const response = await authFetch('/api/v1/enterprise-trial', { headers: {} });
       if (!response.ok) throw new Error(await getApiError(response, 'No se pudo cargar el Enterprise Trial.'));
       state.enterpriseTrial = await response.json();
       renderEnterpriseTrial(state.enterpriseTrial);
@@ -1307,8 +1456,8 @@
     if (!confirmed) return;
     if (feedback) feedback.textContent = 'Activando trial…';
     try {
-      const response = await fetch('/api/v1/enterprise-trial', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + state.token },
+      const response = await authFetch('/api/v1/enterprise-trial', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ confirmation: true })
       });
       if (!response.ok) throw new Error(await getApiError(response, 'No se pudo activar el trial.'));
@@ -1327,8 +1476,8 @@
     if (!repository) return;
     if (feedback) feedback.textContent = 'Autorizando repositorio…';
     try {
-      const response = await fetch('/api/v1/enterprise-trial/repositories', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + state.token },
+      const response = await authFetch('/api/v1/enterprise-trial/repositories', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repository })
       });
       if (!response.ok) throw new Error(await getApiError(response, 'No se pudo autorizar el repositorio.'));
@@ -1355,8 +1504,23 @@
   }
 
   // --- Administración del cliente: propietario y Analyst ---
+  function updateOrganizationPasswordStrategy() {
+    const selected = document.querySelector('input[name="passwordStrategy"]:checked');
+    const group = document.getElementById('passwordInputGroup');
+    const password = document.getElementById('organizationMemberPassword');
+    if (!selected || !group || !password) return;
+    const generate = selected.value === 'generate';
+    group.hidden = generate;
+    password.required = !generate;
+    if (generate) password.value = '';
+  }
+
   function initOrganizationConsole() {
     document.getElementById('btnRefreshOrganization')?.addEventListener('click', refreshOrganization);
+    document.querySelectorAll('input[name="passwordStrategy"]').forEach((radio) => {
+      radio.addEventListener('change', updateOrganizationPasswordStrategy);
+    });
+    updateOrganizationPasswordStrategy();
     document.getElementById('createOrganizationMemberForm')?.addEventListener('submit', createOrganizationAnalyst);
     document.getElementById('organizationRepositoryAuthorizationForm')?.addEventListener('submit', saveOrganizationRepositoryAuthorization);
   }
@@ -1414,16 +1578,16 @@
     if (!isOrganizationOwner()) {
       panel.hidden = true;
       notice.hidden = false;
-      notice.textContent = state.token ? 'Sólo el propietario de la organización puede administrar el equipo.' : 'Inicia sesión con el propietario de la organización para administrar el equipo.';
+      notice.textContent = state.csrfToken ? 'Sólo el propietario de la organización puede administrar el equipo.' : 'Inicia sesión con el propietario de la organización para administrar el equipo.';
       if (passwordPanel) passwordPanel.hidden = true;
       return;
     }
     try {
-      const headers = { Authorization: `Bearer ${state.token}` };
+      const headers = {};
       const [membersResult, authorizationsResult, entitlementsResult] = await Promise.all([
-        fetch('/api/v1/organization/members', { headers }),
-        fetch('/api/v1/organization/repository-authorizations', { headers }),
-        fetch('/api/v1/organization/analyst-entitlements', { headers })
+        authFetch('/api/v1/organization/members', { headers }),
+        authFetch('/api/v1/organization/repository-authorizations', { headers }),
+        authFetch('/api/v1/organization/analyst-entitlements', { headers })
       ]);
       if (!membersResult.ok) throw new Error(await getApiError(membersResult, 'No se pudo cargar el equipo.'));
       state.organizationMembers = await membersResult.json();
@@ -1499,7 +1663,7 @@
     const password = selectedStrategy.value === 'defined' ? passwordInput.value : null;
 
     try {
-      const res = await fetch('/api/v1/organization/members', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.token}` }, body: JSON.stringify({ username, password, generate_temp: selectedStrategy.value === 'generate' }) });
+      const res = await authFetch('/api/v1/organization/members', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password, generate_temp: selectedStrategy.value === 'generate' }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'No se pudo crear el Analyst.');
 
@@ -1516,7 +1680,7 @@
   async function updateOrganizationAnalyst(button) {
     try {
       const active = button.dataset.active !== 'true';
-      const res = await fetch(`/api/v1/organization/members/${encodeURIComponent(button.dataset.organizationMember)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.token}` }, body: JSON.stringify({ active }) });
+      const res = await authFetch(`/api/v1/organization/members/${encodeURIComponent(button.dataset.organizationMember)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ active }) });
       if (!res.ok) throw new Error(await getApiError(res, 'No se pudo actualizar el Analyst.'));
       await refreshOrganization();
     } catch (error) { setOrganizationFeedback(error.message, 'error'); }
@@ -1538,7 +1702,7 @@
     const repository = document.getElementById('organizationAuthorizationRepository').value.trim();
     if (!userId || !normalizeGithubRepository(repository)) { setOrganizationRepositoryFeedback('Selecciona un Analyst e ingresa un repositorio owner/repo válido.', 'error'); return; }
     try {
-      const res = await fetch('/api/v1/organization/repository-authorizations', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.token}` }, body: JSON.stringify({ user_id: userId, repository }) });
+      const res = await authFetch('/api/v1/organization/repository-authorizations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId, repository }) });
       if (!res.ok) throw new Error(await getApiError(res, 'No se pudo autorizar el repositorio.'));
       document.getElementById('organizationAuthorizationRepository').value = '';
       setOrganizationRepositoryFeedback('Repositorio autorizado.', 'success'); await refreshOrganization();
@@ -1548,7 +1712,7 @@
   async function updateOrganizationAuthorization(button) {
     try {
       const active = button.dataset.active !== 'true';
-      const res = await fetch(`/api/v1/organization/repository-authorizations/${encodeURIComponent(button.dataset.organizationAuthorization)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.token}` }, body: JSON.stringify({ active }) });
+      const res = await authFetch(`/api/v1/organization/repository-authorizations/${encodeURIComponent(button.dataset.organizationAuthorization)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ active }) });
       if (!res.ok) throw new Error(await getApiError(res, 'No se pudo actualizar la autorización.'));
       await refreshOrganization();
     } catch (error) { setOrganizationRepositoryFeedback(error.message, 'error'); }
@@ -1615,7 +1779,7 @@
       return;
     }
     try {
-      const res = await fetch('/api/v1/admin/users', { headers: { 'Authorization': `Bearer ${state.token}` } });
+      const res = await authFetch('/api/v1/admin/users', { headers: {} });
       if (!res.ok) throw new Error('No autorizado');
       state.adminUsers = await res.json();
       renderAdminUsers();
@@ -1669,9 +1833,9 @@
 
   async function loadRepositoryAuthorizations() {
     const body = document.getElementById('repositoryAuthorizationsBody');
-    if (!body || !state.token || state.accessRole !== 'admin') return;
+    if (!body || !state.csrfToken || state.accessRole !== 'admin') return;
     try {
-      const res = await fetch('/api/v1/admin/repository-authorizations', { headers: { Authorization: `Bearer ${state.token}` } });
+      const res = await authFetch('/api/v1/admin/repository-authorizations', { headers: {} });
       if (!res.ok) throw new Error('No se pudieron cargar las autorizaciones.');
       const authorizations = await res.json();
       body.innerHTML = authorizations.map(item => `<tr><td>${escapeHTML(item.username || item.user_id)}</td><td><code>${escapeHTML(item.repository)}</code></td><td>${item.active ? 'Activa' : 'Revocada'}</td><td><button type="button" class="btn-copy" data-repository-authorization-id="${escapeHTML(item.id)}" data-active="${item.active}">${item.active ? 'Revocar' : 'Reactivar'}</button></td></tr>`).join('') || '<tr><td colspan="4">Aún no hay repositorios autorizados.</td></tr>';
@@ -1690,8 +1854,8 @@
       return;
     }
     try {
-      const res = await fetch('/api/v1/admin/repository-authorizations', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.token}` },
+      const res = await authFetch('/api/v1/admin/repository-authorizations', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: userId, repository })
       });
       if (!res.ok) throw new Error(await getApiError(res, 'No se pudo autorizar el repositorio.'));
@@ -1704,8 +1868,8 @@
   async function updateRepositoryAuthorization(button) {
     const active = button.dataset.active !== 'true';
     try {
-      const res = await fetch(`/api/v1/admin/repository-authorizations/${encodeURIComponent(button.dataset.repositoryAuthorizationId)}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.token}` },
+      const res = await authFetch(`/api/v1/admin/repository-authorizations/${encodeURIComponent(button.dataset.repositoryAuthorizationId)}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ active })
       });
       if (!res.ok) throw new Error(await getApiError(res, 'No se pudo actualizar la autorización.'));
@@ -1726,7 +1890,7 @@
     const body = document.getElementById('adminAuditBody');
     if (!trail || !body || !isPlatformAdmin()) return;
     try {
-      const res = await fetch('/api/v1/admin/user-audit-events?limit=25', { headers: { 'Authorization': `Bearer ${state.token}` } });
+      const res = await authFetch('/api/v1/admin/user-audit-events?limit=25', { headers: {} });
       if (!res.ok) throw new Error('No autorizado');
       const events = await res.json();
       const actionLabel = { account_created: 'Cuenta creada', account_updated: 'Cuenta actualizada' };
@@ -1768,8 +1932,8 @@
     if (button) button.disabled = true;
     setAdminFeedback('Creando cuenta y registrando la trazabilidad administrativa…');
     try {
-      const res = await fetch('/api/v1/admin/users', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.token}` }, body: JSON.stringify(payload)
+      const res = await authFetch('/api/v1/admin/users', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error(await getApiError(res, res.status === 409 ? 'El usuario ya existe.' : 'No se pudo crear el usuario.'));
       event.target.reset();
@@ -1797,8 +1961,8 @@
       return;
     }
     try {
-      const res = await fetch(`/api/v1/admin/users/${encodeURIComponent(button.dataset.userId)}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.token}` },
+      const res = await authFetch(`/api/v1/admin/users/${encodeURIComponent(button.dataset.userId)}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error(await getApiError(res, 'No se pudo actualizar el usuario.'));
@@ -1923,9 +2087,9 @@
       const payload = generateTemp
         ? { generate_temp: true }
         : { password: document.getElementById('resetUserPassword').value };
-      const res = await fetch(endpoint, {
+      const res = await authFetch(endpoint, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error(await getApiError(res, 'No se pudo restablecer la contraseña.'));
@@ -2006,10 +2170,11 @@
         formData.append('password', pass);
 
         try {
-          const res = await fetch('/api/v1/auth/token', {
+          const res = await fetch('/api/v1/auth/session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: formData
+            body: formData,
+            credentials: 'same-origin'
           });
 
           if (!res.ok) {
@@ -2020,13 +2185,13 @@
           }
 
           const data = await res.json();
-          state.token = data.access_token;
-          state.user.username = user;
-          localStorage.setItem('securecode_token', state.token);
+          state.csrfToken = data.csrf_token;
+          state.user.username = data.username;
+          state.user.role = data.role === 'platform_admin' ? 'Platform Admin' : data.role === 'organization_owner' ? 'Organization Owner' : 'Analyst';
           localStorage.setItem('securecode_user', JSON.stringify(state.user));
           updateUserBadge();
           closeAuthModal();
-          syncAuthenticatedUser();
+          await syncAuthenticatedUser();
         } catch (error) {
           showAuthError('Error al comunicarse con el servicio de autenticación.');
         }
@@ -2036,16 +2201,27 @@
     registrationForm?.addEventListener('submit', async event => {
       event.preventDefault();
       removeAuthAlert();
-      const payload = {
-        organization_name: document.getElementById('registrationOrganizationName').value.trim(),
-        username: document.getElementById('registrationUsername').value.trim(),
-        password: document.getElementById('registrationPassword').value,
-        password_confirmation: document.getElementById('registrationPasswordConfirmation').value
-      };
-      if (!Object.values(passwordRules(payload.password)).every(Boolean) || payload.password !== payload.password_confirmation) {
-        showAuthError('Revisa la contraseña y su confirmación.'); return;
-      }
+      const acceptance = document.getElementById('registrationAcceptance');
       try {
+        const packageResponse = await fetch('/api/v1/service-documents/current');
+        if (!packageResponse.ok) throw new Error('No fue posible verificar los documentos vigentes.');
+        const serviceDocumentPackage = await packageResponse.json();
+        const payload = {
+          organization_name: document.getElementById('registrationOrganizationName').value.trim(),
+          username: document.getElementById('registrationUsername').value.trim(),
+          password: document.getElementById('registrationPassword').value,
+          password_confirmation: document.getElementById('registrationPasswordConfirmation').value,
+          accepted_document_package_id: serviceDocumentPackage.package_id,
+          accepted_document_package_version: serviceDocumentPackage.version,
+          accepted_document_package_sha256: serviceDocumentPackage.sha256,
+          acceptance_confirmed: Boolean(acceptance?.checked)
+        };
+        if (!Object.values(passwordRules(payload.password)).every(Boolean) || payload.password !== payload.password_confirmation) {
+          showAuthError('Revisa la contraseña y su confirmación.'); return;
+        }
+        if (!payload.acceptance_confirmed) {
+          showAuthError('Debe aceptar las condiciones del servicio y el alcance técnico.'); return;
+        }
         const res = await fetch('/api/v1/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         if (!res.ok) throw new Error(await getApiError(res, 'No se pudo crear la organización.'));
         const data = await res.json();
@@ -2078,13 +2254,11 @@
 
   // La identidad presentada en la UI procede del servidor, no de datos editables del navegador.
   async function syncAuthenticatedUser() {
-    if (!state.token) return;
     try {
-      const res = await fetch('/api/v1/auth/me', {
-        headers: { 'Authorization': `Bearer ${state.token}` }
-      });
+      const res = await authFetch('/api/v1/auth/me');
       if (!res.ok) throw new Error('Sesión expirada');
       const profile = await res.json();
+      state.csrfToken = readCsrfCookie();
       state.user.username = profile.username;
       state.user.role = profile.role === 'platform_admin' ? 'Platform Admin' : profile.role === 'organization_owner' ? 'Organization Owner' : 'Analyst';
       state.accessRole = profile.role;
@@ -2228,7 +2402,7 @@
     const roleEl = document.getElementById('userProfileRole');
     const avatarEl = document.getElementById('userAvatarInitial');
 
-    const signedIn = Boolean(state.token && state.accessRole);
+    const signedIn = Boolean(state.csrfToken && state.accessRole);
     if (nameEl) nameEl.textContent = signedIn ? state.user.username : 'Iniciar sesión';
     if (roleEl) roleEl.textContent = signedIn ? state.user.role : 'Acceso seguro requerido';
     if (avatarEl) avatarEl.textContent = signedIn ? state.user.username.charAt(0).toUpperCase() : '?';
@@ -2256,7 +2430,12 @@
   }
 
   function clearAuthenticatedSession() {
-    state.token = null;
+    if (state.csrfToken) void revokeServerSession();
+    clearLocalSession();
+  }
+
+  function clearLocalSession() {
+    state.csrfToken = null;
     state.accessRole = null;
     state.evalHistory = [];
     state.adminUsers = [];
@@ -2267,7 +2446,6 @@
     state.organizationMembers = [];
     state.organizationAuthorizations = [];
     state.organizationAnalystEntitlements = null;
-    localStorage.removeItem('securecode_token');
     localStorage.removeItem('securecode_user');
     localStorage.removeItem('securecode_history');
     state.user = { username: 'Iniciar sesión', role: 'Acceso seguro requerido' };

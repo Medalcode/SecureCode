@@ -1,5 +1,12 @@
+import hashlib
+import hmac
+import ipaddress
 import os
 from collections.abc import Generator
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Annotated
+from urllib.parse import urlparse
 from uuid import UUID
 
 from sqlalchemy import Engine, create_engine
@@ -62,6 +69,7 @@ def get_engine() -> Engine:
                 db_url,
                 pool_pre_ping=True,
                 pool_recycle=300,
+                connect_args={"connect_timeout": 2},
             )
         else:
             # SQLite (used in tests and local development): keep defaults.
@@ -102,48 +110,184 @@ def get_github_token() -> str | None:
     return token
 
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 
-from securecode.adapters.postgres.models import User
-from securecode.api.security import verify_access_token
-from securecode.domain.roles import PLATFORM_ADMIN, is_platform_admin
+from securecode.adapters.postgres.models import User, UserSession
+from securecode.api.security import decode_access_token
+from securecode.domain.roles import is_platform_admin
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
 
+SESSION_COOKIE_NAME = "securecode_session"
+CSRF_COOKIE_NAME = "securecode_csrf"
+CSRF_HEADER_NAME = "X-CSRF-Token"
+_UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
-def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    session: Session = Depends(get_db_session)
-) -> User:
-    credentials_exception = HTTPException(
+
+@dataclass(frozen=True)
+class AuthenticatedPrincipal:
+    user: User
+    jti: str
+    mode: str
+
+
+def _as_utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+def _credentials_exception(mode: str) -> HTTPException:
+    headers = {"WWW-Authenticate": "Bearer"} if mode == "bearer" else None
+    return HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
+        headers=headers,
     )
 
-    user_id = verify_access_token(token)
-    if user_id is None:
-        raise credentials_exception
+
+def _trusted_proxy_networks() -> tuple[ipaddress._BaseNetwork, ...]:
+    raw = os.environ.get("TRUSTED_PROXY_CIDRS", "")
+    networks: list[ipaddress._BaseNetwork] = []
+    for item in raw.split(","):
+        value = item.strip()
+        if not value:
+            continue
+        try:
+            networks.append(ipaddress.ip_network(value, strict=False))
+        except ValueError:
+            continue
+    return tuple(networks)
+
+
+def _is_trusted_proxy(request: Request) -> bool:
+    if os.environ.get("TRUST_PROXY_HEADERS", "false").lower() != "true":
+        return False
+    peer = request.client.host if request.client else None
+    if not peer:
+        return False
+    try:
+        peer_ip = ipaddress.ip_address(peer)
+    except ValueError:
+        return False
+    networks = _trusted_proxy_networks()
+    return bool(networks) and any(peer_ip in network for network in networks)
+
+
+def _request_origin(request: Request) -> tuple[str, str, int]:
+    scheme = request.url.scheme
+    host = request.url.hostname
+    port = request.url.port or (443 if scheme == "https" else 80)
+    if _is_trusted_proxy(request):
+        forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower()
+        forwarded_host = request.headers.get("x-forwarded-host", "").split(",", 1)[0].strip()
+        if forwarded_proto in {"http", "https"}:
+            scheme = forwarded_proto
+        if forwarded_host:
+            parsed_host = urlparse(f"//{forwarded_host}", scheme=scheme)
+            if parsed_host.hostname:
+                host = parsed_host.hostname
+                port = parsed_host.port or (443 if scheme == "https" else 80)
+    if not host:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Origen no permitido")
+    return scheme, host, port
+
+
+def _same_origin(origin: str, request: Request) -> bool:
+    parsed = urlparse(origin)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return False
+    req_scheme, req_host, req_port = _request_origin(request)
+    origin_port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    return (
+        parsed.scheme == req_scheme
+        and parsed.hostname.lower() == req_host.lower()
+        and origin_port == req_port
+    )
+
+
+def require_same_origin(request: Request) -> None:
+    origin = request.headers.get("origin")
+    if not origin or not _same_origin(origin, request):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Origen no permitido")
+
+
+def _validate_csrf(request: Request, user_session: UserSession) -> None:
+    require_same_origin(request)
+    csrf_cookie = request.cookies.get(CSRF_COOKIE_NAME)
+    csrf_header = request.headers.get(CSRF_HEADER_NAME)
+    if not csrf_cookie or not csrf_header:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Token CSRF requerido")
+    if not hmac.compare_digest(csrf_cookie, csrf_header):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Token CSRF inválido")
+    stored_hash = getattr(user_session, "csrf_token_hash", None)
+    if not stored_hash:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sesión sin protección CSRF")
+    expected_hash = hashlib.sha256(csrf_cookie.encode()).hexdigest()
+    if not hmac.compare_digest(str(stored_hash), expected_hash):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Token CSRF inválido")
+
+
+def get_authenticated_principal(
+    request: Request,
+    session: Annotated[Session, Depends(get_db_session)],
+) -> AuthenticatedPrincipal:
+    authorization = request.headers.get("authorization")
+    if authorization:
+        scheme, _, token = authorization.partition(" ")
+        if scheme.lower() != "bearer" or not token.strip():
+            raise _credentials_exception("bearer")
+        mode = "bearer"
+        credential = token.strip()
+    else:
+        mode = "cookie"
+        credential = request.cookies.get(SESSION_COOKIE_NAME, "")
+
+    if not credential:
+        raise _credentials_exception(mode)
+    payload = decode_access_token(credential)
+    if payload is None:
+        raise _credentials_exception(mode)
 
     try:
-        user_uuid = UUID(user_id)
+        user_uuid = UUID(payload.sub)
     except (TypeError, ValueError):
-        raise credentials_exception
+        raise _credentials_exception(mode) from None
+
+    user_session = session.query(UserSession).filter(
+        UserSession.jti == payload.jti,
+        UserSession.user_id == user_uuid,
+        UserSession.revoked_at.is_(None),
+    ).first()
+    if user_session is None or _as_utc(user_session.expires_at) <= datetime.now(UTC):
+        raise _credentials_exception(mode)
+
+    if mode == "cookie" and request.method.upper() in _UNSAFE_METHODS:
+        _validate_csrf(request, user_session)
+
     user = session.query(User).filter(User.id == user_uuid).first()
     if user is None:
-        raise credentials_exception
-
+        raise _credentials_exception(mode)
     if not user.active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Inactive user"
+            detail="Inactive user",
+            headers={"WWW-Authenticate": "Bearer"} if mode == "bearer" else None,
         )
 
-    return user
+    request.state.auth_mode = mode
+    request.state.session_jti = payload.jti
+    return AuthenticatedPrincipal(user=user, jti=payload.jti, mode=mode)
 
 
-def require_platform_admin(current_user: User = Depends(get_current_user)) -> User:
+def get_current_user(
+    principal: Annotated[AuthenticatedPrincipal, Depends(get_authenticated_principal)],
+) -> User:
+    return principal.user
+
+
+def require_platform_admin(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> User:
     """Allow global operations only to internal SecureCode operators."""
     if not is_platform_admin(getattr(current_user, "role", None)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Platform administrator role required")

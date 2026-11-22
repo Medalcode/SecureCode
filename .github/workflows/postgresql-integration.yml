@@ -22,6 +22,7 @@ jobs:
           --health-retries 5
 
     env:
+      APP_ENV: test
       DATABASE_URL: postgresql+psycopg2://securecode_test:securecode_test_password@localhost:5432/securecode_test
 
     steps:

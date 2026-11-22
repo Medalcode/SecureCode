@@ -1,6 +1,8 @@
 import os
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TypedDict
+from uuid import uuid4
 
 import jwt
 from argon2 import PasswordHasher
@@ -70,28 +72,42 @@ def get_jwt_algorithm() -> str:
 def get_jwt_expire_minutes() -> int:
     return int(os.environ.get("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
-def create_access_token(user_id: str) -> str:
-    expire = datetime.now(UTC) + timedelta(minutes=get_jwt_expire_minutes())
-    
-    # We include sub, iat, exp, jti conceptually, but PyJWT handles exp explicitly.
+
+@dataclass(frozen=True)
+class TokenPayload:
+    sub: str
+    jti: str
+
+
+def create_access_token(user_id: str, jti: str | None = None) -> str:
+    issued_at = datetime.now(UTC)
+    expire = issued_at + timedelta(minutes=get_jwt_expire_minutes())
     payload = {
         "sub": user_id,
         "exp": expire,
-        "iat": datetime.now(UTC)
+        "iat": issued_at,
+        "jti": jti or str(uuid4()),
     }
-    
     return jwt.encode(payload, get_jwt_secret(), algorithm=get_jwt_algorithm())
 
-def verify_access_token(token: str) -> str | None:
+
+def decode_access_token(token: str) -> TokenPayload | None:
     try:
         payload = jwt.decode(
-            token, 
-            get_jwt_secret(), 
+            token,
+            get_jwt_secret(),
             algorithms=[get_jwt_algorithm()],
-            options={"require": ["exp", "sub"]}
+            options={"require": ["exp", "sub", "iat", "jti"]},
         )
-        return payload.get("sub")
-    except jwt.ExpiredSignatureError:
-        return None
     except jwt.InvalidTokenError:
         return None
+    subject = payload.get("sub")
+    jti = payload.get("jti")
+    if not isinstance(subject, str) or not isinstance(jti, str) or not jti:
+        return None
+    return TokenPayload(sub=subject, jti=jti)
+
+
+def verify_access_token(token: str) -> str | None:
+    payload = decode_access_token(token)
+    return payload.sub if payload is not None else None

@@ -6,7 +6,10 @@
 .review-20261112/
 .test-*/
 reports/
-docs/
+docs/*
+!docs/compliance/
+docs/compliance/*
+!docs/compliance/service_documents.manifest.json
 tests/
 artifacts/
 .github/

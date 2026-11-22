@@ -25,4 +25,4 @@ Preparar SecureCode para un despliegue controlado, reduciendo exposición del na
 
 ## Límites actuales y siguiente incremento
 
-El cierre de sesión elimina el token del navegador; la revocación inmediata de JWT requiere una lista de revocación compartida o sesiones de corta duración con refresh tokens. El rate limiting distribuido y WAF deben configurarse en el proveedor o gateway, no en memoria de una instancia de Cloud Run.
+El cierre de sesión revoca el `jti` en PostgreSQL y elimina las cookies de la consola web; los clientes API siguen usando Bearer. El rate limiting distribuido y WAF deben configurarse en el proveedor o gateway, no en memoria de una instancia de Cloud Run.

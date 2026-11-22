@@ -4,6 +4,15 @@ from __future__ import annotations
 
 from html import escape
 
+from securecode.api.normative_transparency import (
+    render_controls_section,
+    render_framework_section,
+    render_home_normative_sections,
+    render_methodology_section,
+    render_results_section,
+    render_scope_section,
+)
+
 SITE_UPDATED_AT = "15 de noviembre de 2026"
 LEGAL_NOTICE = (
     "Borrador académico: este texto debe ser revisado por asesoría jurídica y "
@@ -13,6 +22,8 @@ LEGAL_NOTICE = (
 
 NAVIGATION = (
     ("/", "Inicio"),
+    ("/controles", "Controles"),
+    ("/alcance", "Alcance"),
     ("/nosotros", "Nosotros"),
     ("/preguntas-frecuentes", "FAQ"),
     ("/contacto", "Contacto"),
@@ -63,21 +74,24 @@ def page(title: str, description: str, content: str, path: str, *, legal: bool =
         "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\">"
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
         '<meta name="description" content="' + escape(description) + '">'
-        '<meta name="color-scheme" content="light"><title>' + escape(title) + " | SecureCode</title>"
-        '<link rel="stylesheet" href="/static/public/site.css?v=20261115-public-site"></head>'
+        '<meta name="color-scheme" content="light dark"><title>' + escape(title) + " | SecureCode</title>"
+        '<link rel="stylesheet" href="/static/public/site.css?v=20261120-normative-transparency"></head>'
         '<body class="public-site"><a class="skip-link" href="#contenido">Saltar al contenido</a>'
         + _navigation(path) + '<main id="contenido">' + notice + content + "</main>" + _footer() + "</body></html>"
     )
 
 
-HOME = """
+HOME_HERO = """
 <section class="hero">
-  <div class="eyebrow">GOBIERNO DE INGENIERÍA · EVIDENCIA REPRODUCIBLE</div>
-  <h1>Confianza técnica<br><em>para cada cambio.</em></h1>
-  <p class="hero-copy">SecureCode transforma políticas de repositorio en evaluaciones claras, evidencia sellada y decisiones que un equipo puede comprobar.</p>
-  <div class="hero-actions"><a class="button button-primary" href="/app">Ingresar a la plataforma <span aria-hidden="true">→</span></a><a class="button button-secondary" href="#como-funciona">Conocer cómo funciona</a></div>
-  <p class="hero-proof"><span></span> Controles declarativos · Evidencia SHA-256 · Acceso por organización</p>
+  <div class="eyebrow">CONFIANZA TÉCNICA · MARCO NORMATIVO EXPLÍCITO</div>
+  <h1>Seguridad verificable para repositorios GitHub</h1>
+  <p class="hero-copy">SecureCode evalúa automáticamente configuraciones técnicas de seguridad en repositorios GitHub mediante controles específicos alineados con objetivos seleccionados de NIST SP 800-53 Rev. 5.</p>
+  <div class="hero-actions"><a class="button button-primary" href="/controles">Consultar los controles <span aria-hidden="true">→</span></a><a class="button button-secondary" href="#marco">Ver el marco de referencia</a></div>
+  <p class="hero-proof"><span></span> Confianza técnica · Evidencia SHA-256 · Reglas versionadas</p>
 </section>
+"""
+
+HOME_SUPPORT = """
 <section class="feature-grid" aria-label="Beneficios de SecureCode">
   <article><span class="feature-number">01</span><h2>Define el alcance</h2><p>El propietario de cada organización autoriza los repositorios que su equipo puede evaluar.</p></article>
   <article><span class="feature-number">02</span><h2>Contrasta la evidencia</h2><p>Los controles consultan la configuración observable y entregan un dictamen determinista.</p></article>
@@ -88,6 +102,18 @@ HOME = """
   <ol class="steps"><li><strong>Autoriza</strong><span>El propietario delimita analistas y repositorios de su organización.</span></li><li><strong>Evalúa</strong><span>El analista ejecuta el control sobre una rama explícita.</span></li><li><strong>Verifica</strong><span>El resultado incluye criterios, evidencia y hash para su revisión.</span></li></ol>
 </section>
 <section class="callout"><div><p class="eyebrow">LISTO PARA UNA DEMOSTRACIÓN</p><h2>Explora la consola de evaluación.</h2><p>La interfaz separa las funciones públicas de las funciones que requieren autenticación.</p></div><a class="button button-primary" href="/app">Abrir consola</a></section>
+"""
+
+CONTROLS_PAGE = """
+<section class="page-hero compact"><p class="eyebrow">CATÁLOGO PÚBLICO</p><h1>Controles de seguridad</h1><p>Consulta las reglas exactas, la evidencia y las limitaciones antes de iniciar sesión o contratar.</p></section>
+""" + render_controls_section() + render_results_section() + """
+<section class="callout"><div><p class="eyebrow">LÍMITES DEL SERVICIO</p><h2>Conoce también lo que SecureCode no evalúa.</h2><p>El alcance y las exclusiones están disponibles públicamente.</p></div><a class="button button-primary" href="/alcance">Ver alcance <span aria-hidden="true">→</span></a></section>
+"""
+
+SCOPE_PAGE = """
+<section class="page-hero compact"><p class="eyebrow">ALCANCE Y EXCLUSIONES</p><h1>Lo que SecureCode hace y no hace</h1><p>Información pública y anterior a cualquier acción de contratación o suscripción.</p></section>
+""" + render_scope_section() + render_framework_section() + render_methodology_section() + """
+<section class="callout"><div><p class="eyebrow">CONTROLES PUBLICADOS</p><h2>Revisa las reglas antes de evaluar.</h2><p>Cada control muestra su condición exacta y su referencia normativa parcial.</p></div><a class="button button-primary" href="/controles">Ver controles <span aria-hidden="true">→</span></a></section>
 """
 
 ABOUT = """
@@ -109,7 +135,7 @@ FAQ = """
 LEGAL_CONTENT: dict[str, tuple[str, str]] = {
     "terminos": ("Términos de servicio", "<h1>Términos de servicio</h1><p>Estos términos describen el uso previsto de SecureCode como demostración académica. No constituyen una oferta comercial vigente ni sustituyen una revisión legal.</p><h2>Uso autorizado</h2><p>El acceso se limita a cuentas creadas por la plataforma y a los repositorios que una organización haya autorizado. Cada usuario es responsable de proteger sus credenciales y de revisar los resultados antes de tomar decisiones.</p><h2>Disponibilidad y cambios</h2><p>La funcionalidad puede cambiar durante la etapa académica. Una oferta comercial deberá definir soporte, disponibilidad, tratamiento de datos y responsables mediante un acuerdo definitivo.</p>"),
     "privacidad": ("Política de privacidad", "<h1>Política de privacidad</h1><p>SecureCode procesa cuentas, roles, configuraciones y evidencias necesarias para operar la demostración. La plataforma no debe recibir secretos, tokens ni información personal innecesaria en campos de repositorio.</p><h2>Finalidad</h2><p>Los datos se usan para autenticar usuarios, separar organizaciones, autorizar evaluaciones y mantener trazabilidad de las acciones realizadas.</p><h2>Pendiente antes de producción</h2><p>Antes de un lanzamiento comercial se deberán definir responsable del tratamiento, plazos de conservación, mecanismo de solicitudes de titulares y canal de contacto de privacidad.</p>"),
-    "cookies": ("Política de cookies", "<h1>Política de cookies</h1><p>La aplicación utiliza almacenamiento local del navegador para conservar el estado de sesión de la consola y preferencias de interfaz. No incorpora analítica publicitaria ni cookies de terceros en esta versión.</p><h2>Control</h2><p>Al cerrar sesión se elimina el estado autenticado y los datos de visualización asociados. El usuario también puede limpiar el almacenamiento del sitio desde las opciones de su navegador.</p>"),
+    "cookies": ("Política de cookies", "<h1>Política de cookies</h1><p>La consola utiliza una cookie HttpOnly para mantener la sesión autenticada y una cookie legible por el navegador para transportar el token CSRF. También usa almacenamiento local para preferencias de interfaz y datos de visualización. No incorpora analítica publicitaria ni cookies de terceros en esta versión.</p><h2>Control</h2><p>Al cerrar sesión se revoca la sesión en el servidor y se eliminan ambas cookies. El usuario también puede limpiar el almacenamiento del sitio desde las opciones de su navegador.</p>"),
     "eula": ("Acuerdo de licencia de usuario final", "<h1>Acuerdo de licencia de usuario final (EULA)</h1><p>Para fines académicos se concede una licencia limitada, revocable y no transferible para usar la interfaz de demostración. No se autoriza interferir con los controles de acceso ni usar la plataforma para evaluar repositorios sin autorización.</p><h2>Propiedad intelectual</h2><p>Las reglas, evidencias y configuraciones asociadas a una organización deben utilizarse sólo dentro de su ámbito autorizado. Un acuerdo comercial definitivo debe especificar derechos de uso y soporte.</p>"),
     "contratacion": ("Condiciones de contratación y reembolsos", "<h1>Condiciones de contratación y reembolsos</h1><p>Esta versión académica no procesa pagos, suscripciones cobrables ni reembolsos. Las pantallas de planes y consumo son demostrativas y no constituyen una cotización.</p><h2>Antes de comercializar</h2><p>Se deberán publicar los precios vigentes, impuestos, medio de pago, renovación, cancelación, periodo de prueba, condiciones de reembolso y canal de soporte antes de aceptar una contratación.</p>"),
     "sla": ("Acuerdo de nivel de servicio", "<h1>Acuerdo de nivel de servicio (SLA)</h1><p>Los indicadores mostrados en la consola sirven como referencia técnica de la demostración. No representan un compromiso comercial de disponibilidad, respuesta o recuperación.</p><h2>Compromiso futuro</h2><p>Un SLA definitivo debe definir métricas medibles, horarios de soporte, exclusiones, ventanas de mantenimiento, procedimiento de incidentes, créditos de servicio y responsables de contacto.</p>"),
@@ -118,7 +144,12 @@ LEGAL_CONTENT: dict[str, tuple[str, str]] = {
 
 def public_page(path: str) -> str:
     if path == "/":
-        return page("SecureCode — Confianza técnica", "Plataforma para convertir políticas de repositorio en evidencia técnica verificable.", HOME, path)
+        home_content = HOME_HERO + render_home_normative_sections() + HOME_SUPPORT
+        return page("SecureCode — Seguridad verificable", "Evaluación de configuraciones técnicas de GitHub alineada con objetivos seleccionados de NIST SP 800-53 Rev. 5.", home_content, path)
+    if path == "/controles":
+        return page("Controles de seguridad", "Reglas técnicas, evidencia, resultados y limitaciones de los controles públicos de SecureCode.", CONTROLS_PAGE, path)
+    if path == "/alcance":
+        return page("Alcance y exclusiones", "Qué hace SecureCode, qué no hace y cómo se relaciona parcialmente con NIST SP 800-53 Rev. 5.", SCOPE_PAGE, path)
     if path == "/nosotros":
         return page("Nosotros", "Acerca de SecureCode.", ABOUT, path)
     if path == "/contacto":

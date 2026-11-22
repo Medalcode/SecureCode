@@ -9,10 +9,10 @@ from fastapi.testclient import TestClient
 from securecode.adapters.postgres.models import User
 from securecode.api.app import app
 from securecode.api.dependencies import get_db_session
-from securecode.api.security import create_access_token
 from securecode.engine.evaluator import EvaluationStatus
 from securecode.models.gh002 import GH002Evidence
 from securecode.ports.evaluation_repository import PersistedEvaluation
+from tests.conftest import issue_access_token
 
 os.environ["JWT_SECRET_KEY"] = "test-secret-key-that-is-at-least-32-bytes-long"
 os.environ["JWT_ALGORITHM"] = "HS256"
@@ -34,6 +34,8 @@ mock_user = DummyUser(
     password_hash=hash_password("correctpassword"),
     active=True
 )
+
+mock_sessions = []
 
 def mock_session():
     class MockQuery:
@@ -58,6 +60,8 @@ def mock_session():
                 return None
             expr = self.filters[0]
             val = getattr(getattr(expr, "right", None), "value", None)
+            if self.model.__name__ == "UserSession":
+                return next((item for item in mock_sessions if item.jti == str(val) and item.revoked_at is None), None)
             if str(val) == "testuser":
                 return mock_user
             if str(val) == str(mock_user_id):
@@ -67,6 +71,10 @@ def mock_session():
     class _MockSession:
         def query(self, model):
             return MockQuery(model)
+
+        def add(self, item):
+            if item.__class__.__name__ == "UserSession":
+                mock_sessions.append(item)
 
     return _MockSession()
 
@@ -78,7 +86,7 @@ def setup_mock_session():
 
 client = TestClient(app)
 
-valid_token = create_access_token(str(mock_user_id))
+valid_token = issue_access_token(mock_session(), mock_user_id)
 auth_headers = {"Authorization": f"Bearer {valid_token}"}
 
 def mock_persisted_gh002(status: EvaluationStatus, evidence: GH002Evidence):

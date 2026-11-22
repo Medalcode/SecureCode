@@ -1,19 +1,22 @@
 import hashlib
 import html
+import ipaddress
 import json
 import logging
 import os
 import re
 import secrets
+import time
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TypedDict
+from typing import Annotated, Any, TypedDict
 from urllib.parse import quote
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
@@ -29,20 +32,28 @@ from securecode.adapters.postgres.models import (
     Organization,
     OrganizationMembership,
     RepositoryAuthorization,
+    ServiceDocumentAcceptance,
     SubscriptionEvent,
     User,
     UserAuditEvent,
     UserFinOpsSettings,
+    UserSession,
     UserSettings,
     UserSubscription,
 )
-from securecode.api.email_delivery import EmailDeliveryError, send_resend_email
 from securecode.api.dependencies import (
+    CSRF_COOKIE_NAME,
+    SESSION_COOKIE_NAME,
+    AuthenticatedPrincipal,
+    get_authenticated_principal,
     get_current_user,
     get_db_session,
+    get_engine,
     get_github_token,
     require_platform_admin,
+    require_same_origin,
 )
+from securecode.api.email_delivery import EmailDeliveryError, send_resend_email
 from securecode.api.public_site import LEGAL_CONTENT, public_page
 from securecode.api.schemas import (
     EvaluationResponse,
@@ -51,6 +62,8 @@ from securecode.api.schemas import (
     RuleResponse,
     SourceResponse,
 )
+from securecode.api.service_document_manifest import load_document_manifest
+from securecode.api.service_documents import ACCEPTANCE_TYPE, current_onboarding_package
 from securecode.application.enterprise_trial import (
     TrialPolicyError,
     complete_evaluation_reservation,
@@ -65,11 +78,9 @@ from securecode.application.enterprise_trial import (
     authorize_repository as authorize_trial_repository,
 )
 from securecode.application.evaluate_and_store import evaluate_and_store_gh001
-from securecode.engine.evaluator import get_rules_directory
-from securecode.models.gh001 import GH001Evidence
-from securecode.models.gh002 import GH002Evidence
-from securecode.models.gh003 import GH003Evidence
-from securecode.ports.evaluation_repository import EvaluationRepository
+from securecode.application.evaluation_report import build_evaluation_report_pdf
+from securecode.application.result_explanation import build_result_explanation
+from securecode.config import validate_environment
 from securecode.domain.roles import (
     ANALYST,
     ORGANIZATION_OWNER,
@@ -78,11 +89,40 @@ from securecode.domain.roles import (
     is_organization_owner,
     is_platform_admin,
 )
+from securecode.engine.evaluator import get_rules_directory
+from securecode.models.gh001 import GH001Evidence
+from securecode.models.gh002 import GH002Evidence
+from securecode.models.gh003 import GH003Evidence
+from securecode.observability import (
+    REQUEST_ID_HEADER,
+    ObservabilityMiddleware,
+    configure_logging,
+    get_metrics_snapshot,
+    get_request_id,
+    log_critical_error,
+    log_event,
+    metrics,
+    readiness_status,
+)
+from securecode.ports.evaluation_repository import (
+    EvaluationRepository,
+    PersistedEvaluation,
+)
+
+configure_logging()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    validate_environment()
+    yield
+
 
 app = FastAPI(
     title="SecureCode API",
     description="API de evaluación de controles GitHub GH-001, GH-002 y GH-003, con administración, auditoría y FinOps.",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 
@@ -95,11 +135,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-        # The application is served as same-origin static HTML; no third-party scripts are needed.
+        if request.url.path.startswith("/api/v1/auth/"):
+            response.headers["Cache-Control"] = "no-store"
+        # The application is served as same-origin static assets; avoid inline scripts.
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; "
             "form-action 'self'; object-src 'none'; style-src 'self' 'unsafe-inline'; "
-            "script-src 'self' 'unsafe-inline'"
+            "script-src 'self'"
         )
         return response
 
@@ -116,10 +158,26 @@ if allowed_origins:
         allow_origins=allowed_origins,
         allow_credentials=False,
         allow_methods=["GET", "POST", "PATCH"],
-        allow_headers=["Authorization", "Content-Type"],
+        allow_headers=["Authorization", "Content-Type", "X-CSRF-Token", REQUEST_ID_HEADER],
     )
+app.add_middleware(ObservabilityMiddleware)
 
 logger = logging.getLogger(__name__)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, error: Exception) -> JSONResponse:
+    log_critical_error(
+        "http.request.unhandled",
+        error_type=type(error).__name__,
+        method=request.method,
+        route=getattr(request.scope.get("route"), "path", "unmatched"),
+    )
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "Internal Server Error"},
+        headers={REQUEST_ID_HEADER: get_request_id()},
+    )
 
 # Montaje de archivos estaticos para la interfaz de usuario moderna
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -127,6 +185,8 @@ if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 @app.get("/", response_class=HTMLResponse)
+@app.get("/controles", response_class=HTMLResponse)
+@app.get("/alcance", response_class=HTMLResponse)
 @app.get("/nosotros", response_class=HTMLResponse)
 @app.get("/contacto", response_class=HTMLResponse)
 @app.get("/preguntas-frecuentes", response_class=HTMLResponse)
@@ -171,6 +231,7 @@ def get_rules_catalog():
         "catalog_version": "1",
     }
 
+
 @app.get("/api/v1/system/overview")
 def get_system_overview(_: User = Depends(require_platform_admin)):
     """Administrative status only; CI and billing are not live telemetry sources."""
@@ -197,13 +258,24 @@ def get_system_overview(_: User = Depends(require_platform_admin)):
     }
 
 
+@app.get("/internal/observability/metrics")
+def get_observability_metrics(_: User = Depends(require_platform_admin)):
+    """Aggregated, low-cardinality counters for the current process only."""
+    return get_metrics_snapshot()
+
+
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, ConfigDict, Field
 
-from securecode.api.security import create_access_token, hash_password, verify_password
+from securecode.api.security import (
+    create_access_token,
+    get_jwt_expire_minutes,
+    hash_password,
+    verify_password,
+)
 
 # Equalize the expensive password-verification path for unknown usernames.
 # This reduces timing-based account enumeration without persisting a fake user.
@@ -212,6 +284,12 @@ _DUMMY_PASSWORD_HASH = hash_password("securecode-login-timing-placeholder")
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+
+class BrowserSessionResponse(BaseModel):
+    csrf_token: str
+    username: str
+    role: Literal["platform_admin", "organization_owner", "analyst"]
 
 
 class CurrentUserResponse(BaseModel):
@@ -228,6 +306,10 @@ class OrganizationRegistrationRequest(BaseModel):
     username: str = Field(min_length=3, max_length=100)
     password: str = Field(min_length=12, max_length=128)
     password_confirmation: str = Field(min_length=12, max_length=128)
+    accepted_document_package_id: str = Field(min_length=1, max_length=64)
+    accepted_document_package_version: str = Field(min_length=1, max_length=32)
+    accepted_document_package_sha256: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
+    acceptance_confirmed: bool = False
 
 
 class OrganizationRegistrationResponse(CurrentUserResponse):
@@ -247,6 +329,36 @@ class PasswordRecoveryRequest(BaseModel):
 class PasswordRecoveryConfirmRequest(EmailTokenRequest):
     password: str = Field(min_length=12, max_length=128)
     password_confirmation: str = Field(min_length=12, max_length=128)
+
+
+class ServiceDocumentSummary(BaseModel):
+    document_id: str
+    version: str
+    title: str
+    path: str
+    sha256: str
+
+
+class CurrentDocumentPackageResponse(BaseModel):
+    package_id: str
+    version: str
+    sha256: str
+    documents: list[ServiceDocumentSummary]
+
+
+class ServiceDocumentAcceptanceResponse(BaseModel):
+    id: str
+    organization_id: str
+    user_id: str
+    package_id: str
+    package_version: str
+    document_id: str
+    document_version: str
+    document_sha256: str
+    package_sha256: str
+    source_path: str
+    acceptance_type: str
+    accepted_at: datetime
 
 
 class UserCreateRequest(BaseModel):
@@ -420,6 +532,12 @@ class EnterpriseTrialResponse(BaseModel):
     billing_mode: Literal["trial_non_billable"] = "trial_non_billable"
 
 
+@app.get("/api/v1/service-documents/current", response_model=CurrentDocumentPackageResponse)
+def get_current_service_documents():
+    """Publish the exact package version that public registration accepts."""
+    return current_onboarding_package().as_dict()
+
+
 _EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 _SUBSCRIPTION_PERIOD = timedelta(days=30)
 class PlanCatalogEntry(TypedDict):
@@ -464,11 +582,53 @@ def _login_rate_limit_settings() -> tuple[int, int]:
     )
 
 
+def _trusted_proxy_networks() -> tuple[ipaddress._BaseNetwork, ...]:
+    raw = os.environ.get("TRUSTED_PROXY_CIDRS", "")
+    networks: list[ipaddress._BaseNetwork] = []
+    for item in raw.split(","):
+        value = item.strip()
+        if not value:
+            continue
+        try:
+            networks.append(ipaddress.ip_network(value, strict=False))
+        except ValueError:
+            continue
+    return tuple(networks)
+
+
+def _is_trusted_proxy(request: Request) -> bool:
+    if os.environ.get("TRUST_PROXY_HEADERS", "false").lower() != "true":
+        return False
+    peer = request.client.host if request.client else None
+    if not peer:
+        return False
+    try:
+        peer_ip = ipaddress.ip_address(peer)
+    except ValueError:
+        return False
+    networks = _trusted_proxy_networks()
+    return bool(networks) and any(peer_ip in network for network in networks)
+
+
+def _login_client_ip(request: Request) -> str:
+    """Resolve client IP conservatively; never trust forwarded headers by default."""
+    peer = request.client.host if request.client else "unknown"
+    if not _is_trusted_proxy(request):
+        return peer
+    forwarded = request.headers.get("x-forwarded-for", "")
+    candidates = [part.strip() for part in forwarded.split(",") if part.strip()]
+    if len(candidates) != 1:
+        return peer
+    try:
+        ipaddress.ip_address(candidates[0])
+    except ValueError:
+        return peer
+    return candidates[0]
+
+
 def _login_scope_hash(username: str, request: Request) -> str:
     """Hash a username/client tuple without persisting personal identifiers."""
-    client = request.client.host if request.client else "unknown"
-    if os.environ.get("TRUST_PROXY_HEADERS", "false").lower() == "true":
-        client = request.headers.get("x-forwarded-for", client).split(",", 1)[0].strip()
+    client = _login_client_ip(request)
     return hashlib.sha256(f"{username}\x00{client}".encode()).hexdigest()
 
 
@@ -706,14 +866,70 @@ def _record_user_audit(session: Session, actor_id: UUID | None, target_id: UUID 
     ))
 
 
+def _issue_user_session(session: Session, user: User, csrf_token: str | None = None) -> str:
+    jti = str(uuid4())
+    now = datetime.now(UTC)
+    csrf_token_hash = hashlib.sha256(csrf_token.encode()).hexdigest() if csrf_token else None
+    session.add(UserSession(
+        id=uuid4(), user_id=user.id, jti=jti, created_at=now,
+        expires_at=now + timedelta(minutes=get_jwt_expire_minutes()),
+        last_seen_at=now, revoked_at=None, revoked_reason=None,
+        csrf_token_hash=csrf_token_hash,
+    ))
+    return create_access_token(str(user.id), jti=jti)
+
+
+def _secure_cookie(request: Request) -> bool:
+    environment = os.environ.get("APP_ENV", "development").strip().lower()
+    return environment in {"staging", "production"} or request.url.scheme == "https"
+
+
+def _revoke_user_sessions(
+    session: Session,
+    user_id: UUID,
+    reason: str,
+    jti: str | None = None,
+) -> int:
+    query = session.query(UserSession).filter(
+        UserSession.user_id == user_id,
+        UserSession.revoked_at.is_(None),
+    )
+    if jti is not None:
+        query = query.filter(UserSession.jti == jti)
+    revoked_at = datetime.now(UTC)
+    values: dict[Any, Any] = {UserSession.revoked_at: revoked_at, UserSession.revoked_reason: reason}
+    if hasattr(query, "update"):
+        return int(query.update(values, synchronize_session=False))
+    rows = query.all()
+    for row in rows:
+        row.revoked_at = revoked_at
+        row.revoked_reason = reason
+    return len(rows)
+
+
 def _membership_for_user(session: Session, user_id: UUID) -> OrganizationMembership | None:
     """Return the single customer tenancy supported by the current MVP."""
-    return (
+    query = (
         session.query(OrganizationMembership)
         .filter(OrganizationMembership.user_id == user_id)
         .order_by(OrganizationMembership.created_at.asc())
-        .first()
     )
+    try:
+        memberships = list(query.all())
+    except AttributeError:
+        memberships = []
+    if memberships and not hasattr(memberships[0], "role"):
+        first = query.first()
+        memberships = [first] if first is not None else []
+    if len(memberships) > 1:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Multiple organization memberships are not supported",
+        )
+    if memberships:
+        return memberships[0]
+    first = query.first()
+    return first if isinstance(first, OrganizationMembership) or hasattr(first, "role") else None
 
 
 def _require_organization_owner(session: Session, current_user: User) -> OrganizationMembership:
@@ -1056,12 +1272,11 @@ def _trial_response(session: Session, current_user: User) -> dict:
         "billing_mode": "trial_non_billable",
     }
 
-@app.post("/api/v1/auth/token", response_model=Token)
-def login_for_access_token(
+def _authenticate_login(
     request: Request,
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    session: Session = Depends(get_db_session)
-):
+    form_data: OAuth2PasswordRequestForm,
+    session: Session,
+) -> User:
     normalized_username = form_data.username.strip().lower()
     scope_hash = _login_scope_hash(normalized_username, request)
     now = datetime.now(UTC)
@@ -1074,33 +1289,111 @@ def login_for_access_token(
         )
     user = session.query(User).filter(User.username == normalized_username).first()
     password_valid = verify_password(form_data.password, user.password_hash if user else _DUMMY_PASSWORD_HASH)
-    if not user or not password_valid:
+    if not user or not password_valid or not user.active:
         _record_failed_login(session, scope_hash, now)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    if not user.active:
-        _record_failed_login(session, scope_hash, now)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    # Last-login metadata is operational, never used as an authorization decision.
     user.last_login_at = datetime.now(UTC)
     _clear_failed_logins(session, scope_hash)
-    if hasattr(session, "commit"):
-        try:
-            session.commit()
-        except Exception:
-            if hasattr(session, "rollback"):
-                session.rollback()
-            logger.warning("Could not update last_login_at for authenticated user")
+    return user
 
-    access_token = create_access_token(str(user.id))
+
+def _commit_login_session(session: Session) -> None:
+    try:
+        session.commit()
+    except Exception:
+        session.rollback()
+        logger.exception("Could not create authenticated session")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se pudo iniciar la sesión",
+        ) from None
+
+
+@app.post("/api/v1/auth/token", response_model=Token)
+def login_for_access_token(
+    request: Request,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    session: Session = Depends(get_db_session),
+):
+    user = _authenticate_login(request, form_data, session)
+    access_token = _issue_user_session(session, user)
+    _commit_login_session(session)
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.post("/api/v1/auth/session", response_model=BrowserSessionResponse)
+def login_browser_session(
+    request: Request,
+    response: Response,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    session: Session = Depends(get_db_session),
+):
+    require_same_origin(request)
+    user = _authenticate_login(request, form_data, session)
+    csrf_token = secrets.token_urlsafe(32)
+    access_token = _issue_user_session(session, user, csrf_token=csrf_token)
+    _commit_login_session(session)
+    max_age = get_jwt_expire_minutes() * 60
+    secure = _secure_cookie(request)
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        access_token,
+        max_age=max_age,
+        path="/",
+        secure=secure,
+        httponly=True,
+        samesite="lax",
+    )
+    response.set_cookie(
+        CSRF_COOKIE_NAME,
+        csrf_token,
+        max_age=max_age,
+        path="/",
+        secure=secure,
+        httponly=False,
+        samesite="lax",
+    )
+    return {
+        "csrf_token": csrf_token,
+        "username": user.username,
+        "role": canonical_role(user.role),
+    }
+
+
+@app.post("/api/v1/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(
+    request: Request,
+    session: Annotated[Session, Depends(get_db_session)],
+    principal: Annotated[AuthenticatedPrincipal, Depends(get_authenticated_principal)],
+):
+    _revoke_user_sessions(session, principal.user.id, "logout", jti=principal.jti)
+    session.commit()
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    if principal.mode == "cookie":
+        secure = _secure_cookie(request)
+        response.delete_cookie(SESSION_COOKIE_NAME, path="/", secure=secure, samesite="lax")
+        response.delete_cookie(CSRF_COOKIE_NAME, path="/", secure=secure, samesite="lax")
+    return response
+
+
+@app.post("/api/v1/auth/logout-all", status_code=status.HTTP_204_NO_CONTENT)
+def logout_all(
+    request: Request,
+    session: Annotated[Session, Depends(get_db_session)],
+    principal: Annotated[AuthenticatedPrincipal, Depends(get_authenticated_principal)],
+):
+    _revoke_user_sessions(session, principal.user.id, "logout_all")
+    session.commit()
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    if principal.mode == "cookie":
+        secure = _secure_cookie(request)
+        response.delete_cookie(SESSION_COOKIE_NAME, path="/", secure=secure, samesite="lax")
+        response.delete_cookie(CSRF_COOKIE_NAME, path="/", secure=secure, samesite="lax")
+    return response
 
 
 @app.post("/api/v1/auth/register", response_model=OrganizationRegistrationResponse, status_code=status.HTTP_201_CREATED)
@@ -1108,13 +1401,21 @@ def register_organization_owner(
     request: OrganizationRegistrationRequest,
     session: Session = Depends(get_db_session),
 ):
-    """Create the first customer identity and its isolated organization.
+    """Create the first customer identity after explicit document acceptance.
 
     Public registration is intentionally limited to the organization owner role.
     Platform administration can never be requested through this boundary.
     """
     if request.password != request.password_confirmation:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Las contraseñas no coinciden")
+    package = current_onboarding_package()
+    manifest = load_document_manifest()
+    if not request.acceptance_confirmed:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Debe aceptar las condiciones del servicio y el alcance técnico")
+    if request.accepted_document_package_id != package.package_id or request.accepted_document_package_version != package.version:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="La versión de los documentos aceptados no es vigente")
+    if request.accepted_document_package_sha256 != package.sha256:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="La huella de los documentos aceptados no es vigente")
     username = _normalise_username(request.username)
     organization_name = request.organization_name.strip()
     if len(organization_name) < 2:
@@ -1137,16 +1438,39 @@ def register_organization_owner(
         id=uuid4(), organization_id=organization.id, user_id=owner.id,
         role=ORGANIZATION_OWNER, created_at=now,
     )
+    acceptances = [
+        ServiceDocumentAcceptance(
+            id=uuid4(),
+            organization_id=organization.id,
+            user_id=owner.id,
+            package_id=package.package_id,
+            package_version=package.version,
+            document_id=document.document_id,
+            document_version=document.version,
+            document_sha256=document.sha256,
+            package_sha256=package.sha256,
+            source_path=document.path,
+            acceptance_type=ACCEPTANCE_TYPE,
+            accepted_at=now,
+        )
+        for document in package.documents
+    ]
     try:
         # Persist the foreign-key targets first. PostgreSQL enforces these
         # constraints immediately, while SQLite test configurations may not.
         session.add_all((owner, organization))
         session.flush()
-        session.add(membership)
+        session.add_all((membership, *acceptances))
         verification_token = _issue_account_action_token(session, owner, _EMAIL_VERIFICATION) if verification_required else None
         _record_user_audit(session, owner.id, owner.id, "organization_registered", {
             "organization_id": str(organization.id), "organization_name": organization.name,
             "role": ORGANIZATION_OWNER,
+            "accepted_document_package": package.package_id,
+            "accepted_document_package_version": package.version,
+            "accepted_document_package_sha256": package.sha256,
+            "accepted_document_manifest_version": manifest["manifest_version"],
+            "accepted_document_ids": [document.document_id for document in package.documents],
+            "acceptance_type": ACCEPTANCE_TYPE,
         })
         session.commit()
     except SQLAlchemyError as error:
@@ -1183,6 +1507,37 @@ def register_organization_owner(
         "organization_id": str(organization.id), "organization_name": organization.name,
         "verification_required": verification_required,
     }
+
+
+@app.get("/api/v1/organization/service-acceptances", response_model=list[ServiceDocumentAcceptanceResponse])
+def list_service_document_acceptances(
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    membership = _require_organization_owner(session, current_user)
+    records = (
+        session.query(ServiceDocumentAcceptance)
+        .filter(ServiceDocumentAcceptance.organization_id == membership.organization_id)
+        .order_by(ServiceDocumentAcceptance.accepted_at.desc(), ServiceDocumentAcceptance.id.desc())
+        .all()
+    )
+    return [
+        {
+            "id": str(record.id),
+            "organization_id": str(record.organization_id),
+            "user_id": str(record.user_id),
+            "package_id": record.package_id,
+            "package_version": record.package_version,
+            "document_id": record.document_id,
+            "document_version": record.document_version,
+            "document_sha256": record.document_sha256,
+            "package_sha256": record.package_sha256,
+            "source_path": record.source_path,
+            "acceptance_type": record.acceptance_type,
+            "accepted_at": record.accepted_at,
+        }
+        for record in records
+    ]
 
 
 @app.post("/api/v1/auth/email-verification/resend", status_code=status.HTTP_202_ACCEPTED)
@@ -1240,6 +1595,7 @@ def confirm_password_recovery(request: PasswordRecoveryConfirmRequest, session: 
     user = _consume_account_action_token(session, request.token, _PASSWORD_RECOVERY)
     user.password_hash = hash_password(password)
     user.updated_at = datetime.now(UTC)
+    _revoke_user_sessions(session, user.id, "password_recovery")
     _record_user_audit(session, user.id, user.id, "password_recovered", {})
     session.commit()
     return {"message": "Contraseña actualizada. Ya puedes iniciar sesión."}
@@ -1420,6 +1776,8 @@ def update_organization_member(
             detail="No se recibió ningún cambio para aplicar. Proporcione active, una contraseña o generate_temp=true.",
         )
     target.updated_at = datetime.now(UTC)
+    if changes.get("password_reset") or request.active is False:
+        _revoke_user_sessions(session, target.id, "credential_or_access_change")
     audit_changes = changes.copy()
     # Eliminar la contraseña del audit log por seguridad.
     if "_temp_password_store" in locals():
@@ -1824,6 +2182,7 @@ def update_user(
     if not changes:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se recibió ningún cambio para aplicar")
     user.updated_at = datetime.now(UTC)
+    _revoke_user_sessions(session, user.id, "credential_or_access_change")
     _record_user_audit(session, current_admin.id, user.id, "account_updated", changes)
     session.commit()
     session.refresh(user)
@@ -2050,6 +2409,58 @@ def evaluation_history(
     }
 
 
+def _accessible_evaluation_record(
+    session: Session, current_user: User, evaluation_id: UUID
+) -> tuple[EvaluationRecord, PersistedEvaluation]:
+    record = session.query(EvaluationRecord).filter(EvaluationRecord.id == evaluation_id).first()
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluation not found")
+    if not _can_access_organization_user(session, current_user, record.requested_by_user_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluation not found")
+    persisted = PostgresEvaluationRepository_Dependency_Wrapper(session).get_evaluation(evaluation_id)
+    if not persisted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluation not found")
+    return record, persisted
+
+
+def _evaluation_evidence_fields(persisted: PersistedEvaluation) -> dict[str, object]:
+    reconstructed = persisted.reconstructed_evidence
+    if persisted.control_id == "GH-001" and isinstance(reconstructed, GH001Evidence):
+        return {
+            "required_review_approvals": reconstructed.required_review_approvals,
+            "dismiss_stale_reviews": reconstructed.dismiss_stale_reviews,
+        }
+    if persisted.control_id == "GH-002" and isinstance(reconstructed, GH002Evidence):
+        return {
+            "default_branch": reconstructed.default_branch,
+            "protection_enabled": reconstructed.protection_enabled,
+        }
+    if persisted.control_id == "GH-003" and isinstance(reconstructed, GH003Evidence):
+        return {
+            "branch": reconstructed.branch,
+            "required_signatures_enabled": reconstructed.required_signatures_enabled,
+        }
+    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stored evaluation evidence is inconsistent")
+
+
+def _stored_evidence_hash(record: EvaluationRecord, persisted: PersistedEvaluation) -> str:
+    stored_hash = getattr(getattr(record, "evidence", None), "evidence_hash", None)
+    if isinstance(stored_hash, str):
+        return stored_hash
+    return ""
+
+
+def _result_explanation(persisted: PersistedEvaluation, stored_hash: str) -> dict[str, object]:
+    return build_result_explanation(
+        control_id=persisted.control_id,
+        rule_id=persisted.rule_id,
+        rule_version=persisted.rule_version,
+        status=persisted.status,
+        evidence=persisted.reconstructed_evidence,
+        evidence_hash=stored_hash,
+    )
+
+
 @app.get("/api/v1/evaluations/{evaluation_id}")
 def evaluation_detail(
     evaluation_id: UUID,
@@ -2057,39 +2468,10 @@ def evaluation_detail(
     current_user: User = Depends(get_current_user),
 ):
     """Return the immutable evidence for one evaluation, subject to ownership."""
-    record = session.query(EvaluationRecord).filter(EvaluationRecord.id == evaluation_id).first()
-    if not record:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluation not found")
-
-    if not _can_access_organization_user(session, current_user, record.requested_by_user_id):
-        # Do not disclose the existence of another auditor's evaluation.
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluation not found")
-
-    persisted = PostgresEvaluationRepository_Dependency_Wrapper(session).get_evaluation(evaluation_id)
-    if not persisted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluation not found")
-
-    reconstructed = persisted.reconstructed_evidence
-    evidence: dict[str, object]
-    if persisted.control_id == "GH-001" and isinstance(reconstructed, GH001Evidence):
-        evidence = {
-            "required_review_approvals": reconstructed.required_review_approvals,
-            "dismiss_stale_reviews": reconstructed.dismiss_stale_reviews,
-        }
-    elif persisted.control_id == "GH-002" and isinstance(reconstructed, GH002Evidence):
-        evidence = {
-            "default_branch": reconstructed.default_branch,
-            "protection_enabled": reconstructed.protection_enabled,
-        }
-    elif persisted.control_id == "GH-003" and isinstance(reconstructed, GH003Evidence):
-        evidence = {
-            "branch": reconstructed.branch,
-            "required_signatures_enabled": reconstructed.required_signatures_enabled,
-        }
-    else:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stored evaluation evidence is inconsistent")
-
-    evidence["hash"] = reconstructed.canonical_hash()
+    record, persisted = _accessible_evaluation_record(session, current_user, evaluation_id)
+    evidence = _evaluation_evidence_fields(persisted)
+    stored_hash = _stored_evidence_hash(record, persisted)
+    evidence["hash"] = persisted.reconstructed_evidence.canonical_hash()
     return {
         "evaluation_id": str(persisted.id),
         "control_id": persisted.control_id,
@@ -2107,7 +2489,41 @@ def evaluation_detail(
         "evidence": evidence,
         "collected_at": persisted.collected_at.isoformat(),
         "evaluated_at": persisted.evaluated_at.isoformat(),
+        "explanation": _result_explanation(persisted, stored_hash),
     }
+
+
+@app.get("/api/v1/evaluations/{evaluation_id}/report.pdf")
+def evaluation_report_pdf(
+    evaluation_id: UUID,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Return a protected PDF generated only from persisted evaluation data."""
+    record, persisted = _accessible_evaluation_record(session, current_user, evaluation_id)
+    stored_hash = _stored_evidence_hash(record, persisted)
+    generated_at = datetime.now(UTC)
+    pdf_bytes = build_evaluation_report_pdf(
+        evaluation_id=str(persisted.id),
+        control_id=persisted.control_id,
+        status=persisted.status.name,
+        source_repository=persisted.source_repository,
+        source_branch=persisted.source_branch,
+        collected_at=persisted.collected_at.isoformat(),
+        evaluated_at=persisted.evaluated_at.isoformat(),
+        explanation=_result_explanation(persisted, stored_hash),
+        generated_at=generated_at,
+    )
+    filename = f"securecode-{persisted.control_id.lower()}-{evaluation_id}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store, max-age=0",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @app.get("/api/v1/verify/{evaluation_id}")
@@ -2137,6 +2553,60 @@ def verify_evidence_public(
 def health_check():
     return {"status": "ok"}
 
+
+@app.get("/health/live")
+def health_live():
+    return {"status": "alive", "service": "securecode"}
+
+
+@app.get("/health/ready")
+def health_ready():
+    ready, reason = readiness_status(get_engine)
+    status_code = status.HTTP_200_OK if ready else status.HTTP_503_SERVICE_UNAVAILABLE
+    payload = {"status": "ready" if ready else "not_ready", "reason": reason}
+    log_event(
+        logging.INFO if ready else logging.ERROR,
+        "health.readiness.checked",
+        reason=reason,
+    )
+    return JSONResponse(status_code=status_code, content=payload)
+
+
+def _evaluation_status(persisted: PersistedEvaluation) -> str:
+    status_value = getattr(persisted, "status", None)
+    name = getattr(status_value, "name", None)
+    if isinstance(name, str):
+        return name
+    return str(status_value).upper() if status_value is not None else "UNKNOWN"
+
+
+def _record_evaluation_success(control_id: str, persisted: PersistedEvaluation, started: float) -> None:
+    duration_ms = (time.perf_counter() - started) * 1000
+    result_status = _evaluation_status(persisted)
+    metrics.record_evaluation(control_id, result_status, "RESULT", duration_ms)
+    log_event(
+        logging.INFO,
+        "evaluation.completed",
+        control_id=control_id,
+        result_status=result_status,
+        outcome="RESULT",
+        duration_ms=duration_ms,
+    )
+
+
+def _record_evaluation_error(control_id: str, error: Exception, started: float) -> None:
+    duration_ms = (time.perf_counter() - started) * 1000
+    metrics.record_evaluation(control_id, "NONE", "TECHNICAL_ERROR", duration_ms)
+    log_critical_error(
+        "evaluation.technical_error",
+        error_type=type(error).__name__,
+        control_id=control_id,
+        result_status="NONE",
+        outcome="TECHNICAL_ERROR",
+        duration_ms=duration_ms,
+    )
+
+
 @app.post("/api/v1/evaluations/gh-001", response_model=EvaluationResponse)
 def evaluate_gh001_endpoint(
     request: GH001EvaluationRequest,
@@ -2148,6 +2618,7 @@ def evaluate_gh001_endpoint(
     """
     Executes the GH-001 control evaluation on a GitHub repository.
     """
+    started = time.perf_counter()
     _require_repository_authorization(session, current_user, request.owner, request.repository)
     repo = PostgresEvaluationRepository_Dependency_Wrapper(session)
     reservation_id = _reserve_trial_evaluation(
@@ -2163,16 +2634,18 @@ def evaluate_gh001_endpoint(
             requested_by_user_id=current_user.id
         )
         _complete_trial_evaluation(session, reservation_id, persisted.id)
+        _record_evaluation_success("GH-001", persisted, started)
     except ValueError as e:
         _release_trial_evaluation(session, reservation_id)
+        _record_evaluation_error("GH-001", e, started)
         raise HTTPException(status_code=422, detail="Invalid evidence acquired") from e
     except RuntimeError as e:
         _release_trial_evaluation(session, reservation_id)
-        logger.error(f"Execution failed: {e}")
+        _record_evaluation_error("GH-001", e, started)
         raise HTTPException(status_code=502, detail="Infrastructure or upstream communication failure") from e
     except Exception as e:
         _release_trial_evaluation(session, reservation_id)
-        logger.error(f"Unexpected internal error: {e}")
+        _record_evaluation_error("GH-001", e, started)
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
 
     rule_obj = None
@@ -2182,6 +2655,15 @@ def evaluate_gh001_endpoint(
     evidence = persisted.reconstructed_evidence
     if not isinstance(evidence, GH001Evidence):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stored GH-001 evidence is inconsistent")
+    evidence_hash = evidence.canonical_hash()
+    explanation = build_result_explanation(
+        control_id=persisted.control_id,
+        rule_id=persisted.rule_id,
+        rule_version=persisted.rule_version,
+        status=persisted.status,
+        evidence=evidence,
+        evidence_hash=evidence_hash,
+    )
 
     return EvaluationResponse(
         evaluation_id=str(persisted.id),
@@ -2196,10 +2678,11 @@ def evaluate_gh001_endpoint(
         evidence=EvidenceResponse(
             required_review_approvals=evidence.required_review_approvals,
             dismiss_stale_reviews=evidence.dismiss_stale_reviews,
-            hash=evidence.canonical_hash()
+            hash=evidence_hash
         ),
         collected_at=persisted.collected_at.isoformat(),
-        evaluated_at=persisted.evaluated_at.isoformat()
+        evaluated_at=persisted.evaluated_at.isoformat(),
+        explanation=explanation
     )
 
 def PostgresEvaluationRepository_Dependency_Wrapper(session: Session) -> EvaluationRepository:
@@ -2231,6 +2714,7 @@ def evaluate_gh002_endpoint(
     """
     Executes the GH-002 control evaluation on a GitHub repository.
     """
+    started = time.perf_counter()
     _require_repository_authorization(session, current_user, request.owner, request.repository)
     repo = PostgresEvaluationRepository_Dependency_Wrapper(session)
     reservation_id = _reserve_trial_evaluation(
@@ -2245,16 +2729,18 @@ def evaluate_gh002_endpoint(
             requested_by_user_id=current_user.id
         )
         _complete_trial_evaluation(session, reservation_id, persisted.id)
+        _record_evaluation_success("GH-002", persisted, started)
     except ValueError as e:
         _release_trial_evaluation(session, reservation_id)
+        _record_evaluation_error("GH-002", e, started)
         raise HTTPException(status_code=422, detail="Invalid evidence acquired") from e
     except RuntimeError as e:
         _release_trial_evaluation(session, reservation_id)
-        logger.error(f"Execution failed: {e}")
+        _record_evaluation_error("GH-002", e, started)
         raise HTTPException(status_code=502, detail="Infrastructure or upstream communication failure") from e
     except Exception as e:
         _release_trial_evaluation(session, reservation_id)
-        logger.error(f"Unexpected internal error: {e}")
+        _record_evaluation_error("GH-002", e, started)
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
 
     rule_obj = None
@@ -2264,6 +2750,15 @@ def evaluate_gh002_endpoint(
     evidence = persisted.reconstructed_evidence
     if not isinstance(evidence, GH002Evidence):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stored GH-002 evidence is inconsistent")
+    evidence_hash = evidence.canonical_hash()
+    explanation = build_result_explanation(
+        control_id=persisted.control_id,
+        rule_id=persisted.rule_id,
+        rule_version=persisted.rule_version,
+        status=persisted.status,
+        evidence=evidence,
+        evidence_hash=evidence_hash,
+    )
 
     return GH002EvaluationResponse(
         evaluation_id=str(persisted.id),
@@ -2278,10 +2773,11 @@ def evaluate_gh002_endpoint(
         evidence=GH002EvidenceResponse(
             default_branch=evidence.default_branch,
             protection_enabled=evidence.protection_enabled,
-            hash=evidence.canonical_hash()
+            hash=evidence_hash
         ),
         collected_at=persisted.collected_at.isoformat(),
-        evaluated_at=persisted.evaluated_at.isoformat()
+        evaluated_at=persisted.evaluated_at.isoformat(),
+        explanation=explanation
     )
 
 
@@ -2294,6 +2790,7 @@ def evaluate_gh003_endpoint(
     current_user: User = Depends(get_current_user),
 ):
     """Verify that the selected GitHub branch requires signed commits."""
+    started = time.perf_counter()
     _require_repository_authorization(session, current_user, request.owner, request.repository)
     repository = PostgresEvaluationRepository_Dependency_Wrapper(session)
     reservation_id = _reserve_trial_evaluation(
@@ -2309,22 +2806,33 @@ def evaluate_gh003_endpoint(
             requested_by_user_id=current_user.id,
         )
         _complete_trial_evaluation(session, reservation_id, persisted.id)
+        _record_evaluation_success("GH-003", persisted, started)
     except ValueError as error:
         _release_trial_evaluation(session, reservation_id)
+        _record_evaluation_error("GH-003", error, started)
         raise HTTPException(status_code=422, detail="Invalid evidence acquired") from error
     except RuntimeError as error:
         _release_trial_evaluation(session, reservation_id)
-        logger.error("GH-003 execution failed: %s", error)
+        _record_evaluation_error("GH-003", error, started)
         raise HTTPException(status_code=502, detail="Infrastructure or upstream communication failure") from error
     except Exception as error:
         _release_trial_evaluation(session, reservation_id)
-        logger.error("Unexpected GH-003 error: %s", error)
+        _record_evaluation_error("GH-003", error, started)
         raise HTTPException(status_code=500, detail="Internal Server Error") from error
 
     rule = RuleResponse(id=persisted.rule_id, version=persisted.rule_version) if persisted.rule_id and persisted.rule_version else None
     evidence = persisted.reconstructed_evidence
     if not isinstance(evidence, GH003Evidence):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stored GH-003 evidence is inconsistent")
+    evidence_hash = evidence.canonical_hash()
+    explanation = build_result_explanation(
+        control_id=persisted.control_id,
+        rule_id=persisted.rule_id,
+        rule_version=persisted.rule_version,
+        status=persisted.status,
+        evidence=evidence,
+        evidence_hash=evidence_hash,
+    )
     return GH003EvaluationResponse(
         evaluation_id=str(persisted.id),
         control_id=persisted.control_id,
@@ -2334,8 +2842,9 @@ def evaluate_gh003_endpoint(
         evidence=GH003EvidenceResponse(
             branch=evidence.branch,
             required_signatures_enabled=evidence.required_signatures_enabled,
-            hash=evidence.canonical_hash(),
+            hash=evidence_hash,
         ),
         collected_at=persisted.collected_at.isoformat(),
         evaluated_at=persisted.evaluated_at.isoformat(),
+        explanation=explanation,
     )

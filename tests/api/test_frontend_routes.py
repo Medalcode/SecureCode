@@ -11,7 +11,7 @@ def test_public_home_serves_html():
     assert response.status_code == 200
     assert "text/html" in response.headers.get("content-type", "")
     assert response.headers.get("cache-control") == "no-store, max-age=0"
-    assert "/static/public/site.css?v=20261115-public-site" in response.text
+    assert "/static/public/site.css?v=20261120-normative-transparency" in response.text
     assert "Confianza técnica" in response.text
     assert 'href="/app"' in response.text
     assert '/static/public/securecode-mark.svg' in response.text
@@ -23,8 +23,10 @@ def test_console_shell_remains_available_at_app_route():
     assert response.status_code == 200
     assert "text/html" in response.headers.get("content-type", "")
     assert response.headers.get("cache-control") == "no-store, max-age=0"
-    assert "/static/css/app.css?v=20261111-admin-navigation-gate" in response.text
-    assert "/static/js/app.js?v=20261117-email-verification" in response.text
+    assert 'href="/" class="brand-badge"' in response.text
+    assert 'aria-label="Ir a la página de inicio de SecureCode"' in response.text
+    assert "/static/css/app.css?v=20261121-explainable-results" in response.text
+    assert "/static/js/app.js?v=20261121-explainable-results" in response.text
     assert "Enterprise Trial" in response.text
     assert "enterpriseTrialActivateForm" in response.text
     assert "SecureCode" in response.text
@@ -47,6 +49,9 @@ def test_console_shell_remains_available_at_app_route():
     assert 'id="btnExportHistory" title="Exportar historial CSV" hidden' in response.text
     assert 'id="btnSubmitEval"' in response.text
     assert 'id="btnSubmitEval" disabled' not in response.text
+    assert 'id="explanationPanel"' in response.text
+    assert 'id="explanationConditions"' in response.text
+    assert 'id="btnDownloadEvaluationPdf"' in response.text
     assert "Validación local verificada" in response.text
 
 
@@ -86,12 +91,20 @@ def test_api_source_has_no_known_mojibake_markers():
     assert "Â" not in source
 
 
+def test_console_shell_has_no_inline_scripts_and_uses_theme_bootstrap():
+    html = Path("src/securecode/static/index.html").read_text(encoding="utf-8")
+    assert '<script src="/static/js/theme-init.js"></script>' in html
+    assert '<script src="/static/js/app.js?v=20261121-explainable-results"></script>' in html
+    assert "<script>" not in html.replace('<script src="/static/js/theme-init.js"></script>', "").replace('<script src="/static/js/app.js?v=20261121-explainable-results"></script>', "")
+    assert Path("src/securecode/static/js/theme-init.js").exists()
+
+
 def test_admin_navigation_is_gated_by_the_server_validated_role():
     script = Path("src/securecode/static/js/app.js").read_text(encoding="utf-8")
     stylesheet = Path("src/securecode/static/css/app.css").read_text(encoding="utf-8")
     assert "function updateAdminAccess()" in script
-    assert "return Boolean(state.token && state.accessRole === 'platform_admin');" in script
-    assert "return Boolean(state.token && state.accessRole === 'organization_owner');" in script
+    assert "return Boolean(state.csrfToken && state.accessRole === 'platform_admin');" in script
+    assert "return Boolean(state.csrfToken && state.accessRole === 'organization_owner');" in script
     assert "const finopsNav = document.querySelector('.nav-item[data-view=\"usage\"]');" in script
     assert "const subscriptionNav = document.querySelector('.nav-item[data-view=\"subscription\"]');" in script
     assert "const settingsNav = document.querySelector('.nav-item[data-view=\"settings\"]');" in script
@@ -114,13 +127,16 @@ def test_admin_navigation_is_gated_by_the_server_validated_role():
     assert "function loadManagementReport()" in script
     assert "'/api/v1/management-report'" in script
     assert "function downloadManagementReport()" in script
-    assert """if (!state.token) {
+    assert "function renderExplanation(data)" in script
+    assert "function downloadEvaluationPdf()" in script
+    assert "/report.pdf" in script
+    assert """if (!state.csrfToken) {
         setEvaluatorFeedback('Inicia sesión para ejecutar una evaluación y guardar su evidencia.', 'neutral');
         openAuthModal();
         return;
       }""" in script
     assert """btnSubmit?.addEventListener('click', (event) => {
-      if (state.token) return;
+      if (state.csrfToken) return;
       event.preventDefault();
       setEvaluatorFeedback('Inicia sesión para ejecutar una evaluación y guardar su evidencia.', 'neutral');
       openAuthModal();
@@ -155,6 +171,19 @@ def test_analyst_password_reset_modal_replaces_prompt():
             "        : { password: document.getElementById('resetUserPassword').value };") in script
     assert "openOrganizationPasswordPanel(target.username, tempPassword)" in script
     assert 'id="orgPasswordCopyBtn"' in html
+
+
+def test_browser_session_frontend_uses_cookies_and_csrf():
+    script = Path("src/securecode/static/js/app.js").read_text(encoding="utf-8")
+    assert "securecode_token" not in script
+    assert "data.access_token" not in script
+    assert "headers.delete('Authorization')" in script
+    assert "fetch('/api/v1/auth/session'" in script
+    assert "state.csrfToken = data.csrf_token;" in script
+    assert "headers.set('X-CSRF-Token', state.csrfToken);" in script
+    assert "credentials: 'same-origin'" in script
+    assert "function readCsrfCookie()" in script
+    assert "localStorage.removeItem('securecode_token')" not in script
 
 
 def test_rules_catalog_endpoint():

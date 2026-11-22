@@ -6,6 +6,7 @@ from securecode.api.security import (
     hash_password,
     verify_password,
     create_access_token,
+    decode_access_token,
     verify_access_token,
     get_jwt_secret,
 )
@@ -44,6 +45,17 @@ def test_jwt_creation_and_verification():
     # Verify token
     decoded_user_id = verify_access_token(token)
     assert decoded_user_id == user_id
+
+def test_jwt_creation_includes_unique_jti():
+    first = create_access_token("user-one")
+    second = create_access_token("user-one")
+    first_payload = decode_access_token(first)
+    second_payload = decode_access_token(second)
+    assert first_payload is not None
+    assert second_payload is not None
+    assert first_payload.sub == "user-one"
+    assert first_payload.jti
+    assert first_payload.jti != second_payload.jti
 
 def test_jwt_invalid_token():
     assert verify_access_token("not.a.real.jwt") is None

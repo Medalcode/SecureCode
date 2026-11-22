@@ -57,6 +57,24 @@ class AccountActionToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 
 
+class UserSession(Base):
+    __tablename__ = "user_sessions"
+    __table_args__ = (
+        Index("ix_user_sessions_user_active", "user_id", "revoked_at"),
+        UniqueConstraint("jti", name="uq_user_sessions_jti"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    jti: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_reason: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    csrf_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
 class Organization(Base):
     """A tenant that owns Enterprise Trial quotas and memberships."""
 
@@ -68,10 +86,14 @@ class Organization(Base):
 
 
 class OrganizationMembership(Base):
-    """Explicit user-to-tenant relation; a user may belong to many tenants."""
+    """Explicit user-to-tenant relation; this MVP allows one tenant per user."""
 
     __tablename__ = "organization_memberships"
-    __table_args__ = (UniqueConstraint("organization_id", "user_id", name="uq_organization_membership"),)
+    __table_args__ = (
+        UniqueConstraint("organization_id", "user_id", name="uq_organization_membership"),
+        UniqueConstraint("user_id", name="uq_organization_memberships_user"),
+        Index("ix_organization_memberships_user", "user_id"),
+    )
 
     id: Mapped[UUID] = mapped_column(primary_key=True)
     organization_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False)
@@ -110,7 +132,10 @@ class EnterpriseTrialUsage(Base):
     """Transactional reservation so concurrent requests cannot overrun a trial quota."""
 
     __tablename__ = "enterprise_trial_usages"
-    __table_args__ = (UniqueConstraint("trial_id", "idempotency_key", name="uq_enterprise_trial_usage_key"),)
+    __table_args__ = (
+        UniqueConstraint("trial_id", "idempotency_key", name="uq_enterprise_trial_usage_key"),
+        Index("ix_enterprise_trial_usages_trial_state", "trial_id", "state"),
+    )
 
     id: Mapped[UUID] = mapped_column(primary_key=True)
     trial_id: Mapped[UUID] = mapped_column(ForeignKey("enterprise_trials.id"), nullable=False)
@@ -125,6 +150,7 @@ class UserAuditEvent(Base):
     """Immutable security-relevant lifecycle event for an account."""
 
     __tablename__ = "user_audit_events"
+    __table_args__ = (Index("ix_user_audit_events_target_created", "target_user_id", "created_at"),)
 
     id: Mapped[UUID] = mapped_column(primary_key=True)
     actor_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
@@ -170,6 +196,7 @@ class SubscriptionEvent(Base):
     """Append-only history of confirmed subscription changes."""
 
     __tablename__ = "subscription_events"
+    __table_args__ = (Index("ix_subscription_events_user_occurred", "user_id", "occurred_at"),)
 
     id: Mapped[UUID] = mapped_column(primary_key=True)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
@@ -179,6 +206,32 @@ class SubscriptionEvent(Base):
     effective_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     effective_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     event_type: Mapped[str] = mapped_column(String(32), nullable=False)
+
+
+class ServiceDocumentAcceptance(Base):
+    """Append-only proof that an owner accepted a published document bundle."""
+
+    __tablename__ = "service_document_acceptances"
+    __table_args__ = (
+        Index("ix_service_document_acceptances_org_accepted_at", "organization_id", "accepted_at"),
+        Index("ix_service_document_acceptances_user_accepted_at", "user_id", "accepted_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    organization_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    package_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    package_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    document_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    document_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    document_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    package_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_path: Mapped[str] = mapped_column(String(255), nullable=False)
+    acceptance_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    accepted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+
+    organization: Mapped["Organization"] = relationship()
+    user: Mapped["User"] = relationship()
 
 
 class UserFinOpsSettings(Base):

@@ -1,0 +1,72 @@
+[
+  {
+    "op": "replace",
+    "path": "/cases/66/expected_status",
+    "value": "FAIL"
+  },
+  {
+    "op": "replace",
+    "path": "/cases/81/expected_status",
+    "value": "FAIL"
+  },
+  {
+    "op": "replace",
+    "path": "/cases/22/expected_status",
+    "value": "FAIL"
+  },
+  {
+    "op": "replace",
+    "path": "/cases/7/expected_status",
+    "value": "FAIL"
+  },
+  {
+    "op": "replace",
+    "path": "/cases/91/expected_status",
+    "value": "FAIL"
+  },
+  {
+    "op": "replace",
+    "path": "/cases/32/expected_status",
+    "value": "FAIL"
+  },
+  {
+    "op": "replace",
+    "path": "/cases/10/expected_status",
+    "value": "FAIL"
+  },
+  {
+    "op": "replace",
+    "path": "/cases/9/expected_status",
+    "value": "FAIL"
+  },
+  {
+    "op": "replace",
+    "path": "/cases/29/expected_status",
+    "value": "FAIL"
+  },
+  {
+    "op": "replace",
+    "path": "/cases/53/expected_status",
+    "value": "FAIL"
+  },
+  {
+    "op": "replace",
+    "path": "/cases/64/expected_status",
+    "value": "FAIL"
+  },
+  {
+    "op": "replace",
+    "path": "/cases/71/expected_status",
+    "value": "FAIL"
+  },
+  {
+    "op": "replace",
+    "path": "/cases/87/expected_status",
+    "value": "FAIL"
+  },
+  {
+    "op": "replace",
+    "path": "/cases/101/expected_status",
+    "value": "FAIL"
+  }
+]

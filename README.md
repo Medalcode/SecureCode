@@ -13,7 +13,7 @@ Desarrollada mediante metodología **SDD (Specification-Driven Development)**, a
 - **GH-003 (Signed Commits Required)**: Motor de evaluación determinista que verifica si la rama auditada exige commits firmados.
 - **Adaptadores GitHub REST API**: Adquisición y normalización de evidencia en tiempo real con degradación elegante ante estados no observables (*tri-state*: `PASS`, `FAIL`, `UNKNOWN`).
 - **Persistencia Inmutable en PostgreSQL**: Almacenamiento auditable con trazabilidad criptográfica (hashing canónico SHA-256 de evidencia cruda), integridad referencial estricta y migraciones versionadas con Alembic.
-- **Autenticación y Seguridad**: Hashing de contraseñas con Argon2id, tokens de acceso JWT (HS256) con expiración configurable, validación de usuarios activos, vinculación de auditoría `requested_by_user_id`, CORS de lista permitida y cabeceras de seguridad para navegador.
+- **Autenticación y Seguridad**: Hashing de contraseñas con Argon2id, JWT HS256 con `jti` único y sesiones revocables en PostgreSQL, cookie HttpOnly y token CSRF para la consola web, Bearer para clientes API, logout y logout-all, revocación automática al cambiar contraseña o desactivar cuentas, validación de usuarios activos, vinculación de auditoría `requested_by_user_id`, CORS sin credenciales y cabeceras de seguridad para navegador.
 - **Autorización y Auditoría**: tres roles explícitos: `platform_admin` para operación interna de SecureCode, `organization_owner` para gestionar una empresa cliente y `analyst` para evaluar repositorios autorizados. Cada empresa queda aislada por membresías y autorizaciones normalizadas como `owner/repo`.
 - **Frontend SPA Minimalista (Estilo Gemini/ChatGPT)**: Interfaz web oscura/clara sin dependencias pesadas, con selector de controles, visor de evidencia en tiempo real, copia de hash SHA-256, telemetría del sistema, simulación en Sandbox y panel FinOps.
 - **Contenedorización para Producción**: `Dockerfile` multi-stage basado en `python:3.11-slim`, sin compilador en runtime, con usuario no privilegiado (`appuser`, UID 10001); Compose ejecuta la API con filesystem de sólo lectura, sin capacidades Linux y sin escalamiento de privilegios.
@@ -129,6 +129,42 @@ alembic downgrade -1
 alembic downgrade <revision_id>
 ```
 
+### Validación de entorno e instalación limpia
+
+El arranque de la API valida la configuración obligatoria antes de aceptar tráfico. La validación verifica `APP_ENV`, `DATABASE_URL`, `JWT_SECRET_KEY`, `JWT_ALGORITHM`, `CORS_ORIGINS`, parámetros de bloqueo de inicio de sesión y coherencia de secretos opcionales. Los mensajes de error no incluyen valores sensibles.
+
+```bash
+# Validar el entorno actual sin imprimir secretos
+python scripts/validate_environment.py
+
+# Validar una instalación PostgreSQL vacía desde cero
+python scripts/validate_fresh_install.py --database-url "$DATABASE_URL"
+```
+
+`validate_fresh_install.py` aplica todas las migraciones hasta `d4e9f1a2b3c4`, ejecuta `alembic check`, verifica 18 tablas, índices y restricciones, inserta datos de prueba aislados y confirma integridad referencial y unicidad multiempresa. La revisión actual de Alembic es `d4e9f1a2b3c4`.
+
+La verificación E2E de la consola con Playwright se ejecuta con `python scripts/run_browser_session_e2e.py`; valida cookies HttpOnly, CSRF, rechazo de solicitudes sin token/origen y logout con revocación.
+
+### Respaldo y recuperación verificable
+
+Los scripts operan solo contra PostgreSQL aislado de pruebas: requieren entorno explícito `test`, host `loopback`, nombres de base permitidos y URLs entregadas por variables de entorno (`BACKUP_SOURCE_DATABASE_URL` y `RESTORE_TARGET_DATABASE_URL`). Ninguna contraseña se acepta como argumento ni se escribe en artifacts, manifiestos o evidencia.
+
+```bash
+# Crear respaldo custom-format con manifiesto, SHA-256 y huellas por tabla
+python scripts/backup_postgres.py create --allowed-database <base_de_pruebas> --output-dir backups
+
+# Verificar artifact antes de cualquier uso
+python scripts/backup_postgres.py verify --backup backups/<archivo>.backup --manifest backups/<archivo>.backup.manifest.json
+
+# Restaurar en una base nueva securecode_restore_*, sin sobrescritura
+python scripts/restore_postgres.py --backup backups/<archivo>.backup --manifest backups/<archivo>.backup.manifest.json --confirm RESTORE_TO_ISOLATED_TEST_DATABASE
+
+# Verificación integral con dos organizaciones sintéticas, respaldo, restauración y comparación
+python scripts/verify_backup_restore.py --output-dir artifacts/backup-verification
+```
+
+El detalle de políticas, RPO/RTO propuestos, responsabilidades, incidentes y automatización cloud no activada está en [docs/manuals/05-respaldos-y-recuperacion.md](docs/manuals/05-respaldos-y-recuperacion.md).
+
 ---
 
 ## Guía de Despliegue Seguro en Google Cloud Run
@@ -138,7 +174,8 @@ alembic downgrade <revision_id>
 - Definir `APP_ENV=production`, `CORS_ORIGINS` con los dominios HTTPS exactos y `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` según la política de sesión.
 - Inyectar `DATABASE_URL`, `JWT_SECRET_KEY`, `GITHUB_TOKEN`, `RESEND_API_KEY` y las credenciales del usuario inicial exclusivamente desde Secret Manager.
 - Para confirmar correos y recuperar contraseñas, verificar primero el remitente en Resend y definir `RESEND_FROM_EMAIL`, `PUBLIC_APP_URL` (URL HTTPS pública) y `EMAIL_VERIFICATION_REQUIRED=true`. Los enlaces son de un solo uso; la verificación vence en 24 horas y la recuperación en 30 minutos por defecto.
-- Ejecutar `alembic upgrade head` como Job antes de transferir tráfico.
+- Ejecutar `python scripts/validate_environment.py` con la configuración de la revisión candidata; la API también lo ejecuta en el arranque.
+- Ejecutar `alembic upgrade head` como Job antes de transferir tráfico y confirmar `alembic check` sin deriva.
 - Crear el usuario inicial con una contraseña única y conservar sólo el hash Argon2id; no existe acceso de demostración en producción.
 - Confirmar `/health`, el inicio de sesión y una evaluación autenticada en la revisión candidata antes de mover tráfico.
 - Configurar TLS, dominio y WAF/rate limiting en el balanceador o proveedor. La API aplica además un bloqueo persistente configurable tras intentos fallidos (`LOGIN_MAX_FAILURES=5`, `LOGIN_WINDOW_SECONDS=900`); el WAF sigue siendo necesario para limitar abuso por IP antes de consumir Argon2id.
@@ -181,7 +218,7 @@ gcloud run deploy securecode \
   --platform managed \
   --region us-central1 \
   --allow-unauthenticated \
-  --set-env-vars "PORT=8000,LOG_LEVEL=INFO,JWT_ALGORITHM=HS256,EMAIL_VERIFICATION_REQUIRED=true,PUBLIC_APP_URL=https://<TU_URL_PUBLICA>,RESEND_FROM_EMAIL=SecureCode <no-reply@<TU_DOMINIO_VERIFICADO>>" \
+  --set-env-vars "APP_ENV=production,PORT=8000,LOG_LEVEL=INFO,JWT_ALGORITHM=HS256,CORS_ORIGINS=https://securecode.example.com,LOGIN_MAX_FAILURES=5,LOGIN_WINDOW_SECONDS=900,TRUST_PROXY_HEADERS=true,EMAIL_VERIFICATION_REQUIRED=true,PUBLIC_APP_URL=https://<TU_URL_PUBLICA>,RESEND_FROM_EMAIL=SecureCode <no-reply@<TU_DOMINIO_VERIFICADO>>" \
   --set-secrets "DATABASE_URL=securecode-db-url:latest,JWT_SECRET_KEY=securecode-jwt-secret:latest,GITHUB_TOKEN=securecode-github-token:latest,RESEND_API_KEY=securecode-resend-api-key:latest" \
   --no-traffic \
   --tag candidate
@@ -195,10 +232,14 @@ gcloud run deploy securecode \
 ```bash
 # Verificar que la revisión candidata responde correctamente
 curl https://candidate---securecode-<hash>-uc.a.run.app/health
+curl https://candidate---securecode-<hash>-uc.a.run.app/health/live
+curl https://candidate---securecode-<hash>-uc.a.run.app/health/ready
 
 # Transferir el 100% del tráfico
 gcloud run services update-traffic securecode --to-latest --region us-central1
 ```
+
+La aplicación emite logs JSON con `request_id` y contadores de baja cardinalidad por proceso. No se crean alertas ni exportadores automáticamente; la propuesta operacional está en [docs/manuals/06-observabilidad.md](docs/manuals/06-observabilidad.md).
 
 ### Paso 5: Validación de la revisión candidata
 

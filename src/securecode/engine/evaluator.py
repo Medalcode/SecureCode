@@ -20,10 +20,15 @@ def get_rules_directory() -> Path:
     return Path(configured).expanduser().resolve() if configured else _PACKAGED_RULES_DIR
 
 @lru_cache(maxsize=16)
-def get_rule_definition(rule_file: str) -> RuleDefinition:
-    """Load each canonical rule once per process, not once per request."""
-    with (get_rules_directory() / rule_file).open("r", encoding="utf-8") as f:
+def _load_rule_definition(rule_path: str) -> RuleDefinition:
+    """Load one resolved rule path once per process."""
+    with Path(rule_path).open("r", encoding="utf-8") as f:
         return RuleDefinition(**json.load(f))
+
+
+def get_rule_definition(rule_file: str) -> RuleDefinition:
+    """Load each canonical rule once per resolved directory, not per filename."""
+    return _load_rule_definition(str(get_rules_directory() / rule_file))
 
 def evaluate_gh001(evidence: GH001Evidence | None, rule_definition: RuleDefinition | None = None) -> EvaluationStatus:
     """Evaluate GH-001 using canonical rule configuration."""

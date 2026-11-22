@@ -33,7 +33,7 @@ Resultado: **10 verificaciones PASS / 0 FAIL / 0 bloqueos**.
 | 7 | Revocación de la autorización por el Propietario | Revocación efectiva e inmediata |
 | 8 | Evaluación tras revocación | 403 para el Analyst |
 | 9 | Acceso de Analyst a FinOps / suscripción / administración | 403 en los tres casos (autorización server-side) |
-| 10 | Estado del token tras cierre de sesión | Sesión limpiada del navegador (solo `color-scheme`, `securecode_token`, `securecode_user` en `localStorage`) |
+| 10 | Estado de la sesión tras cierre de sesión | Sesión revocada y cookies eliminadas; `localStorage` conserva solo preferencias y datos de visualización |
 
 ### 2.2 Auditoría del flujo de restablecimiento de contraseña
 
@@ -43,7 +43,7 @@ Resultado: **19/19 pasos PASS**, ejecutada contra la revisión que incluía el f
 - Restablecimiento con contraseña definida: la respuesta no reporta `temporary_password`.
 - Una temporal ya aplicada/invalidada deja de autenticar: 401 `{"detail": "Incorrect username or password"}`.
 - Rechazos 403 exactos del Analyst en módulos restringidos (FinOps, suscripción, administración).
-- `localStorage` del navegador contiene solo `color-scheme`, `securecode_token`, `securecode_user`; ninguna contraseña se guarda.
+- `localStorage` del navegador no contiene JWT ni `securecode_token`; la sesión se transporta en cookie HttpOnly y el CSRF se envía por cabecera.
 - Nota de incidente gestionado en la auditoría: un restablecimiento se aplicó por error a una cuenta de auditoría distinta de la objetivo; se remedió en la misma sesión estableciendo una contraseña equivalente y se documentó. Sin impacto sobre datos de organizaciones.
 
 ### 2.3 Verificación de estado de despliegue (2026-11-16)

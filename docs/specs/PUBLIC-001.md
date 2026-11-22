@@ -26,6 +26,8 @@ duplicar la lógica de autorización ni presentar información comercial fictici
   cuadrículas, tarjetas y pie de página.
 - Los documentos legales se muestran como borradores académicos. Ninguna
   dirección, correo, precio, reembolso o compromiso comercial se inventa.
+- El registro enlaza las condiciones del servicio y el alcance técnico vigentes
+  antes de crear la cuenta; la aceptación es explícita y no premarcada.
 
 ## Criterios verificables
 
@@ -33,3 +35,5 @@ duplicar la lógica de autorización ni presentar información comercial fictici
 2. /app conserva el shell de la consola.
 3. Cada documento legal contiene el aviso de revisión jurídica pendiente.
 4. La hoja pública contiene reglas responsivas para pantallas pequeñas.
+5. El formulario de registro muestra enlaces a los documentos vigentes y una
+   casilla de aceptación sin marcar.
