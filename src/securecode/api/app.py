@@ -1595,6 +1595,7 @@ def confirm_password_recovery(request: PasswordRecoveryConfirmRequest, session: 
     user = _consume_account_action_token(session, request.token, _PASSWORD_RECOVERY)
     user.password_hash = hash_password(password)
     user.updated_at = datetime.now(UTC)
+    _revoke_user_sessions(session, user.id, "password_recovery")
     _record_user_audit(session, user.id, user.id, "password_recovered", {})
     session.commit()
     return {"message": "Contraseña actualizada. Ya puedes iniciar sesión."}
