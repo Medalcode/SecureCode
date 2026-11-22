@@ -24,6 +24,7 @@ from postgres_backup_lib import (
     connection_secrets,
     parse_database_url,
     redact,
+    resolve_compatible_tool,
     restore_backup,
     verify_manifest,
     write_json_atomic,
@@ -168,3 +169,34 @@ def test_verify_manifest_accepts_valid_synthetic_artifact(tmp_path: Path):
     assert verified["schema"] == MANIFEST_SCHEMA
     assert verified["alembic_head"] == "d4e9f1a2b3c4"
     assert verified["size_bytes"] == backup_path.stat().st_size
+
+
+def test_resolve_compatible_tool_prefers_server_major(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    pg17 = tmp_path / "pg17"
+    pg15 = tmp_path / "pg15"
+    pg17.mkdir()
+    pg15.mkdir()
+    for directory, version in ((pg17, "pg_dump (PostgreSQL) 17.0"), (pg15, "pg_dump (PostgreSQL) 15.0")):
+        tool = directory / "pg_dump.exe"
+        tool.write_text(f"echo {version}\r\n", encoding="utf-8")
+
+    monkeypatch.setenv("PATH", str(pg17))
+    monkeypatch.setattr("postgres_backup_lib.tool_version", lambda path: "pg_dump (PostgreSQL) 17.0" if "pg17" in str(path).replace("\\", "/") else "pg_dump (PostgreSQL) 15.0")
+    monkeypatch.setattr("postgres_backup_lib.shutil.which", lambda name: str(pg17 / "pg_dump.exe") if name == "pg_dump" else (str(pg15 / "pg_dump.exe") if name == "pg_dump15" else None))
+
+    resolved = resolve_compatible_tool("pg_dump", server_major=15)
+    assert resolved.name in {"pg_dump", "pg_dump.exe"}
+    assert "pg15" in str(resolved).replace("\\", "/")
+
+
+def test_resolve_compatible_tool_rejects_incompatible_major(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    pg17 = tmp_path / "pg17"
+    pg17.mkdir()
+    tool = pg17 / "pg_dump.exe"
+    tool.write_text("echo pg_dump (PostgreSQL) 17.0\r\n", encoding="utf-8")
+    monkeypatch.setenv("PATH", str(pg17))
+    monkeypatch.setattr("postgres_backup_lib.tool_version", lambda _path: "pg_dump (PostgreSQL) 17.0")
+    monkeypatch.setattr("postgres_backup_lib.shutil.which", lambda name: str(tool) if name in {"pg_dump", "pg_dump15"} else None)
+
+    with pytest.raises(RuntimeError, match="Compatible PostgreSQL tool not found"):
+        resolve_compatible_tool("pg_dump", server_major=15)
