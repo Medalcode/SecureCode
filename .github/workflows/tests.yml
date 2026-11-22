@@ -9,7 +9,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     services:
       postgres:
@@ -38,7 +38,14 @@ jobs:
       - name: Install PostgreSQL 15 client tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client-15
+          sudo apt-get install -y --no-install-recommends ca-certificates curl gnupg
+          sudo install -d -m 0755 /etc/apt/keyrings
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --batch --yes --dearmor -o /etc/apt/keyrings/postgresql.gpg
+          echo "deb [signed-by=/etc/apt/keyrings/postgresql.gpg] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client-15
+          /usr/lib/postgresql/15/bin/pg_dump --version
+          /usr/lib/postgresql/15/bin/pg_restore --version
           echo "/usr/lib/postgresql/15/bin" >> "$GITHUB_PATH"
           echo "PG_BIN_DIR=/usr/lib/postgresql/15/bin" >> "$GITHUB_ENV"
 
