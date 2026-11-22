@@ -8,10 +8,7 @@
 
   <!-- Control de Modo Claro/Oscuro Nativo según Modern Web Guidance -->
   <meta name="color-scheme" content="light dark">
-  <script>
-    // FOUC prevention: aplica inmediatamente el tema guardado
-    document.querySelector('meta[name="color-scheme"]').content = localStorage.getItem("color-scheme") || "light dark";
-  </script>
+  <script src="/static/js/theme-init.js"></script>
 
   <!-- Hoja de Estilos Principal -->
   <link rel="stylesheet" href="/static/css/app.css?v=20261121-explainable-results">
@@ -642,23 +639,7 @@
                   <input class="input-control" id="organizationMemberPassword" type="password" minlength="12" autocomplete="new-password" required>
                 </div>
 
-                <script>
-                  // Sincronizar visibilidad del campo de contraseña según la estrategia seleccionada
-                  const strategyRadios = document.querySelectorAll('input[name="passwordStrategy"]');
-                  const passwordInputGroup = document.getElementById('passwordInputGroup');
-                  function updatePasswordInputVisibility() {
-                    const selected = document.querySelector('input[name="passwordStrategy"]:checked');
-                    if (!selected) return;
-                    if (selected.value === 'generate') {
-                      passwordInputGroup.hidden = true;
-                      organizationMemberPassword.value = '';
-                    } else {
-                      passwordInputGroup.hidden = false;
-                    }
-                  }
-                  strategyRadios.forEach(radio => radio.addEventListener('change', updatePasswordInputVisibility));
-                  updatePasswordInputVisibility();
-                </script>
+
 
                 <div class="admin-form-actions"><div class="admin-feedback" id="organizationMemberFeedback" role="status" aria-live="polite"></div><button class="btn-primary" id="btnCreateOrganizationAnalyst" type="submit">Crear Analyst</button></div>
               </form>

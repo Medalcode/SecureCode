@@ -1502,8 +1502,23 @@
   }
 
   // --- Administración del cliente: propietario y Analyst ---
+  function updateOrganizationPasswordStrategy() {
+    const selected = document.querySelector('input[name="passwordStrategy"]:checked');
+    const group = document.getElementById('passwordInputGroup');
+    const password = document.getElementById('organizationMemberPassword');
+    if (!selected || !group || !password) return;
+    const generate = selected.value === 'generate';
+    group.hidden = generate;
+    password.required = !generate;
+    if (generate) password.value = '';
+  }
+
   function initOrganizationConsole() {
     document.getElementById('btnRefreshOrganization')?.addEventListener('click', refreshOrganization);
+    document.querySelectorAll('input[name="passwordStrategy"]').forEach((radio) => {
+      radio.addEventListener('change', updateOrganizationPasswordStrategy);
+    });
+    updateOrganizationPasswordStrategy();
     document.getElementById('createOrganizationMemberForm')?.addEventListener('submit', createOrganizationAnalyst);
     document.getElementById('organizationRepositoryAuthorizationForm')?.addEventListener('submit', saveOrganizationRepositoryAuthorization);
   }

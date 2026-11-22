@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from securecode.application.gh001_benchmark import build_metrics, canonical_sha256
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_V1 = REPO_ROOT.parent / "securecode-ground-truth" / "data" / "ground_truth" / "gh001_benchmark_105.json"
+DEFAULT_V1 = REPO_ROOT / "docs" / "benchmark" / "gh001" / "v1" / "gh001_benchmark_105_v1.snapshot.json"
 BENCH_ROOT = REPO_ROOT / "docs" / "benchmark" / "gh001"
 V1_SNAPSHOT = BENCH_ROOT / "v1" / "gh001_benchmark_105_v1.snapshot.json"
 V2_DATASET = BENCH_ROOT / "v2" / "gh001_benchmark_105_v2.proposed.json"
@@ -18,6 +18,10 @@ V2_SHA256 = BENCH_ROOT / "v2" / "gh001_benchmark_105_v2.proposed.json.sha256"
 V2_PATCH = BENCH_ROOT / "v2" / "gh001_benchmark_105_v2.patch.json"
 V2_REPORT = BENCH_ROOT / "v2" / "gh001_v2_change_report.md"
 PROPOSAL_DATE = "2026-11-21"
+V1_EXPECTED_SHA256 = "8319425d25a1b251f680282495e22a11043093397cf36afcd88a77a1529d7947"
+V1_EXPECTED_CASES = 105
+V1_EXPECTED_MISMATCHES = 14
+V2_OUTPUTS = (V2_DATASET, V2_SHA256, V2_PATCH, V2_REPORT)
 
 
 def _dump_json(path: Path, payload: object) -> None:
@@ -32,6 +36,36 @@ def _file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _canonical_bytes(path: Path) -> bytes:
+    return path.read_bytes().replace(b"\r\n", b"\n")
+
+
+def _ensure_output_target(path: Path) -> None:
+    if path.resolve() == V1_SNAPSHOT.resolve():
+        raise ValueError(f"Refusing to overwrite immutable v1 snapshot: {path}")
+    if path.suffix.lower() != ".json" and path not in V2_OUTPUTS:
+        raise ValueError(f"Refusing to write unexpected output path: {path}")
+
+
+def _verify_v1_snapshot(path: Path) -> bytes:
+    if not path.exists():
+        raise FileNotFoundError(f"V1 dataset not found: {path}")
+    canonical_bytes = _canonical_bytes(path)
+    actual_hash = hashlib.sha256(canonical_bytes).hexdigest()
+    if actual_hash != V1_EXPECTED_SHA256:
+        raise ValueError(
+            "V1 snapshot integrity check failed: "
+            f"expected {V1_EXPECTED_SHA256}, got {actual_hash} for {path}"
+        )
+    payload = json.loads(canonical_bytes.decode("utf-8"))
+    cases = payload.get("cases")
+    if not isinstance(cases, list) or len(cases) != V1_EXPECTED_CASES:
+        raise ValueError(f"Expected {V1_EXPECTED_CASES} cases in v1 snapshot, found {len(cases) if isinstance(cases, list) else 'invalid'}")
+    if len({case["case_id"] for case in cases}) != len(cases):
+        raise ValueError("Duplicate case_id in V1 dataset")
+    return canonical_bytes
+
+
 def _reason(evidence: dict) -> str:
     approvals = evidence.get("required_review_approvals")
     dismiss = evidence.get("dismiss_stale_reviews")
@@ -43,26 +77,23 @@ def _reason(evidence: dict) -> str:
 
 
 def build(v1_path: Path) -> dict:
-    if not v1_path.exists():
-        raise FileNotFoundError(f"V1 dataset not found: {v1_path}")
+    v1_path = v1_path.resolve()
+    if v1_path != V1_SNAPSHOT.resolve():
+        raise ValueError(
+            "GH-001 v1 is immutable; build must read from "
+            f"{V1_SNAPSHOT.as_posix()} and may only emit v2 proposal artifacts"
+        )
 
-    v1_bytes = v1_path.read_bytes()
+    v1_bytes = _verify_v1_snapshot(v1_path)
     v1 = json.loads(v1_bytes.decode("utf-8"))
     cases = v1["cases"]
-    if len(cases) != 105:
-        raise ValueError(f"Expected 105 cases, found {len(cases)}")
-    if len({case["case_id"] for case in cases}) != len(cases):
-        raise ValueError("Duplicate case_id in V1 dataset")
 
     v1_metrics = build_metrics(cases)
     discrepancies = v1_metrics["mismatches"]
-    if len(discrepancies) != 14:
-        raise ValueError(f"Expected 14 discrepancies, found {len(discrepancies)}")
+    if len(discrepancies) != V1_EXPECTED_MISMATCHES:
+        raise ValueError(f"Expected {V1_EXPECTED_MISMATCHES} discrepancies, found {len(discrepancies)}")
     if any(item["expected_status"] != "UNKNOWN" or item["actual_status"] != "FAIL" for item in discrepancies):
         raise ValueError("Unexpected discrepancy classification")
-
-    V1_SNAPSHOT.parent.mkdir(parents=True, exist_ok=True)
-    V1_SNAPSHOT.write_bytes(v1_bytes)
 
     v2_cases = copy.deepcopy(cases)
     changed_ids = [item["case_id"] for item in discrepancies]
@@ -73,6 +104,8 @@ def build(v1_path: Path) -> dict:
     v2_metrics = build_metrics(v2_cases)
     if v2_metrics["mismatched"] != 0:
         raise ValueError("Proposed V2 still has mismatches against the engine")
+    if len(v2_cases) != V1_EXPECTED_CASES or len({case["case_id"] for case in v2_cases}) != V1_EXPECTED_CASES:
+        raise ValueError("Proposed V2 must preserve 105 unique case IDs")
 
     v2_payload = {
         "schema_version": "2.0",
@@ -85,7 +118,7 @@ def build(v1_path: Path) -> dict:
         "source_dataset": {
             "path": "docs/benchmark/gh001/v1/gh001_benchmark_105_v1.snapshot.json",
             "dataset_version": v1.get("schema_version", "1.0"),
-            "file_sha256": _file_sha256(V1_SNAPSHOT),
+            "file_sha256": V1_EXPECTED_SHA256,
         },
         "case_count": len(v2_cases),
         "status_distribution": v2_metrics["expected_distribution"],
@@ -93,6 +126,8 @@ def build(v1_path: Path) -> dict:
         "changes_from_v1": len(changed_ids),
         "cases": v2_cases,
     }
+    for output in V2_OUTPUTS:
+        _ensure_output_target(output)
     _dump_json(V2_DATASET, v2_payload)
     v2_hash = _file_sha256(V2_DATASET)
     V2_SHA256.write_text(f"{v2_hash}\n", encoding="utf-8")
@@ -148,6 +183,7 @@ def build(v1_path: Path) -> dict:
         "Este artefacto no declara adopción oficial de v2.",
         "",
     ])
+    _ensure_output_target(V2_REPORT)
     V2_REPORT.write_text("\n".join(lines), encoding="utf-8")
 
     return {

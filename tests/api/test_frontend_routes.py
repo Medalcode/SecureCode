@@ -91,6 +91,14 @@ def test_api_source_has_no_known_mojibake_markers():
     assert "Â" not in source
 
 
+def test_console_shell_has_no_inline_scripts_and_uses_theme_bootstrap():
+    html = Path("src/securecode/static/index.html").read_text(encoding="utf-8")
+    assert '<script src="/static/js/theme-init.js"></script>' in html
+    assert '<script src="/static/js/app.js?v=20261121-explainable-results"></script>' in html
+    assert "<script>" not in html.replace('<script src="/static/js/theme-init.js"></script>', "").replace('<script src="/static/js/app.js?v=20261121-explainable-results"></script>', "")
+    assert Path("src/securecode/static/js/theme-init.js").exists()
+
+
 def test_admin_navigation_is_gated_by_the_server_validated_role():
     script = Path("src/securecode/static/js/app.js").read_text(encoding="utf-8")
     stylesheet = Path("src/securecode/static/css/app.css").read_text(encoding="utf-8")

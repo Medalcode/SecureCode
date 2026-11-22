@@ -1,26 +1,32 @@
 # SECURECODE — Fase 13: informe de preparación para staging
 
-Fecha: 2026-11-21. Repositorio: `https://github.com/Medalcode/SecureCode`. Este informe documenta el estado real del árbol de trabajo local. No se hicieron commits, pushes, despliegues, cambios en producción ni creación de recursos cloud.
+Fecha: 2026-11-21. Repositorio: `https://github.com/Medalcode/SecureCode`. Este informe documenta el estado observado en el árbol local en esa fecha y debe leerse como **histórico/local**. No implica despliegue, aprobación cloud ni preparación para producción.
 
 ## 1. Resumen ejecutivo
 
-SecureCode pasa las validaciones locales y de PostgreSQL aislado: 378 pruebas aprobadas con PostgreSQL, 358 aprobadas y 20 omitidas sin PostgreSQL, mypy sin errores en 31 archivos fuente, migraciones desde cero hasta `d4e9f1a2b3c4`, `alembic check` limpio, E2E de navegador aprobado y respaldo/restauración verificado con datos sintéticos.
+**Estado observado localmente (2026-11-21):** 378 pruebas aprobadas con PostgreSQL aislado, 358 aprobadas y 20 omitidas sin PostgreSQL, `mypy src` sin errores en 31 archivos fuente, migraciones desde cero hasta `d4e9f1a2b3c4`, `alembic check` limpio, E2E de navegador aprobado y respaldo/restauración verificado con datos sintéticos.
 
-No se puede declarar preparación para producción. El código funcional está en el árbol de trabajo, pero una parte sustancial no está versionada; el build Docker no pudo ejecutarse porque el daemon no está disponible; no existe entorno staging cloud creado; no hay alertas cloud activas; faltan mediciones reales de costos y la revisión jurídica contractual.
+**Estado no verificado o pendiente:** build Docker en entorno con daemon disponible, entorno staging cloud creado, secretos/IAM/service account de staging, monitoreo/alertas activas, mediciones reales de costos, revisión jurídica contractual y smoke tests sobre despliegue real.
 
-**Veredicto: APTO CON OBSERVACIONES PARA STAGING. NO APTO PARA PRODUCCIÓN.**
+**Clasificación del documento:** evidencia histórica/local. **No usar como evidencia de despliegue cloud actual.**
+
+**Veredicto histórico/local: APTO CON OBSERVACIONES PARA STAGING. NO APTO PARA PRODUCCIÓN.**
 
 ## 2. Estado de Git
 
+**Histórico/local en 2026-11-21:**
+
 - Rama: `fix/console-logo-landing`.
-- HEAD: `51beb05b84ccb4474bfeeddb423f9012d2f0e811` (`51beb05 fix(ui): link console logo to public landing`).
+- HEAD observado: `51beb05b84ccb4474bfeeddb423f9012d2f0e811` (`51beb05 fix(ui): link console logo to public landing`).
 - Archivos rastreados modificados: 40.
 - Archivos no rastreados: varios cientos de artefactos de prueba, además de módulos fuente, migraciones, scripts, documentación y pruebas necesarios para el release.
 - `git diff --stat`: 40 archivos, 1524 inserciones y 315 borrados.
 - `git status` mostró advertencias `Permission denied` en directorios `.test-*` preexistentes; no se eliminaron ni modificaron.
-- Una construcción desde HEAD sería incompleta: las migraciones posteriores a `c1a4d9e7f205`, `src/securecode/config.py`, `src/securecode/observability.py`, módulos de sesiones, PDF, cumplimiento y observabilidad están sin versionar.
+- Una construcción desde ese HEAD habría sido incompleta: las migraciones posteriores a `c1a4d9e7f205`, `src/securecode/config.py`, `src/securecode/observability.py`, módulos de sesiones, PDF, cumplimiento y observabilidad estaban sin versionar.
 
-### Archivos que deben incorporarse al siguiente release
+**Estado posterior implementado en el repositorio local (no implica despliegue):** RC001 versionó el release candidate en commits locales hasta `255c3daa49ad9cd45977e94a96fefec655db06fb`. Esta sección se conserva como evidencia histórica de lo observado durante Fase 13.
+
+### Archivos que debían incorporarse al siguiente release (histórico)
 
 Rastreados modificados:
 
@@ -50,7 +56,7 @@ No deben incorporarse: `.kiro-role-tests/`, `.kiro-test-results.txt`, `.test-*/`
 
 ## 4. Arquitectura de staging propuesta
 
-Ver `docs/specs/STAGING-001.md` y `deploy/staging/cloud-run-service.yaml`. Servicio `securecode-staging`, base PostgreSQL exclusiva, secretos exclusivos, cuenta de servicio de mínimo privilegio, HTTPS administrado, CORS explícito, `APP_ENV=staging`, `maxScale=2`, `minScale=0`, CPU 1, memoria 512Mi, concurrencia 40 y probes `/health/live` y `/health/ready`. No se crearon recursos.
+**Pendiente / no verificado en cloud.** Ver `docs/specs/STAGING-001.md` y `deploy/staging/cloud-run-service.yaml`. La propuesta describe servicio `securecode-staging`, base PostgreSQL exclusiva, secretos exclusivos, cuenta de servicio de mínimo privilegio, HTTPS administrado, CORS explícito, `APP_ENV=staging`, `maxScale=2`, `minScale=0`, CPU 1, memoria 512Mi, concurrencia 40 y probes `/health/live` y `/health/ready`. No se crearon recursos ni se verificó esta arquitectura en un entorno desplegado.
 
 ## 5. PostgreSQL y Alembic
 
@@ -75,6 +81,8 @@ Ver `docs/specs/STAGING-001.md` y `deploy/staging/cloud-run-service.yaml`. Servi
 - Las evaluaciones con GitHub se cubren mediante adaptadores simulados y datasets; **no se ejecutó** `scripts/run_full_e2e.py` porque requiere token real de GitHub y consulta al repositorio externo ground-truth. No se afirma validación real de GitHub en esta fase.
 
 ## 8. Benchmarks
+
+**Verificado localmente con artefactos del repositorio:**
 
 - GH-001 v1 histórico: 105 casos, 91 coincidencias, 14 discrepancias, exactitud 0.8667.
 - GH-001 v2 propuesto: 105 casos, 105 coincidencias, 0 discrepancias, exactitud 1.0.
@@ -140,20 +148,20 @@ La plataforma pública informa marco NIST SP 800-53 Rev. 5 como referencia, traz
 
 ## 17. Hallazgos por severidad
 
-| Severidad | Hallazgo | Impacto |
-|---|---|---|
-| ALTA | Código funcional no versionado; HEAD no construye la versión validada | El release desde HEAD excluiría migraciones y módulos críticos. Debe incorporarse la lista de la sección 2. |
-| ALTA | Build Docker no validado por daemon caído | No puede afirmarse build reproducible. |
-| ALTA | Staging cloud no creado | No hay evidencia de comportamiento en Cloud Run, IAM, HTTPS ni red. |
-| ALTA | Alertas cloud no activas | Solo existe matriz propuesta. |
-| MEDIA | Ruff con 220 hallazgos preexistentes | Deuda técnica; no bloquea funcionalidad local. |
-| MEDIA | Entorno por defecto Python 3.14.6; 3.11.15 sin dependencias | Riesgo de validar con intérprete distinto del contenedor. |
-| MEDIA | Sin lockfile de dependencias | Build reproducible no garantizado a largo plazo. |
-| MEDIA | HSTS y rate limiting distribuidos no verificados | Requieren gateway/proveedor. |
-| MEDIA | Revisión jurídica pendiente | No puede iniciarse contratación comercial real. |
-| BAJA | Artefactos `.test-*`, logs y resultados sueltos sin versionar | Ruido operativo; excluir del release. |
+| Severidad | Hallazgo | Estado | Impacto |
+|---|---|---|---|
+| ALTA | Código funcional no versionado al momento de Fase 13 | Histórico/local; mitigado por RC001 en commits locales | Un release desde HEAD de Fase 13 habría excluido migraciones y módulos críticos. |
+| ALTA | Build Docker no validado por daemon caído | No verificado | No puede afirmarse build reproducible. |
+| ALTA | Staging cloud no creado | Pendiente | No hay evidencia de comportamiento en Cloud Run, IAM, HTTPS ni red. |
+| ALTA | Alertas cloud no activas | Pendiente | Solo existe matriz propuesta. |
+| MEDIA | Ruff con 220 hallazgos preexistentes | Conocido | Deuda técnica; no bloquea funcionalidad local. |
+| MEDIA | Entorno por defecto Python 3.14.6; 3.11.15 sin dependencias | Histórico/local | Riesgo de validar con intérprete distinto del contenedor. |
+| MEDIA | Sin lockfile de dependencias | Pendiente | Build reproducible no garantizado a largo plazo. |
+| MEDIA | HSTS y rate limiting distribuidos no verificados | Pendiente/no verificado | Requieren gateway/proveedor. |
+| MEDIA | Revisión jurídica pendiente | Pendiente | No puede iniciarse contratación comercial real. |
+| BAJA | Artefactos `.test-*`, logs y resultados sueltos sin versionar | Histórico/local | Ruido operativo; excluir del release. |
 
-No se identificó un defecto funcional crítico en las pruebas ejecutadas.
+No se identificó un defecto funcional crítico en las pruebas ejecutadas en Fase 13.
 
 ## 18. Matriz de readiness
 

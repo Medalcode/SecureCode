@@ -182,3 +182,39 @@ def test_browser_session_cannot_mutate_without_csrf(session_client):
     _browser_login(client, analyst.username, "AnalystSession#2026")
     response = client.patch("/api/v1/settings", json={"default_repository": "owner/repo"})
     assert response.status_code == 403
+
+
+def test_browser_session_accepts_https_origin_behind_trusted_proxy(session_client, monkeypatch):
+    _, _, _, analyst = session_client
+    monkeypatch.setenv("TRUST_PROXY_HEADERS", "true")
+    monkeypatch.setenv("TRUSTED_PROXY_CIDRS", "127.0.0.1/32")
+    client = TestClient(app, client=("127.0.0.1", 50000))
+    login = client.post(
+        "/api/v1/auth/session",
+        data={"username": analyst.username, "password": "AnalystSession#2026"},
+        headers={"Origin": "https://securecode.example", "X-Forwarded-Proto": "https", "X-Forwarded-Host": "securecode.example"},
+    )
+    assert login.status_code == 200
+    csrf_token = login.json()["csrf_token"]
+    response = client.post(
+        "/api/v1/auth/logout",
+        headers={
+            "Origin": "https://securecode.example",
+            "X-Forwarded-Proto": "https",
+            "X-Forwarded-Host": "securecode.example",
+            "X-CSRF-Token": csrf_token,
+        },
+    )
+    assert response.status_code == 204
+
+
+def test_browser_session_rejects_untrusted_forwarded_origin(session_client, monkeypatch):
+    client, _, _, analyst = session_client
+    monkeypatch.setenv("TRUST_PROXY_HEADERS", "true")
+    monkeypatch.setenv("TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
+    login = client.post(
+        "/api/v1/auth/session",
+        data={"username": analyst.username, "password": "AnalystSession#2026"},
+        headers={"Origin": "https://securecode.example", "X-Forwarded-Proto": "https", "X-Forwarded-Host": "securecode.example"},
+    )
+    assert login.status_code == 403

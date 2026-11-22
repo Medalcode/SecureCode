@@ -6,12 +6,13 @@ Documento informativo. No modifica reglas, umbrales, motor ni conjuntos de refer
 
 ## Fuentes revisadas
 
-- Repositorio: `C:\Users\Jonatthan\Documents\Github\securecode-ground-truth`.
-- Commit local observado: `f6a1db5ba90aaa3461f1663fed3240b2a0ffd252`.
-- Manifiesto: `benchmark/manifest.json`, `benchmark_version=1.0.0`, `ground_truth_commit=f006fb843f13fa09fa4ae39d6c2b0570385b7c1e`.
-- Conjunto sintético: `data/ground_truth/gh001_benchmark_105.json`, `dataset_version=1.0`, 105 casos.
-- SHA-256 local verificado: `8319425d25a1b251f680282495e22a11043093397cf36afcd88a77a1529d7947`, coincide con `file_sha256` del manifiesto.
-- Especificación: `docs/specs/GH001_ORACLE.md`, `Document Version=1.0`.
+- Repositorio de referencia: `securecode-ground-truth` (repositorio externo, no incluido en este paquete).
+- Commit externo observado durante la comparación local: `f6a1db5ba90aaa3461f1663fed3240b2a0ffd252`.
+- Manifiesto externo: `benchmark/manifest.json`, `benchmark_version=1.0.0`, `ground_truth_commit=f006fb843f13fa09fa4ae39d6c2b0570385b7c1e`.
+- Conjunto sintético externo: `data/ground_truth/gh001_benchmark_105.json`, `dataset_version=1.0`, 105 casos.
+- Snapshot v1 conservado en este repositorio: `docs/benchmark/gh001/v1/gh001_benchmark_105_v1.snapshot.json`.
+- SHA-256 verificado del contenido LF del snapshot v1: `8319425d25a1b251f680282495e22a11043093397cf36afcd88a77a1529d7947`, coincide con `file_sha256` del manifiesto externo.
+- Especificación externa: `docs/specs/GH001_ORACLE.md`, `Document Version=1.0`.
 
 ## Semánticas comparadas
 

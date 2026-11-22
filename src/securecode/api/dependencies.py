@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import ipaddress
 import os
 from collections.abc import Generator
 from dataclasses import dataclass
@@ -144,13 +145,63 @@ def _credentials_exception(mode: str) -> HTTPException:
     )
 
 
+def _trusted_proxy_networks() -> tuple[ipaddress._BaseNetwork, ...]:
+    raw = os.environ.get("TRUSTED_PROXY_CIDRS", "")
+    networks: list[ipaddress._BaseNetwork] = []
+    for item in raw.split(","):
+        value = item.strip()
+        if not value:
+            continue
+        try:
+            networks.append(ipaddress.ip_network(value, strict=False))
+        except ValueError:
+            continue
+    return tuple(networks)
+
+
+def _is_trusted_proxy(request: Request) -> bool:
+    if os.environ.get("TRUST_PROXY_HEADERS", "false").lower() != "true":
+        return False
+    peer = request.client.host if request.client else None
+    if not peer:
+        return False
+    try:
+        peer_ip = ipaddress.ip_address(peer)
+    except ValueError:
+        return False
+    networks = _trusted_proxy_networks()
+    return bool(networks) and any(peer_ip in network for network in networks)
+
+
+def _request_origin(request: Request) -> tuple[str, str, int]:
+    scheme = request.url.scheme
+    host = request.url.hostname
+    port = request.url.port or (443 if scheme == "https" else 80)
+    if _is_trusted_proxy(request):
+        forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower()
+        forwarded_host = request.headers.get("x-forwarded-host", "").split(",", 1)[0].strip()
+        if forwarded_proto in {"http", "https"}:
+            scheme = forwarded_proto
+        if forwarded_host:
+            parsed_host = urlparse(f"//{forwarded_host}", scheme=scheme)
+            if parsed_host.hostname:
+                host = parsed_host.hostname
+                port = parsed_host.port or (443 if scheme == "https" else 80)
+    if not host:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Origen no permitido")
+    return scheme, host, port
+
+
 def _same_origin(origin: str, request: Request) -> bool:
     parsed = urlparse(origin)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return False
+    req_scheme, req_host, req_port = _request_origin(request)
+    origin_port = parsed.port or (443 if parsed.scheme == "https" else 80)
     return (
-        parsed.scheme == request.url.scheme
-        and parsed.hostname == request.url.hostname
-        and (parsed.port or (443 if parsed.scheme == "https" else 80))
-        == (request.url.port or (443 if request.url.scheme == "https" else 80))
+        parsed.scheme == req_scheme
+        and parsed.hostname.lower() == req_host.lower()
+        and origin_port == req_port
     )
 
 

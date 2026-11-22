@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -28,6 +29,7 @@ class ValidatedEnvironment:
     login_max_failures: int
     login_window_seconds: int
     trust_proxy_headers: bool
+    trusted_proxy_cidrs: tuple[str, ...]
     github_token_configured: bool
     seed_user_configured: bool
     log_level: str
@@ -137,6 +139,18 @@ def _validate_credentials(env: Mapping[str, str], app_env: str, issues: list[str
     return github_token_configured, seed_user_configured
 
 
+def _validate_trusted_proxy_cidrs(env: Mapping[str, str], issues: list[str]) -> tuple[str, ...]:
+    raw = env.get("TRUSTED_PROXY_CIDRS", "")
+    cidrs = tuple(item.strip() for item in raw.split(",") if item.strip())
+    for cidr in cidrs:
+        try:
+            ipaddress.ip_network(cidr, strict=False)
+        except ValueError:
+            issues.append("TRUSTED_PROXY_CIDRS must contain valid IP addresses or CIDR ranges")
+            break
+    return cidrs
+
+
 def _validate_optional_services(env: Mapping[str, str], app_env: str, issues: list[str]) -> None:
     sentry_dsn = env.get("SENTRY_DSN", "").strip()
     if sentry_dsn and not sentry_dsn.startswith("https://"):
@@ -169,6 +183,9 @@ def validate_environment(environ: Mapping[str, str] | None = None) -> ValidatedE
     login_max_failures = _positive_int(env, "LOGIN_MAX_FAILURES", "5", issues)
     login_window_seconds = _positive_int(env, "LOGIN_WINDOW_SECONDS", "900", issues)
     trust_proxy_headers = _parse_bool(env, "TRUST_PROXY_HEADERS", False, issues)
+    trusted_proxy_cidrs = _validate_trusted_proxy_cidrs(env, issues)
+    if trust_proxy_headers and not trusted_proxy_cidrs:
+        issues.append("TRUSTED_PROXY_CIDRS is required when TRUST_PROXY_HEADERS=true")
     github_token_configured, seed_user_configured = _validate_credentials(env, app_env, issues)
     log_level = _validate_log_level(env, issues)
     _validate_optional_services(env, app_env, issues)
@@ -186,6 +203,7 @@ def validate_environment(environ: Mapping[str, str] | None = None) -> ValidatedE
         login_max_failures=login_max_failures,
         login_window_seconds=login_window_seconds,
         trust_proxy_headers=trust_proxy_headers,
+        trusted_proxy_cidrs=trusted_proxy_cidrs,
         github_token_configured=github_token_configured,
         seed_user_configured=seed_user_configured,
         log_level=log_level,

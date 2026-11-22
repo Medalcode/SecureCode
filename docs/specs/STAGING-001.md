@@ -43,6 +43,7 @@ La plantilla declarativa está en `deploy/staging/cloud-run-service.yaml`. No co
 | `LOGIN_MAX_FAILURES` | `5` | PROPUESTA |
 | `LOGIN_WINDOW_SECONDS` | `900` | PROPUESTA |
 | `TRUST_PROXY_HEADERS` | `true` | PROPUESTA |
+| `TRUSTED_PROXY_CIDRS` | CIDR del balanceador/proxy de staging | PROPUESTA |
 | `PORT` | `8080` en la plantilla; Cloud Run inyecta el puerto dinámico real | PROPUESTA |
 
 La validación de arranque en `src/securecode/config.py` rechaza placeholders y SQLite fuera de `development`/`test`.

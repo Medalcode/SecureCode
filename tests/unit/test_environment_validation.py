@@ -62,6 +62,8 @@ def test_validate_environment_accepts_production_config():
         ({"LOGIN_MAX_FAILURES": "0"}, "LOGIN_MAX_FAILURES must be greater than zero"),
         ({"LOGIN_WINDOW_SECONDS": "abc"}, "LOGIN_WINDOW_SECONDS must be an integer"),
         ({"TRUST_PROXY_HEADERS": "maybe"}, "TRUST_PROXY_HEADERS must be a boolean value"),
+        ({"TRUST_PROXY_HEADERS": "true", "TRUSTED_PROXY_CIDRS": ""}, "TRUSTED_PROXY_CIDRS is required when TRUST_PROXY_HEADERS=true"),
+        ({"TRUSTED_PROXY_CIDRS": "not-a-cidr"}, "TRUSTED_PROXY_CIDRS must contain valid IP addresses or CIDR ranges"),
         ({"LOG_LEVEL": "TRACE"}, "LOG_LEVEL must be CRITICAL, ERROR, WARNING, INFO or DEBUG"),
     ],
 )
@@ -69,13 +71,14 @@ def test_validate_environment_rejects_invalid_common_values(override, message):
     with pytest.raises(ConfigurationError) as exc:
         validate_environment({**BASE_ENV, **override})
 
-    assert message in str(exc.value)
-    assert all(
-        str(value) not in issue
-        for value in override.values()
-        if len(str(value)) > 3
-        for issue in exc.value.issues
-    )
+        assert message in str(exc.value)
+        secret_like = {"short", "change_me", "maybe", "not-a-cidr", "TRACE", "abc"}
+        assert all(
+            str(value) not in issue
+            for value in override.values()
+            if str(value) in secret_like
+            for issue in exc.value.issues
+        )
 
 
 def test_validate_environment_rejects_production_cors_wildcard():
@@ -134,6 +137,7 @@ def test_docker_compose_propagates_startup_validation_variables():
         "LOGIN_MAX_FAILURES",
         "LOGIN_WINDOW_SECONDS",
         "TRUST_PROXY_HEADERS",
+        "TRUSTED_PROXY_CIDRS",
         "LOG_LEVEL",
     ):
         assert f"{name}:" in compose

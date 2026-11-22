@@ -1,5 +1,7 @@
 import hashlib
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -58,8 +60,39 @@ def test_gh001_tristate_contract(approvals, dismiss, expected):
 
 
 def test_v1_snapshot_keeps_historical_hash():
-    actual = hashlib.sha256(V1_SNAPSHOT.read_bytes()).hexdigest()
+    canonical = V1_SNAPSHOT.read_bytes().replace(b"\r\n", b"\n")
+    actual = hashlib.sha256(canonical).hexdigest()
     assert actual == "8319425d25a1b251f680282495e22a11043093397cf36afcd88a77a1529d7947"
+
+
+def test_v1_snapshot_integrity_guard_rejects_modified_copy(tmp_path: Path):
+    modified = tmp_path / "gh001_benchmark_105_v1.modified.json"
+    payload = json.loads(V1_SNAPSHOT.read_text(encoding="utf-8"))
+    payload["cases"][0]["expected_status"] = "PASS"
+    modified.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "scripts" / "build_gh001_v2_proposal.py"), "--v1", str(modified)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "immutable" in (result.stdout + result.stderr).lower() or "integrity" in (result.stdout + result.stderr).lower()
+
+
+def test_build_script_rejects_overwriting_v1_snapshot(tmp_path: Path):
+    outside = tmp_path / "gh001_benchmark_105_v1.snapshot.json"
+    outside.write_bytes(V1_SNAPSHOT.read_bytes())
+    result = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "scripts" / "build_gh001_v2_proposal.py"), "--v1", str(outside)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "immutable" in (result.stdout + result.stderr).lower()
 
 
 def test_v2_proposal_preserves_identifiers_and_evidence():

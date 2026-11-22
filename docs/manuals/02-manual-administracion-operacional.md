@@ -29,7 +29,8 @@ Todas verificadas en el código. Sin ellas o con valores inválidos, el servicio
 | `CORS_ORIGINS` | No / sí en `staging`/`production` | vacío | Lista separada por comas; activa CORS con GET/POST/PATCH y cabeceras `Authorization`/`Content-Type`, sin credenciales. En `staging`/`production` exige HTTPS y rechaza `*`. |
 | `LOGIN_MAX_FAILURES` | No | `5` | Máximo de intentos fallidos de inicio de sesión por ventana; el arranque validado exige un entero positivo. |
 | `LOGIN_WINDOW_SECONDS` | No | `900` | Ventana del límite de tasa en segundos; el arranque validado exige un entero positivo. |
-| `TRUST_PROXY_HEADERS` | No | `false` | Activar sólo detrás de un proxy confiable que sobrescriba `X-Forwarded-For`. |
+| `TRUST_PROXY_HEADERS` | No | `false` | Activar sólo detrás de proxies confiables que sobrescriban encabezados forwarded. |
+| `TRUSTED_PROXY_CIDRS` | Condicional | vacío | CIDR/IP de proxies confiables. Obligatorio cuando `TRUST_PROXY_HEADERS=true`; sin esta lista, los encabezados forwarded se ignoran. |
 | `LOG_LEVEL` | No | `INFO` | Nivel mínimo de logs JSON (`CRITICAL`, `ERROR`, `WARNING`, `INFO`, `DEBUG`); valores inválidos se rechazan en la validación de entorno. |
 | `GITHUB_TOKEN` | No / sí en `staging`/`production` | — | Token para el adaptador de GitHub; se rechazan valores de plantilla. |
 | `SEED_USER_EMAIL`, `SEED_USER_PASSWORD` | No | — | Deben definirse juntos; la contraseña no debe ser valor de plantilla en `staging`/`production`. |

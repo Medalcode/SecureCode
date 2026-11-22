@@ -1,4 +1,5 @@
-import hashlib
+﻿import hashlib
+import ipaddress
 import json
 import logging
 import os
@@ -132,11 +133,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         if request.url.path.startswith("/api/v1/auth/"):
             response.headers["Cache-Control"] = "no-store"
-        # The application is served as same-origin static HTML; no third-party scripts are needed.
+        # The application is served as same-origin static assets; avoid inline scripts.
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; "
             "form-action 'self'; object-src 'none'; style-src 'self' 'unsafe-inline'; "
-            "script-src 'self' 'unsafe-inline'"
+            "script-src 'self'"
         )
         return response
 
@@ -563,11 +564,53 @@ def _login_rate_limit_settings() -> tuple[int, int]:
     )
 
 
+def _trusted_proxy_networks() -> tuple[ipaddress._BaseNetwork, ...]:
+    raw = os.environ.get("TRUSTED_PROXY_CIDRS", "")
+    networks: list[ipaddress._BaseNetwork] = []
+    for item in raw.split(","):
+        value = item.strip()
+        if not value:
+            continue
+        try:
+            networks.append(ipaddress.ip_network(value, strict=False))
+        except ValueError:
+            continue
+    return tuple(networks)
+
+
+def _is_trusted_proxy(request: Request) -> bool:
+    if os.environ.get("TRUST_PROXY_HEADERS", "false").lower() != "true":
+        return False
+    peer = request.client.host if request.client else None
+    if not peer:
+        return False
+    try:
+        peer_ip = ipaddress.ip_address(peer)
+    except ValueError:
+        return False
+    networks = _trusted_proxy_networks()
+    return bool(networks) and any(peer_ip in network for network in networks)
+
+
+def _login_client_ip(request: Request) -> str:
+    """Resolve client IP conservatively; never trust forwarded headers by default."""
+    peer = request.client.host if request.client else "unknown"
+    if not _is_trusted_proxy(request):
+        return peer
+    forwarded = request.headers.get("x-forwarded-for", "")
+    candidates = [part.strip() for part in forwarded.split(",") if part.strip()]
+    if len(candidates) != 1:
+        return peer
+    try:
+        ipaddress.ip_address(candidates[0])
+    except ValueError:
+        return peer
+    return candidates[0]
+
+
 def _login_scope_hash(username: str, request: Request) -> str:
     """Hash a username/client tuple without persisting personal identifiers."""
-    client = request.client.host if request.client else "unknown"
-    if os.environ.get("TRUST_PROXY_HEADERS", "false").lower() == "true":
-        client = request.headers.get("x-forwarded-for", client).split(",", 1)[0].strip()
+    client = _login_client_ip(request)
     return hashlib.sha256(f"{username}\x00{client}".encode()).hexdigest()
 
 
