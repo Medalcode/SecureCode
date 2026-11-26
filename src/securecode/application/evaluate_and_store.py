@@ -1,11 +1,7 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from securecode.adapters.github import (
-    get_gh001_evidence,
-    get_gh002_evidence,
-    get_gh003_evidence,
-)
+from securecode.ports.scm_provider import SCMProviderPort
 from securecode.engine.evaluator import (
     evaluate_gh001,
     evaluate_gh002,
@@ -24,13 +20,15 @@ def evaluate_and_store_gh001(
     branch: str,
     token: str,
     repository: EvaluationRepository,
-    requested_by_user_id: UUID | None = None
+    requested_by_user_id: UUID | None = None,
+    *,
+    scm_provider: SCMProviderPort,
 ) -> PersistedEvaluation:
     """
     Orchestrates evidence acquisition, evaluation, and persistence.
     """
     collected_at = datetime.now(UTC)
-    evidence = get_gh001_evidence(owner, repo, branch, token)
+    evidence = scm_provider.get_gh001_evidence(owner, repo, branch, token)
     evaluated_at = datetime.now(UTC)
     
     rule_def = get_rule_definition("GH-001.json")
@@ -64,13 +62,15 @@ def evaluate_and_store_gh002(
     repo: str,
     token: str,
     repository: EvaluationRepository,
-    requested_by_user_id: UUID | None = None
+    requested_by_user_id: UUID | None = None,
+    *,
+    scm_provider: SCMProviderPort,
 ) -> PersistedEvaluation:
     """
     Orchestrates evidence acquisition, evaluation, and persistence for GH-002.
     """
     collected_at = datetime.now(UTC)
-    evidence = get_gh002_evidence(owner, repo, token)
+    evidence = scm_provider.get_gh002_evidence(owner, repo, token)
     evaluated_at = datetime.now(UTC)
     
     rule_def = get_rule_definition("GH-002.json")
@@ -107,10 +107,12 @@ def evaluate_and_store_gh003(
     token: str,
     repository: EvaluationRepository,
     requested_by_user_id: UUID | None = None,
+    *,
+    scm_provider: SCMProviderPort,
 ) -> PersistedEvaluation:
     """Acquire, evaluate and persist signed-commit policy evidence."""
     collected_at = datetime.now(UTC)
-    evidence = get_gh003_evidence(owner, repo, branch, token)
+    evidence = scm_provider.get_gh003_evidence(owner, repo, branch, token)
     evaluated_at = datetime.now(UTC)
     rule_def = get_rule_definition("GH-003.json")
     status = evaluate_gh003(evidence, rule_def)
