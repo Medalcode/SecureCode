@@ -45,7 +45,7 @@ def _register(client: TestClient, organization: str, username: str) -> None:
 def test_phase5_full_two_organization_flow(monkeypatch):
     monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-that-is-at-least-32-bytes-long")
     monkeypatch.setattr(
-        "securecode.application.evaluate_and_store.get_gh001_evidence",
+        "securecode.adapters.github.get_gh001_evidence",
         lambda *args, **kwargs: GH001Evidence(required_review_approvals=2, dismiss_stale_reviews=True),
     )
     monkeypatch.setattr(
