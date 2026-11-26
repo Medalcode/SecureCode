@@ -213,7 +213,7 @@ def test_api_postgres_integration(engine, session, monkeypatch):
         client = TestClient(app)
         
         # We only mock the external boundary (GitHub)
-        with patch("securecode.application.evaluate_and_store.get_gh001_evidence") as mock_get_evidence:
+        with patch("securecode.adapters.github.get_gh001_evidence") as mock_get_evidence:
             mock_get_evidence.return_value = GH001Evidence(required_review_approvals=2, dismiss_stale_reviews=True)
             
             response = client.post("/api/v1/evaluations/gh-001", json={
