@@ -457,7 +457,7 @@
 
       try {
         await executeEvaluation(state.selectedControl, owner, repository, branch, state.evaluationAbortController.signal);
-        setEvaluatorFeedback('Evaluación finalizada. La evidencia se guardó de forma inmutable.', 'success');
+        setEvaluatorFeedback('Evaluación finalizada. La evidencia se guardó con trazabilidad y hash de integridad.', 'success');
       } catch (err) {
         if (err.name === 'AbortError') {
           setEvaluatorFeedback('La evaluación fue cancelada antes de finalizar. No se registró ningún resultado.', 'neutral');
@@ -979,7 +979,7 @@
     document.getElementById('resultBannerIcon').textContent = '…';
     document.getElementById('resultBannerTitle').textContent = 'Cargando auditoría anterior';
     document.getElementById('resultBannerBadge').textContent = record.control;
-    renderAction('Recuperando la evidencia inmutable almacenada para esta evaluación.');
+    renderAction('Recuperando la evidencia almacenada para esta evaluación.');
     container.classList.add('active');
     container.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }

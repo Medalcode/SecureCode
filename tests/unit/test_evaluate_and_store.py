@@ -9,6 +9,7 @@ from securecode.application.evaluate_and_store import (
     evaluate_and_store_gh002,
     evaluate_and_store_gh003,
 )
+from securecode.adapters.github import GitHubSCMProvider
 from securecode.engine.evaluator import EvaluationStatus
 from securecode.models.gh001 import GH001Evidence
 from securecode.models.gh002 import GH002Evidence
@@ -58,7 +59,7 @@ class RepositorySpy:
         (
             "GH-001",
             evaluate_and_store_gh001,
-            "securecode.application.evaluate_and_store.get_gh001_evidence",
+            "securecode.adapters.github.get_gh001_evidence",
             GH001Evidence(required_review_approvals=2, dismiss_stale_reviews=True),
             ("owner", "repo", "main", "token"),
             "main",
@@ -66,7 +67,7 @@ class RepositorySpy:
         (
             "GH-002",
             evaluate_and_store_gh002,
-            "securecode.application.evaluate_and_store.get_gh002_evidence",
+            "securecode.adapters.github.get_gh002_evidence",
             GH002Evidence(default_branch="trunk", protection_enabled=True),
             ("owner", "repo", "token"),
             "trunk",
@@ -74,7 +75,7 @@ class RepositorySpy:
         (
             "GH-003",
             evaluate_and_store_gh003,
-            "securecode.application.evaluate_and_store.get_gh003_evidence",
+            "securecode.adapters.github.get_gh003_evidence",
             GH003Evidence(branch="release/2026", required_signatures_enabled=True),
             ("owner", "repo", "release/2026", "token"),
             "release/2026",
@@ -86,7 +87,7 @@ def test_orchestrators_acquire_evaluate_persist_and_retrieve(
 ):
     repository = RepositorySpy(control_id, evidence)
     with patch(patch_target, return_value=evidence) as acquire:
-        persisted = function(*args, repository=repository)
+        persisted = function(*args, repository=repository, scm_provider=GitHubSCMProvider())
 
     acquire.assert_called_once()
     assert repository.saved is not None
@@ -102,19 +103,19 @@ def test_orchestrators_acquire_evaluate_persist_and_retrieve(
     [
         (
             evaluate_and_store_gh001,
-            "securecode.application.evaluate_and_store.get_gh001_evidence",
+            "securecode.adapters.github.get_gh001_evidence",
             GH001Evidence(required_review_approvals=None, dismiss_stale_reviews=None),
             ("owner", "repo", "main", "token"),
         ),
         (
             evaluate_and_store_gh002,
-            "securecode.application.evaluate_and_store.get_gh002_evidence",
+            "securecode.adapters.github.get_gh002_evidence",
             GH002Evidence(default_branch="", protection_enabled=None),
             ("owner", "repo", "token"),
         ),
         (
             evaluate_and_store_gh003,
-            "securecode.application.evaluate_and_store.get_gh003_evidence",
+            "securecode.adapters.github.get_gh003_evidence",
             GH003Evidence(branch="main", required_signatures_enabled=None),
             ("owner", "repo", "main", "token"),
         ),
@@ -124,4 +125,4 @@ def test_orchestrators_reject_unreadable_persisted_result(function, patch_target
     repository = RepositorySpy("GH-001", evidence)
     repository.return_none = True
     with patch(patch_target, return_value=evidence), pytest.raises(RuntimeError, match="could not be retrieved"):
-        function(*args, repository=repository)
+        function(*args, repository=repository, scm_provider=GitHubSCMProvider())
