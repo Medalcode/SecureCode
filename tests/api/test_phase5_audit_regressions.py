@@ -49,13 +49,13 @@ def test_phase5_full_two_organization_flow(monkeypatch):
         lambda *args, **kwargs: GH001Evidence(required_review_approvals=2, dismiss_stale_reviews=True),
     )
     monkeypatch.setattr(
-        "securecode.application.evaluate_and_store.get_gh002_evidence",
+        "securecode.adapters.github.get_gh002_evidence",
         lambda *args, **kwargs: SimpleNamespace(
             default_branch="main", protection_enabled=True, canonical_hash=lambda: "d" * 64
         ),
     )
     monkeypatch.setattr(
-        "securecode.application.evaluate_and_store.get_gh003_evidence",
+        "securecode.adapters.github.get_gh003_evidence",
         lambda *args, **kwargs: SimpleNamespace(
             branch="main", required_signatures_enabled=False, canonical_hash=lambda: "e" * 64
         ),
