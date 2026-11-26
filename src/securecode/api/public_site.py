@@ -60,7 +60,7 @@ def _footer() -> str:
         '<a class="public-brand" href="/"><img class="public-mark" src="/static/public/securecode-mark.svg" alt=""><span>SecureCode</span></a>'
         "<p>Evaluación verificable de controles para repositorios de código.</p></div>"
         '<nav aria-label="Documentos legales">' + legal_links + "</nav>"
-        '<p class="footer-note">Proyecto académico · ' + SITE_UPDATED_AT + "</p></footer>"
+        '<p class="footer-note">Desarrollado por Jonatthan Medalla y José Mora<br>Proyecto académico · ' + SITE_UPDATED_AT + "</p></footer>"
     )
 
 
@@ -120,6 +120,7 @@ ABOUT = """
 <section class="page-hero"><p class="eyebrow">SOBRE SECURECODE</p><h1>Gobierno de cambios con evidencia que se puede revisar.</h1><p>SecureCode es un proyecto académico que demuestra una plataforma de evaluación automatizada para políticas de repositorios de código.</p></section>
 <section class="content-grid"><article><h2>Propósito</h2><p>Reducir la distancia entre una política declarada y la evidencia técnica que permite comprobarla.</p></article><article><h2>Principios</h2><p>Privilegio mínimo, trazabilidad, decisiones reproducibles y separación entre la plataforma, cada organización y sus analistas.</p></article><article><h2>Alcance actual</h2><p>La plataforma incluye controles canónicos de revisión de cambios, protección de rama y firmas de commits.</p></article></section>
 <section class="prose"><h2>Una base mantenible</h2><p>La solución separa la interfaz pública, la consola autenticada, las reglas declarativas y los adaptadores de infraestructura. Esta división permite evolucionar cada área sin convertir la aplicación en una única pieza difícil de probar.</p></section>
+<section class="prose"><h2>Acerca de SecureCode</h2><p>Desarrollado por Jonatthan Medalla y José Mora.</p><p>Proyecto académico · Ingeniería Informática · INACAP · 2026</p></section>
 """
 
 CONTACT = """
