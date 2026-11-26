@@ -75,6 +75,15 @@ def test_public_information_and_legal_pages_are_available():
             assert "Borrador académico" in response.text
 
 
+def test_public_credits_and_about_page():
+    for route in ("/", "/nosotros"):
+        response = client.get(route)
+        assert "Desarrollado por Jonatthan Medalla y José Mora" in response.text
+    about = client.get("/nosotros").text
+    assert "Acerca de SecureCode" in about
+    assert "Proyecto académico · Ingeniería Informática · INACAP · 2026" in about
+
+
 def test_unknown_legal_page_returns_not_found():
     assert client.get("/legal/no-existe").status_code == 404
 
