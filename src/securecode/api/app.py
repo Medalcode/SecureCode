@@ -23,6 +23,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from securecode.adapters.github import GitHubSCMProvider
 from securecode.adapters.postgres.models import (
     AccountActionToken,
     EnterpriseTrialRepository,
@@ -2631,7 +2632,8 @@ def evaluate_gh001_endpoint(
             branch=request.branch,
             token=github_token,
             repository=repo,
-            requested_by_user_id=current_user.id
+            requested_by_user_id=current_user.id,
+            scm_provider=GitHubSCMProvider(),
         )
         _complete_trial_evaluation(session, reservation_id, persisted.id)
         _record_evaluation_success("GH-001", persisted, started)
@@ -2726,7 +2728,8 @@ def evaluate_gh002_endpoint(
             repo=request.repository,
             token=github_token,
             repository=repo,
-            requested_by_user_id=current_user.id
+            requested_by_user_id=current_user.id,
+            scm_provider=GitHubSCMProvider(),
         )
         _complete_trial_evaluation(session, reservation_id, persisted.id)
         _record_evaluation_success("GH-002", persisted, started)
@@ -2804,6 +2807,7 @@ def evaluate_gh003_endpoint(
             token=github_token,
             repository=repository,
             requested_by_user_id=current_user.id,
+            scm_provider=GitHubSCMProvider(),
         )
         _complete_trial_evaluation(session, reservation_id, persisted.id)
         _record_evaluation_success("GH-003", persisted, started)
