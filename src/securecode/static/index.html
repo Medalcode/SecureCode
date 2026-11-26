@@ -11,7 +11,7 @@
   <script src="/static/js/theme-init.js"></script>
 
   <!-- Hoja de Estilos Principal -->
-  <link rel="stylesheet" href="/static/css/app.css?v=20261121-explainable-results">
+  <link rel="stylesheet" href="/static/css/app.css?v=20261125-author-credits">
 </head>
 <body>
 
@@ -96,14 +96,20 @@
       </div>
 
       <div class="sidebar-footer">
-        <div class="user-profile" id="btnOpenLogin">
-          <div class="user-avatar" id="userAvatarInitial">?</div>
-          <div class="user-info">
-            <span class="user-name" id="userProfileName">Iniciar sesión</span>
-            <span class="user-role" id="userProfileRole">Acceso seguro requerido</span>
+        <div class="sidebar-account-actions">
+          <div class="user-profile" id="btnOpenLogin">
+            <div class="user-avatar" id="userAvatarInitial">?</div>
+            <div class="user-info">
+              <span class="user-name" id="userProfileName">Iniciar sesión</span>
+              <span class="user-role" id="userProfileRole">Acceso seguro requerido</span>
+            </div>
           </div>
+          <button type="button" class="btn-logout" id="btnLogout" hidden aria-label="Cerrar sesión">Cerrar sesión</button>
         </div>
-        <button type="button" class="btn-logout" id="btnLogout" hidden aria-label="Cerrar sesión">Cerrar sesión</button>
+        <div class="product-credits">
+          <span>Desarrollado por Jonatthan Medalla y José Mora</span>
+          <button class="about-link nav-item" type="button" data-view="about" data-title="Acerca de SecureCode">Acerca de SecureCode</button>
+        </div>
       </div>
     </aside>
 
@@ -786,6 +792,20 @@
             <table class="modern-table"><thead><tr><th>Fecha</th><th>Acción</th><th>Ejecutada por</th><th>Cuenta afectada</th><th>Detalle</th></tr></thead><tbody id="adminAuditBody"></tbody></table>
           </div>
           <div class="security-notice" id="adminAccessNotice">Inicia sesión con una cuenta de administrador para gestionar usuarios.</div>
+        </section>
+
+        <section class="view-panel" id="view-about" aria-labelledby="aboutSecureCodeTitle">
+          <div class="evaluator-hero about-hero">
+            <span class="eyebrow">Proyecto académico</span>
+            <h1 id="aboutSecureCodeTitle">Acerca de <em>SecureCode</em></h1>
+            <p>SecureCode es una plataforma orientada a evaluar controles de seguridad en repositorios de código, facilitando la recopilación de evidencias, la evaluación automatizada y la trazabilidad de los resultados.</p>
+          </div>
+          <div class="about-card">
+            <span class="section-kicker">Desarrollo</span>
+            <h2>Desarrolladores</h2>
+            <p>Jonatthan Medalla y José Mora</p>
+            <div class="about-academic">Proyecto académico · Ingeniería Informática · INACAP · 2026</div>
+          </div>
         </section>
 
       </main>

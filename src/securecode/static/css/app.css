@@ -302,9 +302,39 @@ body {
   padding: 14px 16px;
   border-top: 1px solid var(--border-subtle);
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  background-color: var(--bg-surface);
+}
+
+.sidebar-account-actions {
+  display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: var(--bg-surface);
+  gap: 8px;
+}
+
+.product-credits {
+  color: var(--text-faint);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.about-link.nav-item {
+  display: inline-flex;
+  width: auto;
+  padding: 2px 0;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.about-link.nav-item:hover,
+.about-link.nav-item.active {
+  background: transparent;
+  color: var(--accent-primary);
 }
 
 .user-profile {
@@ -1376,6 +1406,18 @@ body {
 }
 .evaluator-hero h1 em { color: #0d8674; font-family: Georgia, 'Times New Roman', serif; font-weight: 500; }
 .evaluator-hero p { max-width: 650px; font-size: 17px; line-height: 1.55; color: var(--text-muted); }
+.about-hero { margin-bottom: 28px; }
+.about-card {
+  max-width: 640px;
+  padding: 28px;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 88%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-surface) 92%, transparent);
+  box-shadow: var(--shadow-md);
+}
+.about-card h2 { margin: 12px 0 8px; font-size: 22px; letter-spacing: -.03em; }
+.about-card p { margin: 0; color: var(--text-main); font-size: 16px; font-weight: 650; }
+.about-academic { margin-top: 18px; color: var(--text-muted); font-size: 13px; }
 .hero-signals { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 23px; color: var(--text-muted); font-size: 12px; }
 .hero-signals span { display: inline-flex; align-items: center; gap: 5px; }
 .hero-signals b { color: var(--text-main); font-size: 12px; letter-spacing: .01em; }

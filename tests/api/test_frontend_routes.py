@@ -25,7 +25,7 @@ def test_console_shell_remains_available_at_app_route():
     assert response.headers.get("cache-control") == "no-store, max-age=0"
     assert 'href="/" class="brand-badge"' in response.text
     assert 'aria-label="Ir a la página de inicio de SecureCode"' in response.text
-    assert "/static/css/app.css?v=20261121-explainable-results" in response.text
+    assert "/static/css/app.css?v=20261125-author-credits" in response.text
     assert "/static/js/app.js?v=20261121-explainable-results" in response.text
     assert "Enterprise Trial" in response.text
     assert "enterpriseTrialActivateForm" in response.text
@@ -53,6 +53,10 @@ def test_console_shell_remains_available_at_app_route():
     assert 'id="explanationConditions"' in response.text
     assert 'id="btnDownloadEvaluationPdf"' in response.text
     assert "Validación local verificada" in response.text
+    assert "Desarrollado por Jonatthan Medalla y José Mora" in response.text
+    assert 'data-view="about" data-title="Acerca de SecureCode"' in response.text
+    assert 'id="view-about"' in response.text
+    assert "Proyecto académico · Ingeniería Informática · INACAP · 2026" in response.text
 
 
 def test_public_information_and_legal_pages_are_available():
