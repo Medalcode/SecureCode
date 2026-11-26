@@ -220,3 +220,22 @@ def get_gh003_evidence(
     if signatures_status == 404:
         return GH003Evidence(branch=branch, required_signatures_enabled=False)
     return GH003Evidence(branch=branch, required_signatures_enabled=None)
+
+
+class GitHubSCMProvider:
+    """GitHub implementation of the vendor-neutral SCMProviderPort."""
+
+    def get_gh001_evidence(
+        self, owner: str, repo: str, branch: str, token: str | None = None,
+    ) -> GH001Evidence:
+        return get_gh001_evidence(owner, repo, branch, token)
+
+    def get_gh002_evidence(
+        self, owner: str, repo: str, token: str | None = None,
+    ) -> GH002Evidence:
+        return get_gh002_evidence(owner, repo, token)
+
+    def get_gh003_evidence(
+        self, owner: str, repo: str, branch: str, token: str | None = None,
+    ) -> GH003Evidence:
+        return get_gh003_evidence(owner, repo, branch, token)
