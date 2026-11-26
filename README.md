@@ -12,7 +12,7 @@ Desarrollada mediante metodología **SDD (Specification-Driven Development)**, a
 - **GH-002 (Default Branch Protection Enabled)**: Motor de evaluación determinista que valida si la rama principal del repositorio se encuentra protegida contra sobreescrituras directas.
 - **GH-003 (Signed Commits Required)**: Motor de evaluación determinista que verifica si la rama auditada exige commits firmados.
 - **Adaptadores GitHub REST API**: Adquisición y normalización de evidencia en tiempo real con degradación elegante ante estados no observables (*tri-state*: `PASS`, `FAIL`, `UNKNOWN`).
-- **Persistencia Inmutable en PostgreSQL**: Almacenamiento auditable con trazabilidad criptográfica (hashing canónico SHA-256 de evidencia cruda), integridad referencial estricta y migraciones versionadas con Alembic.
+- **Persistencia auditable en PostgreSQL**: Almacenamiento auditable con trazabilidad criptográfica (hashing canónico SHA-256 de evidencia cruda), integridad referencial estricta y migraciones versionadas con Alembic.
 - **Autenticación y Seguridad**: Hashing de contraseñas con Argon2id, JWT HS256 con `jti` único y sesiones revocables en PostgreSQL, cookie HttpOnly y token CSRF para la consola web, Bearer para clientes API, logout y logout-all, revocación automática al cambiar contraseña o desactivar cuentas, validación de usuarios activos, vinculación de auditoría `requested_by_user_id`, CORS sin credenciales y cabeceras de seguridad para navegador.
 - **Autorización y Auditoría**: tres roles explícitos: `platform_admin` para operación interna de SecureCode, `organization_owner` para gestionar una empresa cliente y `analyst` para evaluar repositorios autorizados. Cada empresa queda aislada por membresías y autorizaciones normalizadas como `owner/repo`.
 - **Frontend SPA Minimalista (Estilo Gemini/ChatGPT)**: Interfaz web oscura/clara sin dependencias pesadas, con selector de controles, visor de evidencia en tiempo real, copia de hash SHA-256, telemetría del sistema, simulación en Sandbox y panel FinOps.
@@ -184,7 +184,7 @@ La interfaz no acepta ni guarda PATs de GitHub. La credencial de integración se
 
 ### Prerrequisitos
 
-1. Base de datos PostgreSQL accesible desde Cloud Run (Supabase, Cloud SQL, Neon, etc.).
+1. Base de datos PostgreSQL accesible desde Cloud Run (Supabase o Cloud SQL, por ejemplo).
 2. Migraciones aplicadas contra la base de datos de producción (ver sección anterior).
 3. Secretos creados en Google Cloud Secret Manager.
 
